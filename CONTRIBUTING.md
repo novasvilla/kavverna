@@ -7,15 +7,17 @@ job rather than a trek through the whole application.
 
 Three pieces, in this order:
 
-1. **A descriptor.** Add a variant to `Feature` in `domain/feature-catalog` and fill in its
-   entry in `describe()`. Both are exhaustive matches with no wildcard arm, so the compiler
-   tells you exactly what is missing. The catalogue depends on no feature crate: naming a
-   feature can never drag its code in.
-2. **A crate under `features/`** that does the work and knows nothing about Qt. It should be
+1. **A crate under `features/`** that does the work and knows nothing about Qt. It should be
    testable with plain `cargo test`, without a display. If it needs Qt, the boundary is in the
    wrong place.
+2. **A descriptor.** Add a variant to `Feature` in `domain/feature-catalog` and fill in its
+   entry in `describe()`. Both are exhaustive matches with no wildcard arm, so the compiler
+   tells you exactly what is missing, and the settings keys come from there rather than being
+   written out twice. The catalogue depends on no feature crate: naming a feature can never
+   drag its code in.
 3. **A section under `apps/kavverna-shell/qml/MenuPanel/`,** one file, plus a bridge object in
-   `src/` that turns a snapshot into properties QML can read.
+   `src/` that turns a snapshot into properties QML can read. A state module beside it owns the
+   thread and publishes snapshots, following `clipboard_state.rs`.
 
 Two rules are not negotiable. Only `apps/kavverna-shell` may depend on Qt, and
 `domain/feature-catalog` may never depend on a feature crate.

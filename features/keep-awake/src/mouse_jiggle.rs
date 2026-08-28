@@ -136,13 +136,20 @@ impl MouseJiggle {
         self.keystroke = keystroke;
     }
 
+    /// The binary alone is not enough. Without `ydotoold` running and a socket it can reach,
+    /// every nudge fails and the switch would sit there looking as if it worked.
     pub fn is_available() -> bool {
-        Command::new("ydotool")
-            .arg("--help")
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .is_ok()
+        let socket = std::env::var_os("YDOTOOL_SOCKET")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp/.ydotool_socket"));
+
+        socket.exists()
+            && Command::new("ydotool")
+                .arg("--help")
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .is_ok()
     }
 
     pub fn nudges(&self) -> u32 {

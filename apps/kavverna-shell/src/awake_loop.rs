@@ -1,8 +1,7 @@
 use crate::command::Command;
-use crate::tray::StatusIcon;
+use crate::tray::{StatusIcon, TrayIcon};
 use crate::{awake_state, jiggle_state, panel, settings};
 use keep_awake::{Activity, Hold, KeepAwake, Keystroke, MouseJiggle, Scope, Trigger};
-use ksni::blocking::Handle;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 
@@ -10,7 +9,7 @@ const TICK: Duration = Duration::from_secs(1);
 
 /// Runs on its own thread with a current-thread runtime, so neither Qt's event loop nor
 /// ksni's has to accommodate it.
-pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
+pub fn run(commands: Receiver<Command>, tray: TrayIcon) {
     let runtime = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
         Ok(runtime) => runtime,
         Err(err) => {
@@ -98,7 +97,7 @@ pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
         awake_state::set_hold(active, remaining);
         panel::publish_awake(active, remaining);
 
-        if let Some(tray) = tray.as_ref() {
+        if let Some(tray) = tray.lock().ok().and_then(|held| held.clone()) {
             tray.update(move |icon: &mut StatusIcon| {
                 icon.awake = active;
                 icon.remaining = remaining;

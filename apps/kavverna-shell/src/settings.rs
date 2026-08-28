@@ -1,23 +1,30 @@
+use feature_catalog::Feature;
 use preferences::Preferences;
 use std::sync::{Mutex, MutexGuard};
 
+/// A feature's switch is named once, in the catalogue, so the key that decides whether it runs
+/// and the key the settings page writes cannot drift apart.
+const fn enable_key(feature: Feature) -> &'static str {
+    feature.describe().enable_keys[0]
+}
+
 pub const ALLOW_DISPLAY_SLEEP: &str = "keep-awake.allow-display-sleep";
 pub const RESTORE_ON_START: &str = "keep-awake.restore-on-start";
-pub const MOUSE_JIGGLE: &str = "mouse-jiggle.enabled";
+pub const MOUSE_JIGGLE: &str = enable_key(Feature::MouseJiggle);
 pub const JIGGLE_SHORTEST: &str = "mouse-jiggle.shortest-minutes";
 pub const JIGGLE_LONGEST: &str = "mouse-jiggle.longest-minutes";
 pub const JIGGLE_ACTIVITY: &str = "mouse-jiggle.activity";
 pub const JIGGLE_KEYSTROKE: &str = "mouse-jiggle.keystroke";
 pub const DEFAULT_MINUTES: &str = "keep-awake.default-minutes";
 pub const MIDDLE_CLICK_TOGGLE: &str = "keep-awake.middle-click-toggle";
-pub const CLIPBOARD_ENABLED: &str = "clipboard-history.enabled";
+pub const CLIPBOARD_ENABLED: &str = enable_key(Feature::ClipboardHistory);
 pub const CLIPBOARD_LIMIT: &str = "clipboard-history.limit";
 pub const CLIPBOARD_IMAGES_AND_FILES: &str = "clipboard-history.images-and-files";
 pub const CLIPBOARD_SKIP_SENSITIVE: &str = "clipboard-history.skip-sensitive";
 pub const CLEAR_AFTER_SECONDS: &str = "clipboard-auto-clear.after-seconds";
 pub const CLEAR_ON_SUSPEND: &str = "clipboard-auto-clear.on-suspend";
 pub const CLEAR_ON_SCREEN_LOCK: &str = "clipboard-auto-clear.on-screen-lock";
-pub const CLEAN_LINKS: &str = "clean-url.enabled";
+pub const CLEAN_LINKS: &str = enable_key(Feature::CleanUrl);
 
 pub const ALLOW_DISPLAY_SLEEP_DEFAULT: bool = true;
 pub const RESTORE_ON_START_DEFAULT: bool = false;

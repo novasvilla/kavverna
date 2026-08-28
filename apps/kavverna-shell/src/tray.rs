@@ -166,14 +166,39 @@ impl Tray for StatusIcon {
     }
 }
 
-/// Fails when no StatusNotifierItem host is running, which on a bare session is expected
-/// rather than fatal.
-pub fn show() -> Option<Handle<StatusIcon>> {
-    match StatusIcon::default().spawn() {
-        Ok(handle) => Some(handle),
-        Err(err) => {
-            tracing::warn!(%err, "no StatusNotifierItem host, running without a tray icon");
-            None
+/// Filled in as soon as a host answers, which on a session started from autostart is usually
+/// not on the first try.
+pub type TrayIcon = std::sync::Arc<std::sync::Mutex<Option<Handle<StatusIcon>>>>;
+
+/// Returns at once and keeps asking in the background. Blocking here would hold the interface
+/// back on exactly the session where the panel is still starting, and one attempt would leave
+/// the application running with no way to reach it.
+pub fn show() -> TrayIcon {
+    const ATTEMPTS: u32 = 60;
+    const BETWEEN: std::time::Duration = std::time::Duration::from_millis(500);
+
+    let icon: TrayIcon = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let filling = std::sync::Arc::clone(&icon);
+
+    std::thread::spawn(move || {
+        for attempt in 1..=ATTEMPTS {
+            match StatusIcon::default().spawn() {
+                Ok(handle) => {
+                    if let Ok(mut held) = filling.lock() {
+                        *held = Some(handle);
+                    }
+                    if attempt > 1 {
+                        tracing::info!(attempt, "the tray host answered eventually");
+                    }
+                    return;
+                }
+                Err(err) if attempt == ATTEMPTS => {
+                    tracing::warn!(%err, "no StatusNotifierItem host, running without a tray icon");
+                }
+                Err(_) => std::thread::sleep(BETWEEN),
+            }
         }
-    }
+    });
+
+    icon
 }

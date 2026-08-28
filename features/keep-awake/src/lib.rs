@@ -94,6 +94,20 @@ impl KeepAwake {
         })
     }
 
+    async fn drop_policy_inhibition(&self, cookie: Option<u32>) {
+        let Some(cookie) = cookie else {
+            return;
+        };
+        match PolicyAgentProxy::new(&self.session).await {
+            Ok(agent) => {
+                if let Err(err) = agent.release_inhibition(cookie).await {
+                    tracing::error!(%err, cookie, "an inhibition was left registered");
+                }
+            }
+            Err(err) => tracing::error!(%err, cookie, "an inhibition was left registered"),
+        }
+    }
+
     pub fn is_active(&self) -> bool {
         self.hold.is_some()
     }
@@ -148,20 +162,45 @@ impl KeepAwake {
             }
         };
 
+        // Anything that fails from here leaves the inhibition above registered with nobody
+        // holding it, and a machine that never sleeps again until it is restarted. Each step
+        // hands back what it has taken before it gives up.
         let logind_hold = match policy_cookie {
             Some(_) => None,
-            None => {
-                let logind = Login1ManagerProxy::new(&self.system).await?;
-                Some(logind.inhibit(Scope::LOGIND_WHAT, &self.who, &why, "block").await?)
-            }
+            None => match Login1ManagerProxy::new(&self.system).await {
+                Ok(logind) => {
+                    match logind.inhibit(Scope::LOGIND_WHAT, &self.who, &why, "block").await {
+                        Ok(hold) => Some(hold),
+                        Err(err) => {
+                            self.drop_policy_inhibition(policy_cookie).await;
+                            return Err(err.into());
+                        }
+                    }
+                }
+                Err(err) => {
+                    self.drop_policy_inhibition(policy_cookie).await;
+                    return Err(err.into());
+                }
+            },
         };
 
         let screen_saver_cookie = match scope {
             Scope::SystemOnly => None,
-            Scope::SystemAndDisplay => {
-                let screen_saver = ScreenSaverProxy::new(&self.session).await?;
-                Some(screen_saver.inhibit(&self.who, &why).await?)
-            }
+            Scope::SystemAndDisplay => match ScreenSaverProxy::new(&self.session).await {
+                Ok(screen_saver) => match screen_saver.inhibit(&self.who, &why).await {
+                    Ok(cookie) => Some(cookie),
+                    Err(err) => {
+                        drop(logind_hold);
+                        self.drop_policy_inhibition(policy_cookie).await;
+                        return Err(err.into());
+                    }
+                },
+                Err(err) => {
+                    drop(logind_hold);
+                    self.drop_policy_inhibition(policy_cookie).await;
+                    return Err(err.into());
+                }
+            },
         };
 
         self.hold = Some(ActiveHold {

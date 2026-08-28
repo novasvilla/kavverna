@@ -16,35 +16,35 @@ are never summed into one figure.
 Crate boundaries enforce what would otherwise be convention.
 
 ```
-domain/feature-catalog    Feature enum and descriptors. Depends on no feature crate.
-domain/feature-runtime    Service traits and the reconciling registry.
-domain/feature-assembly   The only crate that depends on every feature. Builds services.
-domain/preferences        Settings store, registered defaults, migrations, backup.
-domain/private-store      XDG file storage, 0700 dirs and 0600 files.
-domain/shortcut-registry  Shortcut roles behind a swappable backend.
-desktop/kde-bridge        Every zbus proxy: logind, ScreenSaver, Solid, notifications.
-features/*                One crate per feature. No Qt.
-apps/kavverna-shell       The only crate that knows Qt. QObjects, QML, tray.
-panel/                    Plasma applet for live readouts, reads over D-Bus.
+domain/feature-catalog    Feature enum and descriptors, including each one's settings keys.
+                          Depends on no feature crate.
+domain/preferences        Settings store: JSON, atomic writes, 0700 dirs and 0600 files.
+desktop/kde-bridge        zbus proxies: KGlobalAccel, logind, ScreenSaver.
+features/*                One crate per feature. No Qt, no display needed to test.
+apps/kavverna-shell       The only crate that knows Qt. QObjects, QML, tray, D-Bus service.
 ```
 
 Two rules follow from this and must hold:
 
-1. **Only `apps/kavverna-shell` may depend on Qt.** Everything under `domain/` and
-   `features/` must compile and test with no display. If a crate needs Qt, the boundary is
-   in the wrong place.
+1. **Only `apps/kavverna-shell` may depend on Qt.** Everything under `domain/`, `desktop/` and
+   `features/` must compile and test with no display. If a crate needs Qt, the boundary is in
+   the wrong place.
 2. **`feature-catalog` may never depend on a feature crate.** That is what stops naming a
    feature from pulling its service into the binary.
 
-### Feature lifecycle
+### How a feature runs
 
-Availability ("installed") sits above each feature's own enable keys. Uninstalling clears
-only availability, so reinstalling restores prior configuration.
+Each one is a thread started from `main`, owning its work and publishing snapshots the shell
+pushes into QML. `clipboard_state.rs` is the pattern worth copying: it starts and stops with
+its setting, so switching a feature off really does close what it had open rather than leaving
+it listening quietly.
 
-A service only knows how to start. `FeatureRegistry::reconcile` decides whether it should be
-running, and presence in the registry is what running means. Reconcile is idempotent, so it
-can be called after any settings change. Adding a `Feature` variant fails the build in
-`describe` and in the assembly, both of which are exhaustive `match` with no wildcard arm.
+A feature's enable key is named once, in the catalogue, and `settings.rs` reads it from there.
+Writing it out a second time is how the switch and the thing it switches drift apart.
+
+There was a `feature-runtime` crate with a reconciling registry and an availability layer above
+the enable keys, taken from the reference application. Nothing ever used it, so it is gone. It
+is in the history if the two-layer model turns out to be wanted.
 
 ## Conventions
 

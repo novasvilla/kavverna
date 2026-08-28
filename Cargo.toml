@@ -4,7 +4,6 @@ members = [
     "apps/kavverna-shell",
     "desktop/kde-bridge",
     "domain/feature-catalog",
-    "domain/feature-runtime",
     "domain/preferences",
     "features/clipboard-history",
     "features/keep-awake",
@@ -79,7 +78,6 @@ clipboard-history = { path = "features/clipboard-history" }
 feature-catalog = { path = "domain/feature-catalog" }
 kde-bridge = { path = "desktop/kde-bridge" }
 link-cleaner = { path = "features/link-cleaner" }
-feature-runtime = { path = "domain/feature-runtime" }
 keep-awake = { path = "features/keep-awake" }
 preferences = { path = "domain/preferences" }
 sound-mixer = { path = "features/sound-mixer" }
