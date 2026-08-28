@@ -1428,6 +1428,7 @@ dependencies = [
  "cxx-qt-lib",
  "directories",
  "feature-catalog",
+ "kde-bridge",
  "keep-awake",
  "ksni",
  "notify-rust",
@@ -1439,6 +1440,16 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "zbus",
+]
+
+[[package]]
+name = "kde-bridge"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "thiserror 2.0.20",
+ "tracing",
  "zbus",
 ]
 

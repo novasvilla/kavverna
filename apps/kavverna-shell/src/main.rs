@@ -6,6 +6,7 @@ mod clipboard_view;
 mod command;
 mod jiggle_state;
 mod launch_at_login;
+mod shortcuts;
 mod mixer_state;
 mod mixer_view;
 mod settings;
@@ -50,6 +51,8 @@ fn main() {
 
     let (sender, requests) = std::sync::mpsc::channel();
     command::publish(sender);
+
+    shortcuts::serve(bus.handle().clone());
 
     let tray = tray::show();
     std::thread::spawn(move || awake_loop::run(requests, tray));

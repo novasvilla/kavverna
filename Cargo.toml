@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "apps/kavverna-shell",
+    "desktop/kde-bridge",
     "domain/feature-catalog",
     "domain/feature-runtime",
     "domain/preferences",
@@ -62,6 +63,7 @@ ksni = { version = "0.3.6", features = ["blocking"] }
 notify-rust = { version = "4.18.0", default-features = false, features = ["d"] }
 
 fastrand = "2.5.0"
+futures-util = "0.3.34"
 
 # Diagnostics
 anyhow = "1.0.104"
@@ -74,6 +76,7 @@ strum = "0.28.0"
 strum_macros = "0.28.0"
 clipboard-history = { path = "features/clipboard-history" }
 feature-catalog = { path = "domain/feature-catalog" }
+kde-bridge = { path = "desktop/kde-bridge" }
 feature-runtime = { path = "domain/feature-runtime" }
 keep-awake = { path = "features/keep-awake" }
 preferences = { path = "domain/preferences" }

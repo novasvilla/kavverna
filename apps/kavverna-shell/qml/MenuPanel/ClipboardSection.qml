@@ -1,3 +1,4 @@
+import QtQml
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -9,8 +10,52 @@ ColumnLayout {
     required property var theme
     required property var clipboard
 
+    /// Which row the keyboard is on. Reset whenever the list changes, since the row that was
+    /// under the selection may no longer be there.
+    property int selected: 0
+    readonly property int rowCount: clipboard.row_ids.length
+
+    signal picked()
+
+    onRowCountChanged: selected = 0
+
+    function choose(index) {
+        if (index >= 0 && index < section.rowCount) {
+            section.clipboard.put_back(section.clipboard.row_ids[index]);
+            section.picked();
+        }
+    }
+
     Layout.fillWidth: true
     spacing: 12
+
+    Shortcut {
+        sequence: "Down"
+        enabled: section.visible && section.rowCount > 0
+        onActivated: section.selected = Math.min(section.selected + 1, section.rowCount - 1)
+    }
+
+    Shortcut {
+        sequence: "Up"
+        enabled: section.visible && section.rowCount > 0
+        onActivated: section.selected = Math.max(section.selected - 1, 0)
+    }
+
+    Shortcut {
+        sequences: ["Return", "Enter"]
+        enabled: section.visible && section.rowCount > 0
+        onActivated: section.choose(section.selected)
+    }
+
+    Instantiator {
+        model: 9
+        delegate: Shortcut {
+            required property int index
+            sequence: "Ctrl+" + (index + 1)
+            enabled: section.visible
+            onActivated: section.choose(index)
+        }
+    }
 
     SectionLabel {
         theme: section.theme
@@ -67,6 +112,8 @@ ColumnLayout {
                     enabled: section.clipboard.row_ids.length > 0
                              || section.clipboard.query.length > 0
                     onTextEdited: section.clipboard.search(text)
+                    // Opened by the shortcut, the first thing anyone does is type.
+                    onVisibleChanged: if (visible) forceActiveFocus()
 
                     background: Rectangle {
                         radius: 6
@@ -143,12 +190,18 @@ ColumnLayout {
                         readonly property bool pinned: section.clipboard.row_pinned[index]
                         readonly property string kind: section.clipboard.row_kinds[index]
 
+                        readonly property bool onIt: section.selected === row.index
+
                         Layout.fillWidth: true
                         implicitHeight: line.implicitHeight + 16
                         radius: 8
-                        color: hover.hovered ? section.theme.selected : section.theme.sunken
+                        color: hover.hovered || row.onIt ? section.theme.selected
+                                                         : section.theme.sunken
+                        border.width: row.onIt ? 1 : 0
+                        border.color: section.theme.accent
 
                         HoverHandler { id: hover }
+                        TapHandler { onTapped: section.choose(row.index) }
 
                         ColumnLayout {
                             id: line
@@ -253,14 +306,26 @@ ColumnLayout {
                                 }
                             }
 
-                            Label {
+                            RowLayout {
                                 Layout.fillWidth: true
                                 visible: !hover.hovered
-                                horizontalAlignment: Text.AlignRight
-                                text: new Date(section.clipboard.row_times[row.index])
-                                      .toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
-                                font.pixelSize: 9
-                                color: section.theme.mutedText
+                                spacing: 6
+
+                                Label {
+                                    visible: row.index < 9
+                                    text: "Ctrl+" + (row.index + 1)
+                                    font.pixelSize: 9
+                                    color: section.theme.mutedText
+                                }
+
+                                Item { Layout.fillWidth: true }
+
+                                Label {
+                                    text: new Date(section.clipboard.row_times[row.index])
+                                          .toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
+                                    font.pixelSize: 9
+                                    color: section.theme.mutedText
+                                }
                             }
                         }
                     }

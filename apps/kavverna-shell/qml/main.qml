@@ -221,6 +221,9 @@ Window {
                 theme: theme
                 clipboard: clipboard
                 visible: !hub.showing_settings && root.page === root.clipboardPage
+                // Choosing an entry puts it on the clipboard, so the panel gets out of the way
+                // for the paste that follows.
+                onPicked: hub.dismiss()
             }
 
             ToolsSection {

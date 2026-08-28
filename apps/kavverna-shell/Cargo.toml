@@ -14,6 +14,7 @@ ksni.workspace = true
 clipboard-history.workspace = true
 feature-catalog.workspace = true
 directories.workspace = true
+kde-bridge.workspace = true
 keep-awake.workspace = true
 notify-rust.workspace = true
 preferences.workspace = true
