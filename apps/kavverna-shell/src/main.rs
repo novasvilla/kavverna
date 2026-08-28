@@ -10,6 +10,8 @@ mod settings;
 mod panel;
 mod remote;
 mod tray;
+mod vitals_state;
+mod vitals_view;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
 
@@ -46,6 +48,9 @@ fn main() {
     let tray = tray::show();
     std::thread::spawn(move || awake_loop::run(requests, tray));
     std::thread::spawn(|| mixer_state::run(mixer_view::publish));
+    std::thread::spawn(|| {
+        vitals_state::run(std::time::Duration::from_secs(2), vitals_view::publish)
+    });
 
     let mut app = QGuiApplication::new();
     let mut engine = QQmlApplicationEngine::new();

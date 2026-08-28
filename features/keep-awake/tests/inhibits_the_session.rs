@@ -10,6 +10,9 @@ fn exclusive() -> MutexGuard<'static, ()> {
     POWER_DAEMON.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+/// Its own identity, so the suite can run while the real application holds an inhibition.
+const TEST_WHO: &str = "Kavverna test suite";
+
 /// Asks the daemon that actually performs the suspend, rather than trusting our own state.
 fn power_daemon_lists_kavverna() -> bool {
     Command::new("busctl")
@@ -22,7 +25,7 @@ fn power_daemon_lists_kavverna() -> bool {
             "ListInhibitions",
         ])
         .output()
-        .map(|out| String::from_utf8_lossy(&out.stdout).contains("Kavverna"))
+        .map(|out| String::from_utf8_lossy(&out.stdout).contains(TEST_WHO))
         .unwrap_or(false)
 }
 
@@ -42,7 +45,7 @@ fn settles_on(expected: bool, probe: fn() -> bool) -> bool {
 async fn the_power_daemon_honours_the_hold() {
     let _exclusive = exclusive();
 
-    let Ok(mut keep_awake) = KeepAwake::connect().await else {
+    let Ok(mut keep_awake) = KeepAwake::connect_as(TEST_WHO).await else {
         eprintln!("skipped: no session bus");
         return;
     };
@@ -74,7 +77,7 @@ async fn the_power_daemon_honours_the_hold() {
 async fn a_lapsed_hold_releases_itself() {
     let _exclusive = exclusive();
 
-    let Ok(mut keep_awake) = KeepAwake::connect().await else {
+    let Ok(mut keep_awake) = KeepAwake::connect_as(TEST_WHO).await else {
         eprintln!("skipped: no session bus");
         return;
     };
@@ -94,7 +97,7 @@ async fn a_lapsed_hold_releases_itself() {
 async fn extending_pushes_the_deadline_out() {
     let _exclusive = exclusive();
 
-    let Ok(mut keep_awake) = KeepAwake::connect().await else {
+    let Ok(mut keep_awake) = KeepAwake::connect_as(TEST_WHO).await else {
         eprintln!("skipped: no session bus");
         return;
     };
@@ -117,7 +120,7 @@ async fn extending_pushes_the_deadline_out() {
 async fn an_indefinite_hold_has_nothing_to_extend() {
     let _exclusive = exclusive();
 
-    let Ok(mut keep_awake) = KeepAwake::connect().await else {
+    let Ok(mut keep_awake) = KeepAwake::connect_as(TEST_WHO).await else {
         eprintln!("skipped: no session bus");
         return;
     };

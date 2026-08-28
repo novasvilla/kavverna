@@ -892,6 +892,7 @@ dependencies = [
  "preferences",
  "sound-mixer",
  "strum",
+ "system-monitor",
  "tempfile",
  "tokio",
  "tracing",

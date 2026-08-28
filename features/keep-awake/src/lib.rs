@@ -74,14 +74,22 @@ pub struct KeepAwake {
     /// logind is a system service; PowerDevil and the screen saver belong to the session.
     system: zbus::Connection,
     session: zbus::Connection,
+    /// How the inhibition identifies itself. Tests give themselves a different one so they
+    /// can run while the real application is holding its own.
+    who: String,
     hold: Option<ActiveHold>,
 }
 
 impl KeepAwake {
     pub async fn connect() -> Result<Self> {
+        Self::connect_as(WHO).await
+    }
+
+    pub async fn connect_as(who: &str) -> Result<Self> {
         Ok(Self {
             system: zbus::Connection::system().await?,
             session: zbus::Connection::session().await?,
+            who: who.to_owned(),
             hold: None,
         })
     }
@@ -127,7 +135,7 @@ impl KeepAwake {
         // after the several seconds PowerDevil takes to notice one, and because it can ask
         // for the screen to stay on, which logind has no way to express.
         let policy_cookie = match PolicyAgentProxy::new(&self.session).await {
-            Ok(agent) => match agent.add_inhibition(scope.policy_bits(), WHO, &why).await {
+            Ok(agent) => match agent.add_inhibition(scope.policy_bits(), &self.who, &why).await {
                 Ok(cookie) => Some(cookie),
                 Err(err) => {
                     tracing::error!(%err, "the power daemon refused the inhibition");
@@ -144,7 +152,7 @@ impl KeepAwake {
             Some(_) => None,
             None => {
                 let logind = Login1ManagerProxy::new(&self.system).await?;
-                Some(logind.inhibit(Scope::LOGIND_WHAT, WHO, &why, "block").await?)
+                Some(logind.inhibit(Scope::LOGIND_WHAT, &self.who, &why, "block").await?)
             }
         };
 
@@ -152,7 +160,7 @@ impl KeepAwake {
             Scope::SystemOnly => None,
             Scope::SystemAndDisplay => {
                 let screen_saver = ScreenSaverProxy::new(&self.session).await?;
-                Some(screen_saver.inhibit(WHO, &why).await?)
+                Some(screen_saver.inhibit(&self.who, &why).await?)
             }
         };
 

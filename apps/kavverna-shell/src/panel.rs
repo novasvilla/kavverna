@@ -18,6 +18,7 @@ pub mod qobject {
         #[qml_element]
         #[qproperty(bool, panel_open)]
         #[qproperty(bool, showing_settings)]
+        #[qproperty(i32, page)]
         #[qproperty(bool, awake)]
         #[qproperty(QString, awake_summary)]
         #[qproperty(bool, allow_display_sleep)]
@@ -91,6 +92,7 @@ const DISMISS_GRACE: Duration = Duration::from_millis(400);
 pub struct KavvernaPanelRust {
     panel_open: bool,
     showing_settings: bool,
+    page: i32,
     awake: bool,
     awake_summary: QString,
     allow_display_sleep: bool,
@@ -120,6 +122,7 @@ impl Default for KavvernaPanelRust {
         Self {
             panel_open: false,
             showing_settings: false,
+            page: 0,
             awake: false,
             awake_summary: QString::from("Sleep allowed"),
             allow_display_sleep,
@@ -363,6 +366,27 @@ pub fn open_hub() {
 
     with_panel(|mut panel| {
         panel.as_mut().set_showing_settings(false);
+        panel.as_mut().set_panel_open(true);
+    });
+}
+
+/// Named rather than numbered so a script does not have to know the tab order.
+pub fn open_page(name: &str) {
+    let page = match name {
+        "sound" => 1,
+        "monitoring" => 2,
+        "clipboard" => 3,
+        "tools" => 4,
+        _ => 0,
+    };
+
+    if let Ok(mut at) = DISMISSED_AT.lock() {
+        *at = None;
+    }
+
+    with_panel(move |mut panel| {
+        panel.as_mut().set_showing_settings(false);
+        panel.as_mut().set_page(page);
         panel.as_mut().set_panel_open(true);
     });
 }

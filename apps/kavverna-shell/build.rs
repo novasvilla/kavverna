@@ -11,11 +11,12 @@ const QML: &[&str] = &[
     "qml/Shared/ChoiceRow.qml",
     "qml/MenuPanel/EnergySection.qml",
     "qml/MenuPanel/SoundSection.qml",
+    "qml/MenuPanel/MonitoringSection.qml",
     "qml/MenuPanel/ToolsSection.qml",
     "qml/Settings/SettingsPage.qml",
 ];
 
-const RUST: &[&str] = &["src/panel.rs", "src/mixer_view.rs"];
+const RUST: &[&str] = &["src/panel.rs", "src/mixer_view.rs", "src/vitals_view.rs"];
 
 fn main() {
     // Declared by hand because the builder only tracks the Rust sources, so without this a

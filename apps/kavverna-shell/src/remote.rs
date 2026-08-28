@@ -18,6 +18,11 @@ impl Shell {
         panel::open_hub();
     }
 
+    /// One of energy, sound, monitoring, clipboard or tools.
+    fn show_page(&self, name: String) {
+        panel::open_page(&name);
+    }
+
     fn show_settings(&self) {
         panel::open_settings();
     }

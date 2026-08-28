@@ -11,8 +11,9 @@ Window {
 
     readonly property int energyPage: 0
     readonly property int soundPage: 1
+    readonly property int monitoringPage: 2
     readonly property int toolsPage: 4
-    property int page: energyPage
+    property int page: hub.page
 
     width: 360
     // Two nested margins sit between the layout and the window edge: the card's 6 and the
@@ -45,11 +46,19 @@ Window {
 
     KavvernaPanel {
         id: hub
-        Component.onCompleted: attach()
+        Component.onCompleted: {
+            attach()
+            report_screen(Screen.desktopAvailableWidth, Screen.desktopAvailableHeight)
+        }
     }
 
     MixerView {
         id: mixer
+        Component.onCompleted: attach()
+    }
+
+    VitalsView {
+        id: vitals
         Component.onCompleted: attach()
     }
 
@@ -142,7 +151,8 @@ Window {
                         model: [
                             { glyph: "\u266a", name: "Sound", page: root.soundPage,
                               ready: mixer.available },
-                            { glyph: "\u25f4", name: "Monitoring", page: 2, ready: false },
+                            { glyph: "\u25f4", name: "Monitoring", page: root.monitoringPage,
+                              ready: true },
                             { glyph: "\u2704", name: "Clipboard", page: 3, ready: false },
                             { glyph: "\ud83d\udee0", name: "Tools", page: root.toolsPage,
                               ready: true },
@@ -175,7 +185,7 @@ Window {
                             HoverHandler { id: hover }
                             TapHandler {
                                 enabled: modelData.ready
-                                onTapped: root.page = modelData.page
+                                onTapped: hub.set_page(modelData.page)
                             }
                         }
                     }
@@ -192,6 +202,12 @@ Window {
                 theme: theme
                 mixer: mixer
                 visible: !hub.showing_settings && root.page === root.soundPage
+            }
+
+            MonitoringSection {
+                theme: theme
+                vitals: vitals
+                visible: !hub.showing_settings && root.page === root.monitoringPage
             }
 
             ToolsSection {
