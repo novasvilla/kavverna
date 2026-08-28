@@ -5,6 +5,7 @@ members = [
     "domain/feature-catalog",
     "domain/feature-runtime",
     "domain/preferences",
+    "features/clipboard-history",
     "features/keep-awake",
     "features/sound-mixer",
     "features/system-monitor",
@@ -42,7 +43,6 @@ nix = "0.31.3"
 # Wayland
 wayland-client = "0.31.15"
 wayland-protocols = "0.32.13"
-wl-clipboard-rs = "0.9.3"
 
 # Storage and data
 rusqlite = "0.40.2"
@@ -72,6 +72,7 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 # Feature catalogue
 strum = "0.28.0"
 strum_macros = "0.28.0"
+clipboard-history = { path = "features/clipboard-history" }
 feature-catalog = { path = "domain/feature-catalog" }
 feature-runtime = { path = "domain/feature-runtime" }
 keep-awake = { path = "features/keep-awake" }
