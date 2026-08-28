@@ -3,6 +3,15 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## 0.1.4
+
+### Fixed
+
+- **The settings page ran off the side.** The scrolling area bound its content to the
+  flickable's width rather than to what is visible, so once a scrollbar appeared the right hand
+  edge of every row went past it.
+- The settings file path was printed twice, once loose in the middle of the energy section.
+
 ## 0.1.3
 
 ### Fixed

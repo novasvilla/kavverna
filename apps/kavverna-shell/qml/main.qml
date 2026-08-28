@@ -206,15 +206,22 @@ Window {
             // The settings page is taller than some screens. The chrome stays put and the
             // pages scroll, rather than the window growing past the display.
             ScrollView {
+                id: scroller
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 implicitHeight: pages.implicitHeight
                 contentWidth: availableWidth
                 clip: true
+                // Nothing here is ever meant to be wider than the panel, so a horizontal bar
+                // would only ever mean a page had overflowed.
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
                 ColumnLayout {
                     id: pages
-                    width: parent.width
+                    // The scrollbar takes width off the viewport when it appears. Binding to
+                    // the flickable's own width instead leaves the content wider than what is
+                    // visible, and the right hand side of every row goes off the edge.
+                    width: scroller.availableWidth
                     spacing: 12
 
                 EnergySection {

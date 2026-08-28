@@ -95,13 +95,6 @@ ColumnLayout {
         }
     }
 
-    Label {
-        Layout.fillWidth: true
-        text: page.hub.settings_path
-        font.pixelSize: 9
-        color: page.theme.mutedText
-        elide: Text.ElideMiddle
-    }
 
 
     SectionLabel {
