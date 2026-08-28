@@ -2,3 +2,6 @@
 **/*.rs.bk
 *.pdb
 .cargo/
+
+# Working notes, never published. See CLAUDE.md for how this repo goes public.
+/ROADMAP.md

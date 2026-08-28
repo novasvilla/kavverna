@@ -147,3 +147,14 @@ privileged daemon with a heartbeat that restores automatic mode when the UI stop
 read-back verification after every write (the `nct6799` chip ignores writes silently when
 `pwm_enable` is wrong), an independent thermal watchdog, and a duty floor that never accepts
 zero. Automatic mode is the state to fail toward in every path.
+
+## Publishing
+
+`ROADMAP.md` is a local working file. It is in `.gitignore` and must never be committed: it
+carries half-formed ideas, money questions and notes to self that have no place in a public
+repository. The plan a reader is meant to see lives in the README and in `docs/`.
+
+Earlier commits still contain it. The repository has no remote and has never been pushed, so
+going public means creating the GitHub repository and pushing **one clean commit with no
+history**, not this local history. Check `git log --all --name-only -- ROADMAP.md` comes back
+empty on whatever is about to be pushed.
