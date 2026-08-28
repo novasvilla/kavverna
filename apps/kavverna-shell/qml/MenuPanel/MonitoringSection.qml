@@ -75,7 +75,7 @@ ColumnLayout {
                 label: "CPU  ·  " + section.vitals.cpu_temperature_text
                 value: section.vitals.cpu_load_text
                 fraction: section.vitals.cpu_load
-                tint: section.vitals.cpu_load > 0.9 ? "#E9573D"
+                tint: section.vitals.cpu_load > 0.9 ? section.theme.ember
                     : section.vitals.cpu_load > 0.7 ? section.theme.warm
                                                     : section.theme.accent
             }
@@ -215,7 +215,7 @@ ColumnLayout {
                 label: "VRAM"
                 value: section.vitals.vram_text
                 fraction: section.vitals.vram_used
-                tint: section.vitals.vram_used > 0.9 ? "#E9573D" : section.theme.warm
+                tint: section.vitals.vram_used > 0.9 ? section.theme.ember : section.theme.warm
             }
         }
     }

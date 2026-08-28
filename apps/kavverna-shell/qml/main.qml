@@ -46,7 +46,12 @@ Window {
         onActivated: hub.dismiss()
     }
 
-    Theme { id: theme }
+    // 0 follows the desktop, 1 is the cavern, 2 is its mouth.
+    Theme {
+        id: theme
+        dark: hub.appearance === 0 ? Application.styleHints.colorScheme !== Qt.Light
+                                   : hub.appearance === 1
+    }
 
     KavvernaPanel {
         id: hub
@@ -100,7 +105,7 @@ Window {
                         text: "K"
                         font.pixelSize: 20
                         font.bold: true
-                        color: hub.awake ? theme.warm : theme.accent
+                        color: hub.awake ? theme.accent : theme.secondaryText
                     }
                 }
 
@@ -119,7 +124,7 @@ Window {
                         implicitWidth: pill.implicitWidth + 18
                         implicitHeight: 21
                         radius: 10
-                        color: hub.awake ? Qt.rgba(0.91, 0.71, 0.30, 0.18) : theme.sunken
+                        color: hub.awake ? Qt.alpha(theme.accent, 0.18) : theme.sunken
 
                         RowLayout {
                             id: pill

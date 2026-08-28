@@ -33,6 +33,7 @@ pub mod qobject {
         #[qproperty(bool, timed)]
         #[qproperty(bool, jiggle_available)]
         #[qproperty(QString, jiggle_status)]
+        #[qproperty(i32, appearance)]
         #[qproperty(bool, launch_at_login)]
         #[qproperty(QString, settings_path)]
         #[qproperty(QString, version)]
@@ -71,6 +72,8 @@ pub mod qobject {
         #[qinvokable]
         fn choose_default_minutes(self: Pin<&mut KavvernaPanel>, minutes: i32);
         #[qinvokable]
+        fn choose_appearance(self: Pin<&mut KavvernaPanel>, appearance: i32);
+        #[qinvokable]
         fn choose_middle_click_toggle(self: Pin<&mut KavvernaPanel>, toggle: bool);
         #[qinvokable]
         fn extend_minutes(self: Pin<&mut KavvernaPanel>, minutes: i32);
@@ -103,6 +106,7 @@ pub struct KavvernaPanelRust {
     timed: bool,
     jiggle_available: bool,
     jiggle_status: QString,
+    appearance: i32,
     launch_at_login: bool,
     settings_path: QString,
     version: QString,
@@ -153,6 +157,10 @@ impl Default for KavvernaPanelRust {
             timed: false,
             jiggle_available: keep_awake::MouseJiggle::is_available(),
             jiggle_status: QString::from("Off"),
+            appearance: as_i32(
+                settings::integer_at(settings::APPEARANCE, settings::APPEARANCE_DEFAULT),
+                0,
+            ),
             launch_at_login: launch_at_login::is_enabled(),
             settings_path: QString::from(&settings_location()),
             version: QString::from(&format!(
@@ -281,6 +289,11 @@ impl qobject::KavvernaPanel {
             settings::put_integer(settings::JIGGLE_SHORTEST, i64::from(minutes));
             self.as_mut().set_jiggle_shortest(minutes);
         }
+    }
+
+    fn choose_appearance(mut self: Pin<&mut Self>, appearance: i32) {
+        settings::put_integer(settings::APPEARANCE, i64::from(appearance));
+        self.as_mut().set_appearance(appearance);
     }
 
     fn choose_jiggle_activity(mut self: Pin<&mut Self>, activity: i32) {

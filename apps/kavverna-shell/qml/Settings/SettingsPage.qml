@@ -43,6 +43,19 @@ ColumnLayout {
                 on: page.hub.restore_on_start
                 onToggled: (value) => page.hub.choose_restore_on_start(value)
             }
+
+            ChoiceRow {
+                theme: page.theme
+                title: "Appearance"
+                detail: "Follow the desktop, or pick a side."
+                choices: [
+                    { label: "Follow", value: 0 },
+                    { label: "Dark", value: 1 },
+                    { label: "Light", value: 2 }
+                ]
+                current: page.hub.appearance
+                onPicked: (value) => page.hub.choose_appearance(value)
+            }
         }
     }
 
