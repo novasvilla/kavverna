@@ -92,11 +92,15 @@ impl qobject::MixerView {
     }
 
     fn set_stream_volume(self: Pin<&mut Self>, node_id: i32, percent: i32) {
-        send_volume(node_id, percent);
+        for sibling in siblings(node_id) {
+            send_volume(sibling, percent);
+        }
     }
 
     fn mute_stream(self: Pin<&mut Self>, node_id: i32, muted: bool) {
-        send_mute(node_id, muted);
+        for sibling in siblings(node_id) {
+            send_mute(sibling, muted);
+        }
     }
 
     fn set_output_volume(self: Pin<&mut Self>, node_id: i32, percent: i32) {
@@ -131,11 +135,11 @@ impl qobject::MixerView {
         let mut volumes = QList::<i32>::default();
         let mut muted = QList::<bool>::default();
 
-        for stream in &snapshot.streams {
-            names.append(QString::from(&stream.name));
-            ids.append(stream.node_id as i32);
-            volumes.append(stream.volume.percent().round() as i32);
-            muted.append(stream.muted);
+        for application in &snapshot.applications() {
+            names.append(QString::from(&application.name));
+            ids.append(application.node_ids[0] as i32);
+            volumes.append(application.volume.percent().round() as i32);
+            muted.append(application.muted);
         }
 
         self.as_mut().set_stream_names(names);
@@ -182,6 +186,14 @@ impl qobject::MixerView {
         self.as_mut().set_inputs_muted(snapshot.every_input_muted());
         self.as_mut().set_available(mixer_state::is_running());
     }
+}
+
+/// An application's streams move together, since PipeWire gives them nothing to tell apart.
+fn siblings(node_id: i32) -> Vec<i32> {
+    let Ok(node_id) = u32::try_from(node_id) else {
+        return Vec::new();
+    };
+    mixer_state::get().streams_beside(node_id).into_iter().map(|id| id as i32).collect()
 }
 
 /// Devices are addressed by name rather than node id, which is recycled between runs.

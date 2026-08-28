@@ -30,6 +30,18 @@ pub struct AudioDevice {
     pub is_default: bool,
 }
 
+/// One row in the mixer. An application can hold several streams at once, and PipeWire gives
+/// them nothing to tell apart: Vesktop's two playbacks are both called Playback. Showing them
+/// separately gives two identical rows and no way to choose, so they move together.
+#[derive(Debug, Clone)]
+pub struct AudioApplication {
+    pub key: AppKey,
+    pub name: String,
+    pub node_ids: Vec<u32>,
+    pub volume: Volume,
+    pub muted: bool,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct MixerSnapshot {
     pub streams: Vec<AudioStream>,
@@ -38,6 +50,46 @@ pub struct MixerSnapshot {
 }
 
 impl MixerSnapshot {
+    /// Grouped by application, in the order the streams first appear, so a new stream from an
+    /// application already listed does not reorder the mixer under the pointer.
+    pub fn applications(&self) -> Vec<AudioApplication> {
+        let mut rows: Vec<AudioApplication> = Vec::new();
+
+        for stream in &self.streams {
+            match rows.iter_mut().find(|row| row.key == stream.key) {
+                Some(row) => {
+                    row.node_ids.push(stream.node_id);
+                    if stream.volume.percent() > row.volume.percent() {
+                        row.volume = stream.volume;
+                    }
+                    row.muted = row.muted && stream.muted;
+                }
+                None => rows.push(AudioApplication {
+                    key: stream.key.clone(),
+                    name: stream.name.clone(),
+                    node_ids: vec![stream.node_id],
+                    volume: stream.volume,
+                    muted: stream.muted,
+                }),
+            }
+        }
+
+        rows
+    }
+
+    /// Every stream an application owns, so a change reaches all of them rather than whichever
+    /// one happened to be listed.
+    pub fn streams_beside(&self, node_id: u32) -> Vec<u32> {
+        let Some(owner) = self.streams.iter().find(|stream| stream.node_id == node_id) else {
+            return vec![node_id];
+        };
+        self.streams
+            .iter()
+            .filter(|stream| stream.key == owner.key)
+            .map(|stream| stream.node_id)
+            .collect()
+    }
+
     pub fn default_output(&self) -> Option<&AudioDevice> {
         self.outputs.iter().find(|device| device.is_default)
     }
@@ -90,6 +142,66 @@ mod tests {
 
     fn snapshot(outputs: Vec<AudioDevice>) -> MixerSnapshot {
         MixerSnapshot { streams: Vec::new(), outputs, inputs: Vec::new() }
+    }
+
+    fn stream(node_id: u32, key: &str, name: &str, percent: f32, muted: bool) -> AudioStream {
+        AudioStream {
+            node_id,
+            key: AppKey::from_refined(key),
+            name: name.into(),
+            volume: Volume::from_percent(percent),
+            muted,
+            target: None,
+        }
+    }
+
+    #[test]
+    fn an_application_with_several_streams_is_one_row() {
+        let mut mixer = MixerSnapshot::default();
+        mixer.streams = vec![
+            stream(67, "vesktop", "Vesktop", 60.0, false),
+            stream(94, "firefox", "Firefox", 100.0, false),
+            stream(111, "vesktop", "Vesktop", 40.0, false),
+        ];
+
+        let rows = mixer.applications();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].name, "Vesktop");
+        assert_eq!(rows[0].node_ids, vec![67, 111]);
+        assert_eq!(rows[1].name, "Firefox");
+    }
+
+    #[test]
+    fn a_row_shows_the_loudest_of_its_streams() {
+        let mut mixer = MixerSnapshot::default();
+        mixer.streams =
+            vec![stream(1, "app", "App", 20.0, false), stream(2, "app", "App", 80.0, false)];
+
+        assert_eq!(mixer.applications()[0].volume.percent().round(), 80.0);
+    }
+
+    #[test]
+    fn a_row_is_muted_only_when_all_of_its_streams_are() {
+        let mut mixer = MixerSnapshot::default();
+        mixer.streams =
+            vec![stream(1, "app", "App", 50.0, true), stream(2, "app", "App", 50.0, false)];
+        assert!(!mixer.applications()[0].muted);
+
+        mixer.streams[1].muted = true;
+        assert!(mixer.applications()[0].muted);
+    }
+
+    #[test]
+    fn a_change_reaches_every_stream_the_application_owns() {
+        let mut mixer = MixerSnapshot::default();
+        mixer.streams =
+            vec![stream(67, "vesktop", "Vesktop", 50.0, false),
+                 stream(94, "firefox", "Firefox", 50.0, false),
+                 stream(111, "vesktop", "Vesktop", 50.0, false)];
+
+        assert_eq!(mixer.streams_beside(67), vec![67, 111]);
+        assert_eq!(mixer.streams_beside(94), vec![94]);
+        assert_eq!(mixer.streams_beside(999), vec![999]);
     }
 
     #[test]
