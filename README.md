@@ -96,8 +96,14 @@ cargo build --release
 ./target/release/kavverna-shell
 ```
 
-A PKGBUILD is in [packaging/](packaging/) for anyone who wants an Arch package today. An AUR
-package will follow once the feature set is worth installing.
+On Arch, [packaging/](packaging/) has a PKGBUILD that builds from the tagged release:
+
+```sh
+cd kavverna/packaging && makepkg -si
+```
+
+An AUR package is prepared and waiting on an account. Prebuilt binaries are attached to each
+[release](https://github.com/novasvilla/kavverna/releases).
 
 ## What you need
 

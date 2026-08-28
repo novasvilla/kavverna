@@ -1,0 +1,21 @@
+pkgbase = kavverna
+	pkgdesc = One tray icon for the utilities a KDE Plasma desktop is missing
+	pkgver = 0.1.1
+	pkgrel = 1
+	url = https://github.com/novasvilla/kavverna
+	arch = x86_64
+	license = GPL-3.0-or-later
+	makedepends = rust
+	makedepends = clang
+	makedepends = pkgconf
+	depends = qt6-base
+	depends = qt6-declarative
+	depends = layer-shell-qt
+	depends = libpipewire
+	depends = sqlite
+	depends = hicolor-icon-theme
+	optdepends = ydotool: synthetic paste, once a feature asks for it
+	source = kavverna-0.1.1.tar.gz::https://github.com/novasvilla/kavverna/archive/refs/tags/v0.1.1.tar.gz
+	sha256sums = 1753651c842951c58d5b33421904f0ad3aad106eb2f8011216a1f18fbc3baf1b
+
+pkgname = kavverna

@@ -11,7 +11,7 @@ depends=('qt6-base' 'qt6-declarative' 'layer-shell-qt' 'libpipewire' 'sqlite' 'h
 makedepends=('rust' 'clang' 'pkgconf')
 optdepends=('ydotool: synthetic paste, once a feature asks for it')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('1753651c842951c58d5b33421904f0ad3aad106eb2f8011216a1f18fbc3baf1b')
 
 build() {
   cd "$pkgname-$pkgver"
