@@ -1,6 +1,19 @@
 use cxx_qt_build::{CxxQtBuilder, QmlModule};
 
-const QML: &[&str] = &["qml/main.qml"];
+/// Mirrors the reference project's split: one file per panel section, one per settings page,
+/// shared controls and design tokens of their own.
+const QML: &[&str] = &[
+    "qml/main.qml",
+    "qml/Theme.qml",
+    "qml/Shared/SectionLabel.qml",
+    "qml/Shared/Card.qml",
+    "qml/Shared/SettingRow.qml",
+    "qml/Shared/ChoiceRow.qml",
+    "qml/MenuPanel/EnergySection.qml",
+    "qml/MenuPanel/SoundSection.qml",
+    "qml/Settings/SettingsPage.qml",
+];
+
 const RUST: &[&str] = &["src/panel.rs", "src/mixer_view.rs"];
 
 fn main() {
