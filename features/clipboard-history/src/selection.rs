@@ -43,6 +43,9 @@ const OWN_MARKER: &str = "application/x-kavverna-internal";
 /// clear timer, so the two fight each other once a second until one gives up.
 const PLASMA_REPLACED_EMPTY: &str = "application/x-kde-onlyReplaceEmpty";
 
+/// Anything here is content in its own right, and a rewrite would take it with it.
+const RICH_TYPES: [&str; 3] = ["text/html", "text/uri-list", "text/rtf"];
+
 const URI_LIST: &str = "text/uri-list";
 const PNG: &str = "image/png";
 const UTF8_TEXT: &str = "text/plain;charset=utf-8";
@@ -74,7 +77,13 @@ pub enum Payload {
 
 #[derive(Debug)]
 pub enum SelectionEvent {
-    Copied { selection: Selection, payload: Payload },
+    Copied {
+        selection: Selection,
+        payload: Payload,
+        /// The offer carried nothing richer than plain text, so replacing it loses nothing a
+        /// person would notice. Taking the selection destroys what the previous owner offered.
+        plain_only: bool,
+    },
     /// Something was copied and deliberately not read, because nothing is keeping it. Auto
     /// clear needs to know a copy happened; it never needs to know what it was.
     Changed(Selection),
@@ -371,8 +380,20 @@ impl Watcher {
             return;
         }
 
+        if !self.policy.read_content.load(Ordering::Relaxed) {
+            offer.destroy();
+            (self.report)(SelectionEvent::Changed(selection));
+            return;
+        }
+
+        let plain_only = !types
+            .iter()
+            .any(|mime| RICH_TYPES.contains(&mime.as_str()) || mime.starts_with("image/"));
+
         match self.read(&offer, &types, conn) {
-            Some(payload) => (self.report)(SelectionEvent::Copied { selection, payload }),
+            Some(payload) => {
+                (self.report)(SelectionEvent::Copied { selection, payload, plain_only })
+            }
             None => tracing::debug!(?types, "nothing worth keeping in this selection"),
         }
         offer.destroy();

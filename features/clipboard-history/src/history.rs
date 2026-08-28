@@ -28,6 +28,7 @@ pub struct Settings {
     pub skip_sensitive: bool,
     pub images_and_files: bool,
     pub clear_after: Option<Duration>,
+    pub clean_links: bool,
 }
 
 impl Default for Settings {
@@ -38,6 +39,7 @@ impl Default for Settings {
             skip_sensitive: true,
             images_and_files: true,
             clear_after: None,
+            clean_links: false,
         }
     }
 }
@@ -182,8 +184,10 @@ fn run(
             Ok(Event::Copied(SelectionEvent::Copied {
                 selection: Selection::Clipboard,
                 payload,
+                plain_only,
             })) => {
                 clearing.noticed_copy(Instant::now());
+                let payload = tidy(&watcher, payload, plain_only, settings);
                 save(&mut store, payload, settings)
             }
             Ok(Event::Copied(SelectionEvent::Changed(Selection::Clipboard))) => {
@@ -226,8 +230,32 @@ fn run(
 /// Short enough that a five second delay is not noticeably late, and idle the rest of the time.
 const TICK: Duration = Duration::from_secs(1);
 
+/// Replaces a copied link with its cleaned version before anything else sees it, so what is
+/// pasted and what is saved are the same thing. Our own write carries the marker the watcher
+/// ignores, so this does not come back around.
+fn tidy(
+    watcher: &SelectionWatcher,
+    payload: Payload,
+    plain_only: bool,
+    settings: Settings,
+) -> Payload {
+    if !settings.clean_links || !plain_only {
+        return payload;
+    }
+    let Payload::Text(text) = &payload else {
+        return payload;
+    };
+    let Some(cleaned) = link_cleaner::clean(text, &link_cleaner::Rules::default()) else {
+        return payload;
+    };
+
+    tracing::info!(removed = ?cleaned.removed, "took the tracking out of a copied link");
+    watcher.offer(Selection::Clipboard, Payload::Text(cleaned.link.clone()));
+    Payload::Text(cleaned.link)
+}
+
 fn apply_policy(policy: &CapturePolicy, settings: Settings) {
-    policy.read_content.store(settings.keep_history, Ordering::Relaxed);
+    policy.read_content.store(settings.keep_history || settings.clean_links, Ordering::Relaxed);
     policy.images_and_files.store(settings.images_and_files, Ordering::Relaxed);
 }
 

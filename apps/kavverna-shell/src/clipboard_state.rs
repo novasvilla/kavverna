@@ -34,6 +34,10 @@ pub fn keeps_history() -> bool {
     settings::bool_at(settings::CLIPBOARD_ENABLED, settings::CLIPBOARD_ENABLED_DEFAULT)
 }
 
+pub fn cleans_links() -> bool {
+    settings::bool_at(settings::CLEAN_LINKS, settings::CLEAN_LINKS_DEFAULT)
+}
+
 pub fn clears_on_suspend() -> bool {
     settings::bool_at(settings::CLEAR_ON_SUSPEND, settings::CLEAR_ON_SUSPEND_DEFAULT)
 }
@@ -47,6 +51,7 @@ pub fn clears_on_screen_lock() -> bool {
 /// copy happened, which is all the timer needs.
 pub fn wanted() -> bool {
     keeps_history()
+        || cleans_links()
         || clears_on_suspend()
         || clears_on_screen_lock()
         || clear_after().is_some()
@@ -133,6 +138,7 @@ fn set_commands(commands: Option<Commands>) {
 fn read_settings() -> Settings {
     Settings {
         keep_history: keeps_history(),
+        clean_links: cleans_links(),
         clear_after: clear_after(),
         limit: u32::try_from(settings::integer_at(
             settings::CLIPBOARD_LIMIT,

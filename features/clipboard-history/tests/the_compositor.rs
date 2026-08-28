@@ -63,9 +63,13 @@ fn paste() -> Option<String> {
 }
 
 fn watching() -> (SelectionWatcher, Receiver<SelectionEvent>) {
+    watching_with(CapturePolicy::default())
+}
+
+fn watching_with(policy: CapturePolicy) -> (SelectionWatcher, Receiver<SelectionEvent>) {
     let (out, events) = channel();
     let watcher = SelectionWatcher::start(
-        CapturePolicy::default().into(),
+        policy.into(),
         Box::new(move |event| {
             let _ = out.send(event);
         }),
@@ -77,7 +81,7 @@ fn watching() -> (SelectionWatcher, Receiver<SelectionEvent>) {
 fn next_copy(events: &Receiver<SelectionEvent>) -> Payload {
     loop {
         match events.recv_timeout(PATIENCE) {
-            Ok(SelectionEvent::Copied { selection, payload }) => {
+            Ok(SelectionEvent::Copied { selection, payload, .. }) => {
                 assert_eq!(selection, Selection::Clipboard);
                 return payload;
             }
@@ -231,4 +235,26 @@ fn plasma_putting_the_clipboard_back_is_not_a_new_copy() {
         matches!(events.recv_timeout(Duration::from_millis(800)), Err(RecvTimeoutError::Timeout)),
         "an offer Plasma re-asserted is not a copy anyone made"
     );
+}
+
+/// The claim that switching the history off stops the content reaching this process at all is
+/// only worth making if it is true, and it was not: an edit meant to gate the read never landed
+/// in the file and nothing noticed.
+#[test]
+fn with_reading_off_the_content_is_never_taken() {
+    use std::sync::atomic::AtomicBool;
+
+    let _guard = one_at_a_time();
+    let _restore = RestoredClipboard::save();
+
+    let policy = CapturePolicy { read_content: AtomicBool::new(false), ..Default::default() };
+    let (_watcher, events) = watching_with(policy);
+
+    copy("nobody should read this");
+
+    match events.recv_timeout(PATIENCE) {
+        Ok(SelectionEvent::Changed(selection)) => assert_eq!(selection, Selection::Clipboard),
+        Ok(other) => panic!("the content was read: {other:?}"),
+        Err(_) => panic!("the copy went unnoticed"),
+    }
 }

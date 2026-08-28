@@ -8,6 +8,7 @@ members = [
     "domain/preferences",
     "features/clipboard-history",
     "features/keep-awake",
+    "features/link-cleaner",
     "features/sound-mixer",
     "features/system-monitor",
 ]
@@ -77,6 +78,7 @@ strum_macros = "0.28.0"
 clipboard-history = { path = "features/clipboard-history" }
 feature-catalog = { path = "domain/feature-catalog" }
 kde-bridge = { path = "desktop/kde-bridge" }
+link-cleaner = { path = "features/link-cleaner" }
 feature-runtime = { path = "domain/feature-runtime" }
 keep-awake = { path = "features/keep-awake" }
 preferences = { path = "domain/preferences" }

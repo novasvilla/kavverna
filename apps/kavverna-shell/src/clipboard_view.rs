@@ -38,6 +38,7 @@ pub mod qobject {
         #[qproperty(i32, clear_after)]
         #[qproperty(bool, clear_on_suspend)]
         #[qproperty(bool, clear_on_screen_lock)]
+        #[qproperty(bool, clean_links)]
         type ClipboardView = super::ClipboardViewRust;
     }
 
@@ -74,6 +75,8 @@ pub mod qobject {
         fn choose_clear_on_suspend(self: Pin<&mut ClipboardView>, on: bool);
         #[qinvokable]
         fn choose_clear_on_screen_lock(self: Pin<&mut ClipboardView>, on: bool);
+        #[qinvokable]
+        fn choose_clean_links(self: Pin<&mut ClipboardView>, on: bool);
     }
 }
 
@@ -100,6 +103,7 @@ pub struct ClipboardViewRust {
     clear_after: i32,
     clear_on_suspend: bool,
     clear_on_screen_lock: bool,
+    clean_links: bool,
 }
 
 impl qobject::ClipboardView {
@@ -175,6 +179,11 @@ impl qobject::ClipboardView {
         self.as_mut().set_clear_on_screen_lock(on);
     }
 
+    fn choose_clean_links(mut self: Pin<&mut Self>, on: bool) {
+        settings::put_bool(settings::CLEAN_LINKS, on);
+        self.as_mut().set_clean_links(on);
+    }
+
     fn adopt_klipper_history(mut self: Pin<&mut Self>) {
         clipboard_state::send(Command::AdoptKlipperHistory);
         self.as_mut().set_klipper_waiting(0);
@@ -230,6 +239,7 @@ impl qobject::ClipboardView {
         );
         self.as_mut().set_clear_on_suspend(clipboard_state::clears_on_suspend());
         self.as_mut().set_clear_on_screen_lock(clipboard_state::clears_on_screen_lock());
+        self.as_mut().set_clean_links(clipboard_state::cleans_links());
     }
 }
 

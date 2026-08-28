@@ -158,6 +158,14 @@ ColumnLayout {
                 onPicked: (value) => page.clipboard.choose_limit(value)
             }
 
+            SettingRow {
+                theme: page.theme
+                title: "Take the tracking out of copied links"
+                detail: "Removes campaign and click parameters the moment a link reaches the clipboard, and leaves everything else exactly as it was. Never touches a copy that carries formatting or files."
+                on: page.clipboard.clean_links
+                onToggled: (value) => page.clipboard.choose_clean_links(value)
+            }
+
             ChoiceRow {
                 theme: page.theme
                 title: "Empty the clipboard after"

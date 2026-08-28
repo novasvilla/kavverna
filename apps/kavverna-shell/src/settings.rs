@@ -17,6 +17,7 @@ pub const CLIPBOARD_SKIP_SENSITIVE: &str = "clipboard-history.skip-sensitive";
 pub const CLEAR_AFTER_SECONDS: &str = "clipboard-auto-clear.after-seconds";
 pub const CLEAR_ON_SUSPEND: &str = "clipboard-auto-clear.on-suspend";
 pub const CLEAR_ON_SCREEN_LOCK: &str = "clipboard-auto-clear.on-screen-lock";
+pub const CLEAN_LINKS: &str = "clean-url.enabled";
 
 pub const ALLOW_DISPLAY_SLEEP_DEFAULT: bool = true;
 pub const RESTORE_ON_START_DEFAULT: bool = false;
@@ -41,6 +42,9 @@ pub const CLIPBOARD_SKIP_SENSITIVE_DEFAULT: bool = true;
 pub const CLEAR_AFTER_SECONDS_DEFAULT: i64 = 0;
 pub const CLEAR_ON_SUSPEND_DEFAULT: bool = false;
 pub const CLEAR_ON_SCREEN_LOCK_DEFAULT: bool = false;
+
+/// Off until asked for: it rewrites what somebody copied, and doing that unasked is rude.
+pub const CLEAN_LINKS_DEFAULT: bool = false;
 
 static STORE: Mutex<Option<Preferences>> = Mutex::new(None);
 

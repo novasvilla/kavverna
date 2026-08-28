@@ -9,6 +9,7 @@ repository.workspace = true
 [dependencies]
 blake3.workspace = true
 image.workspace = true
+link-cleaner.workspace = true
 nix = { workspace = true, features = ["fs", "poll"] }
 rusqlite.workspace = true
 tempfile.workspace = true
