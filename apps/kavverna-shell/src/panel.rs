@@ -28,6 +28,7 @@ pub mod qobject {
         #[qproperty(bool, middle_click_toggle)]
         #[qproperty(bool, timed)]
         #[qproperty(bool, jiggle_available)]
+        #[qproperty(QString, jiggle_status)]
         #[qproperty(bool, launch_at_login)]
         #[qproperty(QString, settings_path)]
         type KavvernaPanel = super::KavvernaPanelRust;
@@ -61,6 +62,8 @@ pub mod qobject {
         #[qinvokable]
         fn extend_minutes(self: Pin<&mut KavvernaPanel>, minutes: i32);
         #[qinvokable]
+        fn nudge_now(self: Pin<&mut KavvernaPanel>);
+        #[qinvokable]
         fn choose_launch_at_login(self: Pin<&mut KavvernaPanel>, launch: bool);
     }
 }
@@ -87,6 +90,7 @@ pub struct KavvernaPanelRust {
     middle_click_toggle: bool,
     timed: bool,
     jiggle_available: bool,
+    jiggle_status: QString,
     launch_at_login: bool,
     settings_path: QString,
 }
@@ -121,6 +125,7 @@ impl Default for KavvernaPanelRust {
             ),
             timed: false,
             jiggle_available: keep_awake::MouseJiggle::is_available(),
+            jiggle_status: QString::from("Off"),
             launch_at_login: launch_at_login::is_enabled(),
             settings_path: QString::from(&settings_location()),
         }
@@ -135,6 +140,17 @@ fn settings_location() -> String {
     directories::ProjectDirs::from("dev", "", "kavverna")
         .map(|dirs| dirs.config_dir().join("settings.json").display().to_string())
         .unwrap_or_else(|| "not available".into())
+}
+
+fn describe_jiggle(state: crate::jiggle_state::JiggleState) -> String {
+    if !state.running {
+        return "Off".into();
+    }
+
+    match state.seconds_until_next {
+        Some(seconds) => format!("Next nudge in {seconds}s  ·  {} so far", state.nudges),
+        None => "Starting".into(),
+    }
 }
 
 fn summarise(active: bool, remaining: Option<Duration>) -> String {
@@ -217,6 +233,10 @@ impl qobject::KavvernaPanel {
         self.as_mut().set_middle_click_toggle(toggle);
     }
 
+    fn nudge_now(self: Pin<&mut Self>) {
+        command::send(Command::NudgeNow);
+    }
+
     fn extend_minutes(self: Pin<&mut Self>, minutes: i32) {
         let seconds = u64::try_from(minutes).unwrap_or(0).saturating_mul(60);
         command::send(Command::Extend(Duration::from_secs(seconds)));
@@ -233,6 +253,8 @@ impl qobject::KavvernaPanel {
     }
 
     fn apply(mut self: Pin<&mut Self>, active: bool, remaining: Option<Duration>) {
+        let jiggle = crate::jiggle_state::get();
+        self.as_mut().set_jiggle_status(QString::from(&describe_jiggle(jiggle)));
         self.as_mut().set_awake(active);
         self.as_mut().set_timed(active && remaining.is_some());
         self.as_mut().set_awake_summary(QString::from(&summarise(active, remaining)));

@@ -11,6 +11,7 @@ Window {
 
     readonly property int energyPage: 0
     readonly property int soundPage: 1
+    readonly property int toolsPage: 4
     property int page: energyPage
 
     width: 360
@@ -143,6 +144,8 @@ Window {
                               ready: mixer.available },
                             { glyph: "\u25f4", name: "Monitoring", page: 2, ready: false },
                             { glyph: "\u2704", name: "Clipboard", page: 3, ready: false },
+                            { glyph: "\ud83d\udee0", name: "Tools", page: root.toolsPage,
+                              ready: true },
                             { glyph: "\u26a1", name: "Energy", page: root.energyPage,
                               ready: true }
                         ]
@@ -189,6 +192,12 @@ Window {
                 theme: theme
                 mixer: mixer
                 visible: !hub.showing_settings && root.page === root.soundPage
+            }
+
+            ToolsSection {
+                theme: theme
+                hub: hub
+                visible: !hub.showing_settings && root.page === root.toolsPage
             }
 
             SettingsPage {

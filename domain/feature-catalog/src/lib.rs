@@ -19,6 +19,7 @@ pub enum Feature {
     CleanUrl,
     PlainTextPaste,
     KeepAwake,
+    MouseJiggle,
     FanControl,
 }
 
@@ -37,6 +38,7 @@ impl Feature {
             Self::CleanUrl => "clean-url",
             Self::PlainTextPaste => "plain-text-paste",
             Self::KeepAwake => "keep-awake",
+            Self::MouseJiggle => "mouse-jiggle",
             Self::FanControl => "fan-control",
         }
     }

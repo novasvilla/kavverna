@@ -11,6 +11,7 @@ const QML: &[&str] = &[
     "qml/Shared/ChoiceRow.qml",
     "qml/MenuPanel/EnergySection.qml",
     "qml/MenuPanel/SoundSection.qml",
+    "qml/MenuPanel/ToolsSection.qml",
     "qml/Settings/SettingsPage.qml",
 ];
 

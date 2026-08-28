@@ -94,48 +94,6 @@ ColumnLayout {
         }
     }
 
-    SectionLabel {
-        theme: page.theme
-        text: "MOUSE JIGGLE"
-    }
-
-    Card {
-        theme: page.theme
-        implicitHeight: jiggle.implicitHeight + 24
-
-        ColumnLayout {
-            id: jiggle
-            anchors.fill: parent
-            anchors.margins: 12
-            spacing: 14
-
-            SettingRow {
-                theme: page.theme
-                title: "Nudge the pointer"
-                detail: page.hub.jiggle_available
-                        ? "Moves the pointer and puts it back, for applications that watch for input rather than power inhibitions."
-                        : "Needs ydotool and a running ydotoold."
-                on: page.hub.mouse_jiggle
-                onToggled: (value) => page.hub.choose_mouse_jiggle(value)
-            }
-
-            ChoiceRow {
-                theme: page.theme
-                visible: page.hub.mouse_jiggle
-                title: "Every"
-                current: page.hub.jiggle_minutes
-                choices: [
-                    { label: "1m", value: 1 },
-                    { label: "2m", value: 2 },
-                    { label: "5m", value: 5 },
-                    { label: "10m", value: 10 },
-                    { label: "15m", value: 15 }
-                ]
-                onPicked: (value) => page.hub.choose_jiggle_minutes(value)
-            }
-        }
-    }
-
     Label {
         Layout.fillWidth: true
         text: page.hub.settings_path

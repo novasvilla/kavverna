@@ -7,7 +7,10 @@ mod processor;
 mod thermal;
 
 pub use graphics::{Gpu, GpuReading, GpuRole, GraphicsReading, SysfsCard, discover_sysfs_cards};
-pub use memory::{MemoryPressure, MemoryReading, PressureLevel, parse_meminfo, parse_pressure};
+pub use memory::{
+    CompressedSwap, MemoryPressure, MemoryReading, PressureLevel, discover_compressed_swap,
+    parse_meminfo, parse_mm_stat, parse_pressure,
+};
 pub use nvidia::NvidiaCards;
 pub use processor::{CpuTicks, ProcessorTicks, parse_stat};
 pub use thermal::{Sensor, Thermometer, parse_label};
@@ -21,6 +24,7 @@ pub struct Vitals {
     pub cpu_temperature: Option<f32>,
     pub memory: MemoryReading,
     pub pressure: MemoryPressure,
+    pub compressed_swap: Vec<CompressedSwap>,
     pub graphics: GraphicsReading,
     pub taken_at: Option<Instant>,
 }
@@ -80,6 +84,7 @@ impl Vitalsigns {
             pressure: std::fs::read_to_string("/proc/pressure/memory")
                 .map(|contents| parse_pressure(&contents))
                 .unwrap_or_default(),
+            compressed_swap: discover_compressed_swap(),
             graphics: GraphicsReading { cards },
             taken_at: Some(Instant::now()),
         }

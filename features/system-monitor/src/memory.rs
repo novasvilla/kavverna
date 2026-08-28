@@ -59,6 +59,53 @@ pub fn parse_meminfo(contents: &str) -> MemoryReading {
     }
 }
 
+/// Swap that lives in compressed RAM rather than on a disk. Reporting only what
+/// `/proc/meminfo` says would claim gigabytes of swap on a machine whose disk is untouched.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CompressedSwap {
+    pub device: String,
+    /// What applications believe they swapped out.
+    pub stored: u64,
+    /// What it actually costs in RAM once compressed.
+    pub ram_cost: u64,
+}
+
+impl CompressedSwap {
+    pub fn ratio(&self) -> f32 {
+        if self.ram_cost == 0 { 0.0 } else { self.stored as f32 / self.ram_cost as f32 }
+    }
+}
+
+/// Parses a zram `mm_stat` line: orig_data_size, compr_data_size, mem_used_total, then
+/// counters this does not need.
+pub fn parse_mm_stat(device: &str, contents: &str) -> Option<CompressedSwap> {
+    let fields: Vec<u64> =
+        contents.split_whitespace().filter_map(|value| value.parse().ok()).collect();
+
+    Some(CompressedSwap {
+        device: device.to_owned(),
+        stored: *fields.first()?,
+        ram_cost: *fields.get(2)?,
+    })
+}
+
+/// Finds every zram device backing swap.
+pub fn discover_compressed_swap() -> Vec<CompressedSwap> {
+    let Ok(entries) = std::fs::read_dir("/sys/block") else {
+        return Vec::new();
+    };
+
+    entries
+        .flatten()
+        .filter(|entry| entry.file_name().to_string_lossy().starts_with("zram"))
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let contents = std::fs::read_to_string(entry.path().join("mm_stat")).ok()?;
+            parse_mm_stat(&name, &contents)
+        })
+        .collect()
+}
+
 /// Stall time as a share of the last window. Linux reports this directly, where macOS only
 /// exposes a three-state hint.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -162,6 +209,33 @@ SReclaimable:     581160 kB
     #[test]
     fn a_field_name_that_prefixes_another_is_not_confused_for_it() {
         assert_eq!(parse_meminfo(SAMPLE).swap_total, 31986684 * KIB);
+    }
+
+    /// The real `mm_stat` of this machine's zram device.
+    #[test]
+    fn compressed_swap_reports_what_it_really_costs() {
+        let sample = "4299317248 1121926831 1167548416 0 2478813184 55690 88269 44859 201557";
+        let swap = parse_mm_stat("zram0", sample).expect("parsed");
+
+        assert_eq!(swap.stored, 4_299_317_248);
+        assert_eq!(swap.ram_cost, 1_167_548_416);
+        assert!((swap.ratio() - 3.68).abs() < 0.01, "ratio was {}", swap.ratio());
+    }
+
+    /// What meminfo calls swap is nearly four times what it costs, so showing the meminfo
+    /// figure alone reads as disk thrashing on a machine with no disk swap at all.
+    #[test]
+    fn the_cost_is_far_below_what_meminfo_reports() {
+        let swap =
+            parse_mm_stat("zram0", "4299317248 1121926831 1167548416 0 0 0 0 0").expect("parsed");
+
+        assert!(swap.ram_cost < swap.stored / 3);
+    }
+
+    #[test]
+    fn a_truncated_mm_stat_is_ignored_rather_than_half_read() {
+        assert_eq!(parse_mm_stat("zram0", "123 456"), None);
+        assert_eq!(parse_mm_stat("zram0", ""), None);
     }
 
     #[test]

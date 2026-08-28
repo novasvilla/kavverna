@@ -14,6 +14,7 @@ fn ids_match_the_released_set() {
         "keep-awake",
         "microphone-tools",
         "monitor-alerts",
+        "mouse-jiggle",
         "network-monitor",
         "output-switcher",
         "plain-text-paste",

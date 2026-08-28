@@ -2,6 +2,7 @@ mod app_icon;
 mod awake_loop;
 mod awake_state;
 mod command;
+mod jiggle_state;
 mod launch_at_login;
 mod mixer_state;
 mod mixer_view;

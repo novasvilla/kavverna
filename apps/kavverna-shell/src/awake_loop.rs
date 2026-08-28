@@ -1,6 +1,6 @@
 use crate::command::Command;
 use crate::tray::StatusIcon;
-use crate::{awake_state, panel, settings};
+use crate::{awake_state, jiggle_state, panel, settings};
 use keep_awake::{Hold, KeepAwake, MouseJiggle, Scope, Trigger};
 use ksni::blocking::Handle;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
@@ -52,6 +52,7 @@ pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
                 }
             }
             Ok(Command::Release) => runtime.block_on(keep_awake.release()),
+            Ok(Command::NudgeNow) => jiggle.nudge_now(),
             Err(RecvTimeoutError::Timeout) => {
                 if runtime.block_on(keep_awake.expire_if_due()) {
                     announce_expiry();
@@ -63,14 +64,21 @@ pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
             }
         }
 
-        if keep_awake.is_active()
-            && settings::bool_at(settings::MOUSE_JIGGLE, settings::MOUSE_JIGGLE_DEFAULT)
-        {
+        // A tool in its own right: it runs whenever it is switched on, whether or not sleep
+        // is being held off.
+        let jiggling = settings::bool_at(settings::MOUSE_JIGGLE, settings::MOUSE_JIGGLE_DEFAULT);
+        if jiggling {
             jiggle.set_interval(jiggle_interval());
             jiggle.tick();
         } else {
             jiggle.rest();
         }
+
+        jiggle_state::set(jiggle_state::JiggleState {
+            running: jiggling,
+            nudges: jiggle.nudges(),
+            seconds_until_next: jiggle.until_next().map(|left| left.as_secs()),
+        });
 
         let active = keep_awake.is_active();
         let remaining = keep_awake.remaining();

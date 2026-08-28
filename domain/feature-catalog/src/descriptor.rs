@@ -6,6 +6,7 @@ pub enum Group {
     Monitoring,
     Clipboard,
     Energy,
+    Tools,
 }
 
 /// A curated claim about what a feature costs at rest, not a live measurement.
@@ -130,6 +131,15 @@ impl Feature {
                 energy: EnergyProfile::Idle,
                 beta: false,
                 enable_keys: &["keep-awake.enabled"],
+            },
+            Self::MouseJiggle => Descriptor {
+                title: "Mouse jiggle",
+                summary: "Nudge the pointer on an interval so idle watchers see activity.",
+                group: Group::Tools,
+                icon: "input-mouse",
+                energy: EnergyProfile::Periodic,
+                beta: false,
+                enable_keys: &["mouse-jiggle.enabled"],
             },
             Self::FanControl => Descriptor {
                 title: "Fan control",

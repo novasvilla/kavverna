@@ -6,6 +6,7 @@ pub enum Command {
     Engage(Hold, Scope),
     Extend(std::time::Duration),
     Release,
+    NudgeNow,
 }
 
 static COMMANDS: OnceLock<Sender<Command>> = OnceLock::new();

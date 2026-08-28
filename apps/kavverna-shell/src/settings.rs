@@ -3,8 +3,8 @@ use std::sync::{Mutex, MutexGuard};
 
 pub const ALLOW_DISPLAY_SLEEP: &str = "keep-awake.allow-display-sleep";
 pub const RESTORE_ON_START: &str = "keep-awake.restore-on-start";
-pub const MOUSE_JIGGLE: &str = "keep-awake.mouse-jiggle";
-pub const JIGGLE_MINUTES: &str = "keep-awake.mouse-jiggle-minutes";
+pub const MOUSE_JIGGLE: &str = "mouse-jiggle.enabled";
+pub const JIGGLE_MINUTES: &str = "mouse-jiggle.minutes";
 pub const DEFAULT_MINUTES: &str = "keep-awake.default-minutes";
 pub const MIDDLE_CLICK_TOGGLE: &str = "keep-awake.middle-click-toggle";
 
