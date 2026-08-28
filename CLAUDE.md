@@ -171,11 +171,11 @@ answers, and nothing happens on a click. Run with `QT_LOGGING_RULES='qt.qml.*=tr
 real reason is at the end of the output. `panel.rs` also says so once, on the first request that
 finds no interface attached.
 
-The target is Linux with Plasma, not macOS. Read the reference app for behaviour and for how it
-organises files, never for values: `font.pixelSize` is an integer here, and copying its 11.5 and
-10.5 across cost a whole session's worth of debugging for one line. For anything that has an
-icon, use `icon.name` from the desktop theme rather than a character, so it matches Breeze and
-cannot land on a glyph the font does not carry.
+The target is Linux with Plasma, and a design borrowed from elsewhere brings its platform with
+it. `font.pixelSize` is an integer here, and a fractional size copied from a macOS layout cost a
+whole session's debugging for one line. For anything that has an icon, use `icon.name` from the
+desktop theme rather than a character, so it matches Breeze and cannot land on a glyph the font
+does not carry.
 
 Running the test suite while Kavverna is running writes the tests' own copies into the real
 clipboard history. Stop the app first, or clear the history afterwards.
