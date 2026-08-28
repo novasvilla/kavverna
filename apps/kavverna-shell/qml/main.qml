@@ -156,15 +156,16 @@ Window {
                     Repeater {
                         model: [
                             { glyph: "\u266a", name: "Sound", page: root.soundPage,
-                              ready: mixer.available },
+                              ready: mixer.available,
+                              unready: "Sound is waiting for PipeWire" },
                             { glyph: "\u25f4", name: "Monitoring", page: root.monitoringPage,
-                              ready: true },
+                              ready: true, unready: "" },
                             { glyph: "\u2704", name: "Clipboard", page: root.clipboardPage,
-                              ready: true },
+                              ready: true, unready: "" },
                             { glyph: "\ud83d\udee0", name: "Tools", page: root.toolsPage,
-                              ready: true },
+                              ready: true, unready: "" },
                             { glyph: "\u26a1", name: "Energy", page: root.energyPage,
-                              ready: true }
+                              ready: true, unready: "" }
                         ]
 
                         delegate: Rectangle {
@@ -186,8 +187,7 @@ Window {
                             }
 
                             ToolTip.visible: hover.hovered
-                            ToolTip.text: modelData.ready ? modelData.name
-                                                          : modelData.name + " is not built yet"
+                            ToolTip.text: modelData.ready ? modelData.name : modelData.unready
 
                             HoverHandler { id: hover }
                             TapHandler {

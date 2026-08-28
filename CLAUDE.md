@@ -152,12 +152,16 @@ zero. Automatic mode is the state to fail toward in every path.
 
 `ROADMAP.md` is a local working file. It is in `.gitignore` and must never be committed: it
 carries half-formed ideas, money questions and notes to self that have no place in a public
-repository. The plan a reader is meant to see lives in the README and in `docs/`.
+repository. What a reader should see lives in the README, in `docs/` and in the What is next
+section, which lists features and nothing else.
 
-Earlier commits still contain it. The repository has no remote and has never been pushed, so
-going public means creating the GitHub repository and pushing **one clean commit with no
-history**, not this local history. Check `git log --all --name-only -- ROADMAP.md` comes back
-empty on whatever is about to be pushed.
+The history was rewritten once to take the file out of every commit, and the repository is
+public at `github.com/novasvilla/kavverna`. Before any push that touches history again, check
+that `git log --all --name-only -- ROADMAP.md` comes back empty.
+
+Releases are tagged `vX.Y.Z` and the version lives in three places that move together: the
+workspace `Cargo.toml`, `packaging/PKGBUILD` with a recomputed checksum, and `.SRCINFO`. The
+fourth number a version shows is the CI run that built it, supplied by `KAVVERNA_BUILD`.
 
 ## When the panel does not open
 
