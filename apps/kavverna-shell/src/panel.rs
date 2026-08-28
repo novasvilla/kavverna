@@ -324,8 +324,18 @@ fn with_panel(action: impl FnOnce(Pin<&mut qobject::KavvernaPanel>) + Send + 'st
     let Ok(panel) = PANEL.lock() else {
         return;
     };
-    if let Some(thread) = panel.as_ref() {
-        let _ = thread.queue(action);
+    match panel.as_ref() {
+        Some(thread) => {
+            let _ = thread.queue(action);
+        }
+        None => {
+            static SAID: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+            if !SAID.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                tracing::error!(
+                    "the interface never loaded; run with QT_LOGGING_RULES='qt.qml.*=true' to                      see why, since a QML failure is otherwise silent"
+                );
+            }
+        }
     }
 }
 

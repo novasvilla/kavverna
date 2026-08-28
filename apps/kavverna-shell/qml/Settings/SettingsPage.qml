@@ -111,10 +111,10 @@ ColumnLayout {
 
     Card {
         theme: page.theme
-        implicitHeight: clipboard.implicitHeight + 24
+        implicitHeight: saving.implicitHeight + 24
 
         ColumnLayout {
-            id: clipboard
+            id: saving
             anchors.fill: parent
             anchors.margins: 12
             spacing: 14

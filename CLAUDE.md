@@ -158,3 +158,20 @@ Earlier commits still contain it. The repository has no remote and has never bee
 going public means creating the GitHub repository and pushing **one clean commit with no
 history**, not this local history. Check `git log --all --name-only -- ROADMAP.md` comes back
 empty on whatever is about to be pushed.
+
+## When the panel does not open
+
+A QML failure is silent. `QQmlApplicationEngine::load` reports nothing through the tracing
+subscriber, so a broken file looks exactly like a broken tray icon: the process runs, the tray
+answers, and nothing happens on a click. Run with `QT_LOGGING_RULES='qt.qml.*=true'` and the
+real reason is at the end of the output. `panel.rs` also says so once, on the first request that
+finds no interface attached.
+
+The target is Linux with Plasma, not macOS. Read the reference app for behaviour and for how it
+organises files, never for values: `font.pixelSize` is an integer here, and copying its 11.5 and
+10.5 across cost a whole session's worth of debugging for one line. For anything that has an
+icon, use `icon.name` from the desktop theme rather than a character, so it matches Breeze and
+cannot land on a glyph the font does not carry.
+
+Running the test suite while Kavverna is running writes the tests' own copies into the real
+clipboard history. Stop the app first, or clear the history afterwards.

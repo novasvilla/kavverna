@@ -31,7 +31,7 @@ ColumnLayout {
                 id: keeping
                 text: "Save clipboard history"
                 checked: section.clipboard.enabled
-                font.pixelSize: 11.5
+                font.pixelSize: 12
                 onToggled: section.clipboard.enable(checked)
 
                 contentItem: Label {
@@ -77,8 +77,9 @@ ColumnLayout {
                 }
 
                 Button {
-                    text: "✕"
-                    font.pixelSize: 10
+                    icon.name: "edit-clear"
+                    icon.width: 12
+                    icon.height: 12
                     implicitWidth: 26
                     implicitHeight: 26
                     visible: section.clipboard.query.length > 0
@@ -91,8 +92,9 @@ ColumnLayout {
                 }
 
                 Button {
-                    text: "🗑"
-                    font.pixelSize: 11
+                    icon.name: "edit-delete"
+                    icon.width: 12
+                    icon.height: 12
                     implicitWidth: 26
                     implicitHeight: 26
                     enabled: section.clipboard.recent_count > 0
@@ -115,7 +117,7 @@ ColumnLayout {
             anchors.centerIn: parent
             visible: section.clipboard.row_ids.length === 0
             text: section.clipboard.query.length > 0 ? "No results" : "Nothing copied yet"
-            font.pixelSize: 10.5
+            font.pixelSize: 10
             color: section.theme.mutedText
         }
 
@@ -175,7 +177,7 @@ ColumnLayout {
                                 Label {
                                     Layout.fillWidth: true
                                     text: section.clipboard.row_previews[row.index]
-                                    font.pixelSize: 10.5
+                                    font.pixelSize: 10
                                     color: section.theme.primaryText
                                     wrapMode: Text.Wrap
                                     maximumLineCount: 3
@@ -189,10 +191,11 @@ ColumnLayout {
                                 visible: hover.hovered
 
                                 Button {
-                                    text: "↑"
+                                    icon.name: "go-up"
+                                    icon.width: 11
+                                    icon.height: 11
                                     implicitWidth: 22
                                     implicitHeight: 22
-                                    font.pixelSize: 10
                                     enabled: section.clipboard.query.length === 0
                                     ToolTip.visible: hovered
                                     ToolTip.text: "Move up"
@@ -200,10 +203,11 @@ ColumnLayout {
                                 }
 
                                 Button {
-                                    text: "↓"
+                                    icon.name: "go-down"
+                                    icon.width: 11
+                                    icon.height: 11
                                     implicitWidth: 22
                                     implicitHeight: 22
-                                    font.pixelSize: 10
                                     enabled: section.clipboard.query.length === 0
                                     ToolTip.visible: hovered
                                     ToolTip.text: "Move down"
@@ -238,10 +242,11 @@ ColumnLayout {
                                 Item { Layout.fillWidth: true }
 
                                 Button {
-                                    text: "✕"
+                                    icon.name: "edit-delete"
+                                    icon.width: 11
+                                    icon.height: 11
                                     implicitWidth: 22
                                     implicitHeight: 22
-                                    font.pixelSize: 9
                                     ToolTip.visible: hovered
                                     ToolTip.text: "Delete"
                                     onClicked: section.clipboard.forget(row.entryId)
@@ -272,7 +277,7 @@ ColumnLayout {
         Label {
             text: section.clipboard.pinned_count + " pinned  ·  "
                   + section.clipboard.recent_count + " recent"
-            font.pixelSize: 9.5
+            font.pixelSize: 10
             color: section.theme.mutedText
         }
 
@@ -281,7 +286,7 @@ ColumnLayout {
         Label {
             visible: !section.clipboard.available
             text: "not watching"
-            font.pixelSize: 9.5
+            font.pixelSize: 10
             color: section.theme.mutedText
         }
     }
