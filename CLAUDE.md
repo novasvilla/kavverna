@@ -100,6 +100,33 @@ call reports nothing and proves nothing. And a quiet moment where it returns an 
 says only that nothing is inhibiting right now. `AddInhibition` returning a cookie is the
 immediate, authoritative answer.
 
+## Sound, verified and unverified
+
+Volume is amplitude cubed: a slider at 50 reads 0.125 in the graph. Measured against a live
+sink, not assumed.
+
+Identifying the application behind a stream needs three passes. The registry hands out fewer
+properties than the bound object does, and a node usually reaches the registry before the
+client that owns it, so a stream is identified again when its client appears and again when
+its own info event arrives. Where only a process id is known the binary comes from /proc,
+skipping the audio server's own bridges: a stream arriving through the PulseAudio bridge
+reports the bridge rather than the application.
+
+Working and verified against the live system: reading every device and stream, writing
+volume, switching the default output and input through the session's `default` metadata, and
+cycling outputs.
+
+Two open questions, both found by checking the system rather than trusting our own state:
+
+- **Per application routing does not work by setting a property.** Neither `target.object`
+  nor `target.node` moves a stream that is already playing, confirmed by watching the Link
+  objects rather than the metadata write. `pactl move-sink-input` does move it, so a live
+  move needs the links rebuilt.
+- **Muting a USB headset microphone reports success but `pactl` still shows it unmuted.**
+  The likely cause is that a node's mute and a device route's mute are different layers, and
+  each tool reads a different one. Not confirmed. Until it is, do not claim mute-all covers
+  every input.
+
 ## Hazards
 
 Fan control writes PWM values to `/sys/class/hwmon/*` as root. A fan left at 0 RPM can

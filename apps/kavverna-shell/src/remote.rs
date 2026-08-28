@@ -44,6 +44,44 @@ impl Shell {
         command::send(Command::Release);
     }
 
+    /// Moves to the next output the user cycles through, which is what a shortcut binds to.
+    fn cycle_output(&self) -> String {
+        let snapshot = crate::mixer_state::get();
+        let cycle: Vec<String> = snapshot.outputs.iter().map(|d| d.name.clone()).collect();
+
+        match snapshot.next_in_cycle(&cycle) {
+            Some(name) => {
+                let name = name.clone();
+                crate::mixer_state::send(
+                    sound_mixer::MixerCommand::MakeDefaultOutput(name.clone()),
+                );
+                name
+            }
+            None => "no outputs".into(),
+        }
+    }
+
+    fn mute_every_input(&self, muted: bool) {
+        for device in crate::mixer_state::get().inputs {
+            crate::mixer_state::send(sound_mixer::MixerCommand::SetMute {
+                node_id: device.node_id,
+                muted,
+            });
+        }
+    }
+
+    #[zbus(property)]
+    fn default_output(&self) -> String {
+        crate::mixer_state::get()
+            .default_output()
+            .map_or_else(|| "none".into(), |device| device.description.clone())
+    }
+
+    #[zbus(property)]
+    fn microphones_muted(&self) -> bool {
+        crate::mixer_state::get().every_input_muted()
+    }
+
     #[zbus(property)]
     fn awake(&self) -> bool {
         awake_state::get().active
