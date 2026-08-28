@@ -38,20 +38,19 @@ QtObject {
     readonly property color mutedText: dark ? Qt.rgba(1, 1, 1, 0.25)
                                             : Qt.rgba(0.13, 0.10, 0.07, 0.38)
 
-    // Spacing, radii and text sizes live here for the same reason the colours do: a value
-    // written at its use site is a value the theme cannot reach.
+    // Only what is genuinely repeated. A one-off pixel value doing a local job, the seven pixel
+    // dot or the one pixel gap between a title and its detail, is geometry rather than scale and
+    // stays where it is used.
     readonly property int gapTight: 4
     readonly property int gapSnug: 6
     readonly property int gap: 10
+    /// What a card holds itself away from its own edge, and what one card keeps from the next.
     readonly property int pad: 12
 
     readonly property int radiusSmall: 6
     readonly property int radius: 10
-    readonly property int radiusLarge: 14
 
-    readonly property int textTiny: 9
-    readonly property int textSmall: 11
-    readonly property int textBody: 13
+    readonly property int textBody: 11
+    readonly property int textStrong: 13
     readonly property int textTitle: 16
-    readonly property int textDisplay: 20
 }

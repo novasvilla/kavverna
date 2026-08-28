@@ -1,7 +1,7 @@
 use cxx_qt_build::{CxxQtBuilder, QmlModule};
 
-/// Mirrors the reference project's split: one file per panel section, one per settings page,
-/// shared controls and design tokens of their own.
+// One file per panel section, one per settings page, and the shared controls and design tokens
+// they are built from.
 const QML: &[&str] = &[
     "qml/main.qml",
     "qml/Theme.qml",
@@ -9,6 +9,7 @@ const QML: &[&str] = &[
     "qml/Shared/Card.qml",
     "qml/Shared/SettingRow.qml",
     "qml/Shared/ChoiceRow.qml",
+    "qml/Shared/PillButton.qml",
     "qml/MenuPanel/EnergySection.qml",
     "qml/MenuPanel/SoundSection.qml",
     "qml/MenuPanel/MonitoringSection.qml",

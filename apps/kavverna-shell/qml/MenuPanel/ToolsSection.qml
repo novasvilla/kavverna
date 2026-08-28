@@ -19,12 +19,12 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        implicitHeight: body.implicitHeight + 24
+        implicitHeight: body.implicitHeight + section.theme.pad * 2
 
         ColumnLayout {
             id: body
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: section.theme.pad
             spacing: 10
 
             RowLayout {
@@ -33,7 +33,7 @@ ColumnLayout {
 
                 Label {
                     text: "\ud83d\uddb1"
-                    font.pixelSize: 16
+                    font.pixelSize: section.theme.textTitle
                     color: section.hub.mouse_jiggle ? section.theme.accent
                                                     : section.theme.secondaryText
                 }
@@ -44,7 +44,7 @@ ColumnLayout {
 
                     Label {
                         text: "Nudge the pointer"
-                        font.pixelSize: 13
+                        font.pixelSize: section.theme.textStrong
                         font.bold: true
                         color: section.theme.primaryText
                     }
@@ -54,7 +54,7 @@ ColumnLayout {
                         text: section.hub.jiggle_available
                               ? section.hub.jiggle_status
                               : "Needs ydotool and a running ydotoold"
-                        font.pixelSize: 11
+                        font.pixelSize: section.theme.textBody
                         color: section.hub.mouse_jiggle ? section.theme.accent
                                                         : section.theme.secondaryText
                         elide: Text.ElideRight
@@ -71,7 +71,7 @@ ColumnLayout {
             Label {
                 Layout.fillWidth: true
                 text: "Moves the pointer somewhere else and can press a key, for the applications that watch for input rather than for a power inhibition."
-                font.pixelSize: 11
+                font.pixelSize: section.theme.textBody
                 color: section.theme.secondaryText
                 wrapMode: Text.WordWrap
             }
@@ -130,18 +130,13 @@ ColumnLayout {
                 onPicked: (value) => section.hub.choose_jiggle_keystroke(value)
             }
 
-            Button {
+            PillButton {
+                theme: section.theme
                 Layout.fillWidth: true
                 implicitHeight: 28
                 enabled: section.hub.jiggle_available
                 text: "Nudge now"
-                font.pixelSize: 11
                 onClicked: section.hub.nudge_now()
-
-                background: Rectangle {
-                    radius: 6
-                    color: parent.down ? section.theme.controlDown : section.theme.control
-                }
             }
         }
     }

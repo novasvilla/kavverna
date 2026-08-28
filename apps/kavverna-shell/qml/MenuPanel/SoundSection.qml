@@ -19,12 +19,12 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        implicitHeight: outputs.implicitHeight + 24
+        implicitHeight: outputs.implicitHeight + section.theme.pad * 2
 
         ColumnLayout {
             id: outputs
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: section.theme.pad
             spacing: 8
 
             Repeater {
@@ -53,7 +53,7 @@ ColumnLayout {
                         Label {
                             Layout.fillWidth: true
                             text: section.mixer.output_names[outputRow.index]
-                            font.pixelSize: 11
+                            font.pixelSize: section.theme.textBody
                             font.bold: outputRow.isDefault
                             color: section.theme.primaryText
                             elide: Text.ElideRight
@@ -66,7 +66,7 @@ ColumnLayout {
 
                         Label {
                             text: section.mixer.output_volumes[outputRow.index] + "%"
-                            font.pixelSize: 11
+                            font.pixelSize: section.theme.textBody
                             color: section.theme.secondaryText
                         }
                     }
@@ -92,18 +92,18 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        implicitHeight: streams.implicitHeight + 24
+        implicitHeight: streams.implicitHeight + section.theme.pad * 2
 
         ColumnLayout {
             id: streams
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: section.theme.pad
             spacing: 8
 
             Label {
                 visible: section.mixer.stream_names.length === 0
                 text: "Nothing is playing"
-                font.pixelSize: 11
+                font.pixelSize: section.theme.textBody
                 color: section.theme.secondaryText
             }
 
@@ -125,14 +125,14 @@ ColumnLayout {
                         Label {
                             Layout.fillWidth: true
                             text: section.mixer.stream_names[streamRow.index]
-                            font.pixelSize: 11
+                            font.pixelSize: section.theme.textBody
                             color: section.theme.primaryText
                             elide: Text.ElideRight
                         }
 
                         Label {
                             text: streamRow.percent + "%"
-                            font.pixelSize: 11
+                            font.pixelSize: section.theme.textBody
                             color: streamRow.percent > 100 ? section.theme.warm
                                                            : section.theme.secondaryText
                         }
@@ -176,12 +176,12 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        implicitHeight: microphone.implicitHeight + 24
+        implicitHeight: microphone.implicitHeight + section.theme.pad * 2
 
         RowLayout {
             id: microphone
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: section.theme.pad
             spacing: 10
 
             ColumnLayout {
@@ -201,14 +201,14 @@ ColumnLayout {
                     text: section.mixer.inputs_muted
                           ? "Every microphone is muted"
                           : section.mixer.input_names.length + " inputs"
-                    font.pixelSize: 11
+                    font.pixelSize: section.theme.textBody
                     color: section.theme.secondaryText
                 }
             }
 
             Button {
                 text: section.mixer.inputs_muted ? "Unmute all" : "Mute all"
-                font.pixelSize: 11
+                font.pixelSize: section.theme.textBody
                 implicitHeight: 26
                 onClicked: section.mixer.mute_every_input(!section.mixer.inputs_muted)
             }

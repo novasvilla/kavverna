@@ -28,13 +28,13 @@ ColumnLayout {
             Label {
                 id: meterLabel
                 Layout.fillWidth: true
-                font.pixelSize: 11
+                font.pixelSize: section.theme.textBody
                 color: theme.secondaryText
             }
 
             Label {
                 id: meterValue
-                font.pixelSize: 11
+                font.pixelSize: section.theme.textBody
                 font.bold: true
                 color: theme.primaryText
             }
@@ -62,12 +62,12 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        implicitHeight: system.implicitHeight + 24
+        implicitHeight: system.implicitHeight + section.theme.pad * 2
 
         ColumnLayout {
             id: system
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: section.theme.pad
             spacing: 10
 
             Meter {
@@ -128,13 +128,13 @@ ColumnLayout {
                 Label {
                     Layout.fillWidth: true
                     text: "Pressure"
-                    font.pixelSize: 11
+                    font.pixelSize: section.theme.textBody
                     color: section.theme.secondaryText
                 }
 
                 Label {
                     text: section.vitals.pressure_text
-                    font.pixelSize: 11
+                    font.pixelSize: section.theme.textBody
                     color: section.theme.primaryText
                 }
             }
@@ -145,13 +145,13 @@ ColumnLayout {
                 Label {
                     Layout.fillWidth: true
                     text: "Compressed swap"
-                    font.pixelSize: 11
+                    font.pixelSize: section.theme.textBody
                     color: section.theme.secondaryText
                 }
 
                 Label {
                     text: section.vitals.swap_text
-                    font.pixelSize: 11
+                    font.pixelSize: section.theme.textBody
                     color: section.theme.primaryText
                 }
             }
@@ -165,12 +165,12 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        implicitHeight: graphics.implicitHeight + 24
+        implicitHeight: graphics.implicitHeight + section.theme.pad * 2
 
         ColumnLayout {
             id: graphics
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: section.theme.pad
             spacing: 10
 
             RowLayout {
@@ -181,23 +181,16 @@ ColumnLayout {
                 Repeater {
                     model: section.vitals.card_names
 
-                    delegate: Button {
+                    delegate: PillButton {
                         required property int index
                         required property string modelData
 
+                        theme: section.theme
+                        active: section.vitals.chosen_card === index
                         Layout.fillWidth: true
                         implicitHeight: 24
                         text: modelData
-                        font.pixelSize: 10
-                        leftPadding: 4
-                        rightPadding: 4
                         onClicked: section.vitals.choose_card(index)
-
-                        background: Rectangle {
-                            radius: 6
-                            color: section.vitals.chosen_card === parent.index
-                                   ? section.theme.selected : section.theme.control
-                        }
                     }
                 }
             }

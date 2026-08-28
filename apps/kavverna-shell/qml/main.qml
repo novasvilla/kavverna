@@ -87,7 +87,7 @@ Window {
         ColumnLayout {
             id: body
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: theme.pad
             spacing: 12
 
             RowLayout {
@@ -115,7 +115,7 @@ Window {
 
                     Label {
                         text: hub.showing_settings ? "Settings" : "Kavverna"
-                        font.pixelSize: 16
+                        font.pixelSize: theme.textTitle
                         font.bold: true
                         color: theme.primaryText
                     }
@@ -140,7 +140,7 @@ Window {
 
                             Label {
                                 text: hub.awake_summary
-                                font.pixelSize: 11
+                                font.pixelSize: theme.textBody
                                 font.bold: true
                                 color: hub.awake ? theme.warm : theme.secondaryText
                             }
@@ -188,7 +188,7 @@ Window {
                             Label {
                                 anchors.centerIn: parent
                                 text: parent.modelData.glyph
-                                font.pixelSize: 16
+                                font.pixelSize: theme.textTitle
                                 color: parent.current ? theme.accent
                                      : parent.modelData.ready ? theme.secondaryText
                                                               : theme.mutedText

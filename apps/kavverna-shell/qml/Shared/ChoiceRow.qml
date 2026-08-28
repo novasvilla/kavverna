@@ -17,14 +17,14 @@ ColumnLayout {
 
     Label {
         id: titleLabel
-        font.pixelSize: 13
+        font.pixelSize: row.theme.textStrong
         font.bold: true
         color: row.theme.primaryText
     }
 
     Label {
         id: detailLabel
-        font.pixelSize: 11
+        font.pixelSize: row.theme.textBody
         color: row.theme.secondaryText
         wrapMode: Text.WordWrap
         Layout.fillWidth: true
@@ -38,22 +38,14 @@ ColumnLayout {
         Repeater {
             model: row.choices
 
-            delegate: Button {
+            delegate: PillButton {
                 required property var modelData
-                readonly property bool active: modelData.value === row.current
 
+                theme: row.theme
+                active: modelData.value === row.current
                 Layout.fillWidth: true
-                implicitHeight: 26
                 text: modelData.label
-                font.pixelSize: 11
-                leftPadding: 2
-                rightPadding: 2
                 onClicked: row.picked(modelData.value)
-
-                background: Rectangle {
-                    radius: 6
-                    color: parent.active ? row.theme.selected : row.theme.control
-                }
             }
         }
     }

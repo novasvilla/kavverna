@@ -20,14 +20,14 @@ RowLayout {
 
         Label {
             id: titleLabel
-            font.pixelSize: 13
+            font.pixelSize: row.theme.textStrong
             font.bold: true
             color: row.theme.primaryText
         }
 
         Label {
             id: detailLabel
-            font.pixelSize: 11
+            font.pixelSize: row.theme.textBody
             color: row.theme.secondaryText
             wrapMode: Text.WordWrap
             Layout.fillWidth: true

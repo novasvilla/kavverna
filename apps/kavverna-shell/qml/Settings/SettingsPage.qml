@@ -20,12 +20,12 @@ ColumnLayout {
 
     Card {
         theme: page.theme
-        implicitHeight: startup.implicitHeight + 24
+        implicitHeight: startup.implicitHeight + page.theme.pad * 2
 
         ColumnLayout {
             id: startup
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: page.theme.pad
             spacing: 12
 
             SettingRow {
@@ -66,12 +66,12 @@ ColumnLayout {
 
     Card {
         theme: page.theme
-        implicitHeight: energy.implicitHeight + 24
+        implicitHeight: energy.implicitHeight + page.theme.pad * 2
 
         ColumnLayout {
             id: energy
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: page.theme.pad
             spacing: 14
 
             SettingRow {
@@ -108,8 +108,6 @@ ColumnLayout {
         }
     }
 
-
-
     SectionLabel {
         theme: page.theme
         text: "CLIPBOARD"
@@ -117,12 +115,12 @@ ColumnLayout {
 
     Card {
         theme: page.theme
-        implicitHeight: saving.implicitHeight + 24
+        implicitHeight: saving.implicitHeight + page.theme.pad * 2
 
         ColumnLayout {
             id: saving
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: page.theme.pad
             spacing: 14
 
             SettingRow {
@@ -211,7 +209,7 @@ ColumnLayout {
                 text: "Plasma's own clipboard puts the content straight back whenever anything "
                       + "empties it. Until Prevent empty clipboard is turned off in System "
                       + "Settings under Clipboard, none of this has any visible effect."
-                font.pixelSize: 11
+                font.pixelSize: page.theme.textBody
                 color: page.theme.secondaryText
                 wrapMode: Text.WordWrap
             }
@@ -223,7 +221,7 @@ ColumnLayout {
 
                 Label {
                     text: "Take over from Plasma"
-                    font.pixelSize: 13
+                    font.pixelSize: page.theme.textStrong
                     font.bold: true
                     color: page.theme.primaryText
                 }
@@ -234,7 +232,7 @@ ColumnLayout {
                           + " entries saved. They can be adopted here, keeping the times they "
                           + "already had. Nothing is written to Plasma's file. Turn its history "
                           + "off in System Settings under Clipboard so the two stop competing."
-                    font.pixelSize: 11
+                    font.pixelSize: page.theme.textBody
                     color: page.theme.secondaryText
                     wrapMode: Text.WordWrap
                 }
@@ -243,7 +241,7 @@ ColumnLayout {
                     Layout.fillWidth: true
                     implicitHeight: 26
                     text: "Adopt " + page.clipboard.klipper_waiting + " entries"
-                    font.pixelSize: 11
+                    font.pixelSize: page.theme.textBody
                     onClicked: page.clipboard.adopt_klipper_history()
                 }
             }
@@ -257,12 +255,12 @@ ColumnLayout {
 
     Card {
         theme: page.theme
-        implicitHeight: about.implicitHeight + 24
+        implicitHeight: about.implicitHeight + page.theme.pad * 2
 
         ColumnLayout {
             id: about
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: page.theme.pad
             spacing: 8
 
             RowLayout {
@@ -278,7 +276,7 @@ ColumnLayout {
 
                 Label {
                     text: page.hub.version
-                    font.pixelSize: 11
+                    font.pixelSize: page.theme.textBody
                     color: page.theme.mutedText
                 }
 
@@ -289,7 +287,7 @@ ColumnLayout {
                 Layout.fillWidth: true
                 text: "One tray icon for the utilities a Linux desktop is missing. Everything "
                       + "runs on this machine, with no account and nothing sent anywhere."
-                font.pixelSize: 11
+                font.pixelSize: page.theme.textBody
                 color: page.theme.secondaryText
                 wrapMode: Text.WordWrap
             }
@@ -298,7 +296,7 @@ ColumnLayout {
                 Layout.fillWidth: true
                 text: "Inspired by Vorssaint for macOS. Written from scratch in Rust, not "
                       + "ported from it."
-                font.pixelSize: 11
+                font.pixelSize: page.theme.textBody
                 color: page.theme.secondaryText
                 wrapMode: Text.WordWrap
             }
@@ -320,7 +318,7 @@ ColumnLayout {
                         Layout.fillWidth: true
                         implicitHeight: 26
                         text: modelData.label
-                        font.pixelSize: 11
+                        font.pixelSize: page.theme.textBody
                         onClicked: Qt.openUrlExternally(modelData.url)
                     }
                 }

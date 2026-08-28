@@ -64,12 +64,12 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        implicitHeight: controls.implicitHeight + 24
+        implicitHeight: controls.implicitHeight + section.theme.pad * 2
 
         ColumnLayout {
             id: controls
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: section.theme.pad
             spacing: 8
 
             CheckBox {
@@ -107,7 +107,7 @@ ColumnLayout {
                     id: search
                     Layout.fillWidth: true
                     placeholderText: "Search copied text"
-                    font.pixelSize: 11
+                    font.pixelSize: section.theme.textBody
                     color: section.theme.primaryText
                     enabled: section.clipboard.row_ids.length > 0
                              || section.clipboard.query.length > 0
@@ -170,7 +170,7 @@ ColumnLayout {
 
         ScrollView {
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: section.theme.pad
             visible: section.clipboard.row_ids.length > 0
             clip: true
 

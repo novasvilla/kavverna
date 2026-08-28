@@ -19,12 +19,12 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        implicitHeight: body.implicitHeight + 24
+        implicitHeight: body.implicitHeight + section.theme.pad * 2
 
         ColumnLayout {
             id: body
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: section.theme.pad
             spacing: 10
 
             RowLayout {
@@ -43,7 +43,7 @@ ColumnLayout {
 
                     Label {
                         text: "Keep awake"
-                        font.pixelSize: 13
+                        font.pixelSize: section.theme.textStrong
                         font.bold: true
                         color: section.theme.primaryText
                     }
@@ -52,7 +52,7 @@ ColumnLayout {
                         Layout.fillWidth: true
                         text: section.hub.awake ? section.hub.awake_summary
                                                 : "May suspend when idle"
-                        font.pixelSize: 11
+                        font.pixelSize: section.theme.textBody
                         color: section.theme.secondaryText
                         elide: Text.ElideRight
                     }
@@ -78,21 +78,13 @@ ColumnLayout {
                         { label: "8h", minutes: 480 }
                     ]
 
-                    delegate: Button {
+                    delegate: PillButton {
                         required property var modelData
 
+                        theme: section.theme
                         Layout.fillWidth: true
-                        implicitHeight: 26
                         text: modelData.label
-                        font.pixelSize: 11
-                        leftPadding: 2
-                        rightPadding: 2
                         onClicked: section.hub.keep_awake_minutes(modelData.minutes)
-
-                        background: Rectangle {
-                            radius: 6
-                            color: parent.down ? section.theme.controlDown : section.theme.control
-                        }
                     }
                 }
             }
@@ -104,7 +96,7 @@ ColumnLayout {
 
                 Label {
                     text: "Add more"
-                    font.pixelSize: 11
+                    font.pixelSize: section.theme.textBody
                     color: section.theme.secondaryText
                 }
 
@@ -115,21 +107,14 @@ ColumnLayout {
                         { label: "+1h", minutes: 60 }
                     ]
 
-                    delegate: Button {
+                    delegate: PillButton {
                         required property var modelData
 
+                        theme: section.theme
                         Layout.fillWidth: true
                         implicitHeight: 24
                         text: modelData.label
-                        font.pixelSize: 11
-                        leftPadding: 2
-                        rightPadding: 2
                         onClicked: section.hub.extend_minutes(modelData.minutes)
-
-                        background: Rectangle {
-                            radius: 6
-                            color: parent.down ? section.theme.controlDown : section.theme.control
-                        }
                     }
                 }
             }
@@ -137,7 +122,7 @@ ColumnLayout {
             CheckBox {
                 text: "Let displays sleep"
                 checked: section.hub.allow_display_sleep
-                font.pixelSize: 11
+                font.pixelSize: section.theme.textBody
                 onToggled: section.hub.choose_display_sleep(checked)
             }
         }
