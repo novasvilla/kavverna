@@ -58,10 +58,8 @@ pub fn wanted() -> bool {
 }
 
 fn clear_after() -> Option<Duration> {
-    let seconds = settings::integer_at(
-        settings::CLEAR_AFTER_SECONDS,
-        settings::CLEAR_AFTER_SECONDS_DEFAULT,
-    );
+    let seconds =
+        settings::integer_at(settings::CLEAR_AFTER_SECONDS, settings::CLEAR_AFTER_SECONDS_DEFAULT);
     (seconds > 0).then(|| Duration::from_secs(seconds.unsigned_abs()))
 }
 
@@ -158,6 +156,5 @@ fn read_settings() -> Settings {
 
 /// Content, not settings: a settings backup has no business carrying what was copied.
 fn data_root() -> Option<std::path::PathBuf> {
-    directories::ProjectDirs::from("dev", "", "kavverna")
-        .map(|dirs| dirs.data_dir().to_path_buf())
+    directories::ProjectDirs::from("dev", "", "kavverna").map(|dirs| dirs.data_dir().to_path_buf())
 }

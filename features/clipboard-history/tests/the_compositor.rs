@@ -5,8 +5,8 @@
 //! These tests take over the clipboard, so they run one at a time and put back what they found.
 
 use std::process::{Command, Stdio};
-use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
 
 use clipboard_history::selection::{
@@ -182,9 +182,8 @@ fn a_copy_reaches_the_history_and_can_be_put_back() {
 
     copy("saved by the history");
 
-    let holding = |snapshot: &Snapshot| {
-        snapshot.rows.iter().any(|row| row.preview == "saved by the history")
-    };
+    let holding =
+        |snapshot: &Snapshot| snapshot.rows.iter().any(|row| row.preview == "saved by the history");
     let mut arrived = None;
     let patience = std::time::Instant::now() + PATIENCE;
     while std::time::Instant::now() < patience {

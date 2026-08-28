@@ -84,10 +84,8 @@ pub fn is_generic(name: &str) -> bool {
 /// Recovers the real application from a framework process's arguments. Electron is told
 /// where to keep its data and which bundle to run, and both name the application.
 pub fn refine_from_cmdline(args: &[String]) -> Option<String> {
-    let from_data_dir = args
-        .iter()
-        .find_map(|arg| arg.strip_prefix("--user-data-dir="))
-        .and_then(|path| last_segment(path));
+    let from_data_dir =
+        args.iter().find_map(|arg| arg.strip_prefix("--user-data-dir=")).and_then(last_segment);
 
     let from_bundle = args
         .iter()
@@ -164,7 +162,8 @@ mod tests {
 
     #[test]
     fn the_binary_wins_over_a_display_name() {
-        let node = props(&[("application.name", "Chromium"), ("application.process.binary", "electron")]);
+        let node =
+            props(&[("application.name", "Chromium"), ("application.process.binary", "electron")]);
 
         assert_eq!(app_key_resolving(&node, None, |_| None).as_str(), "electron");
     }
@@ -201,10 +200,8 @@ mod tests {
     #[test]
     fn a_client_with_only_a_process_id_is_keyed_by_its_binary() {
         let node = props(&[("application.name", "SDL Application")]);
-        let client = props(&[
-            ("application.name", "SDL Application"),
-            ("pipewire.sec.pid", "541940"),
-        ]);
+        let client =
+            props(&[("application.name", "SDL Application"), ("pipewire.sec.pid", "541940")]);
 
         let key = app_key_resolving(&node, Some(&client), |pid| {
             (pid == 541940).then(|| "dota2".to_owned())
@@ -249,7 +246,7 @@ mod tests {
         let args: Vec<String> = [
             "/proc/self/exe",
             "--type=utility",
-            "--user-data-dir=/home/novas/.config/vesktop",
+            "--user-data-dir=/home/someone/.config/vesktop",
             "--standard-schemes=vesktop",
         ]
         .iter()
@@ -272,7 +269,7 @@ mod tests {
 
     #[test]
     fn a_data_directory_that_names_the_framework_is_no_better_than_what_we_had() {
-        let args = vec!["--user-data-dir=/home/novas/.config/Electron".to_owned()];
+        let args = vec!["--user-data-dir=/home/someone/.config/Electron".to_owned()];
 
         assert_eq!(refine_from_cmdline(&args), None);
     }
@@ -291,7 +288,8 @@ mod tests {
 
     #[test]
     fn the_shown_name_keeps_its_capitals() {
-        let node = props(&[("application.name", "Chromium"), ("application.process.binary", "electron")]);
+        let node =
+            props(&[("application.name", "Chromium"), ("application.process.binary", "electron")]);
 
         assert_eq!(display_name(&node, None), "Chromium");
         assert_eq!(display_name(&props(&[]), None), "Unknown application");

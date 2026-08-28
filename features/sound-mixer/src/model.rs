@@ -157,12 +157,14 @@ mod tests {
 
     #[test]
     fn an_application_with_several_streams_is_one_row() {
-        let mut mixer = MixerSnapshot::default();
-        mixer.streams = vec![
-            stream(67, "vesktop", "Vesktop", 60.0, false),
-            stream(94, "firefox", "Firefox", 100.0, false),
-            stream(111, "vesktop", "Vesktop", 40.0, false),
-        ];
+        let mixer = MixerSnapshot {
+            streams: vec![
+                stream(67, "vesktop", "Vesktop", 60.0, false),
+                stream(94, "firefox", "Firefox", 100.0, false),
+                stream(111, "vesktop", "Vesktop", 40.0, false),
+            ],
+            ..Default::default()
+        };
 
         let rows = mixer.applications();
         assert_eq!(rows.len(), 2);
@@ -173,18 +175,26 @@ mod tests {
 
     #[test]
     fn a_row_shows_the_loudest_of_its_streams() {
-        let mut mixer = MixerSnapshot::default();
-        mixer.streams =
-            vec![stream(1, "app", "App", 20.0, false), stream(2, "app", "App", 80.0, false)];
+        let mixer = MixerSnapshot {
+            streams: vec![
+                stream(1, "app", "App", 20.0, false),
+                stream(2, "app", "App", 80.0, false),
+            ],
+            ..Default::default()
+        };
 
         assert_eq!(mixer.applications()[0].volume.percent().round(), 80.0);
     }
 
     #[test]
     fn a_row_is_muted_only_when_all_of_its_streams_are() {
-        let mut mixer = MixerSnapshot::default();
-        mixer.streams =
-            vec![stream(1, "app", "App", 50.0, true), stream(2, "app", "App", 50.0, false)];
+        let mut mixer = MixerSnapshot {
+            streams: vec![
+                stream(1, "app", "App", 50.0, true),
+                stream(2, "app", "App", 50.0, false),
+            ],
+            ..Default::default()
+        };
         assert!(!mixer.applications()[0].muted);
 
         mixer.streams[1].muted = true;
@@ -193,11 +203,14 @@ mod tests {
 
     #[test]
     fn a_change_reaches_every_stream_the_application_owns() {
-        let mut mixer = MixerSnapshot::default();
-        mixer.streams =
-            vec![stream(67, "vesktop", "Vesktop", 50.0, false),
-                 stream(94, "firefox", "Firefox", 50.0, false),
-                 stream(111, "vesktop", "Vesktop", 50.0, false)];
+        let mixer = MixerSnapshot {
+            streams: vec![
+                stream(67, "vesktop", "Vesktop", 50.0, false),
+                stream(94, "firefox", "Firefox", 50.0, false),
+                stream(111, "vesktop", "Vesktop", 50.0, false),
+            ],
+            ..Default::default()
+        };
 
         assert_eq!(mixer.streams_beside(67), vec![67, 111]);
         assert_eq!(mixer.streams_beside(94), vec![94]);
@@ -218,7 +231,8 @@ mod tests {
 
     #[test]
     fn cycling_wraps_at_the_end() {
-        let mixer = snapshot(vec![device("speakers", false, false), device("headset", true, false)]);
+        let mixer =
+            snapshot(vec![device("speakers", false, false), device("headset", true, false)]);
         let cycle = vec!["speakers".to_owned(), "headset".to_owned()];
 
         assert_eq!(mixer.next_in_cycle(&cycle), Some(&"speakers".to_owned()));
@@ -258,8 +272,10 @@ mod tests {
 
     #[test]
     fn every_input_muted_needs_all_of_them() {
-        let mut mixer = MixerSnapshot::default();
-        mixer.inputs = vec![device("mic", true, true), device("line", false, false)];
+        let mut mixer = MixerSnapshot {
+            inputs: vec![device("mic", true, true), device("line", false, false)],
+            ..Default::default()
+        };
         assert!(!mixer.every_input_muted());
 
         mixer.inputs[1].muted = true;

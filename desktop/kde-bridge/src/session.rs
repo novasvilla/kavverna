@@ -56,13 +56,9 @@ pub async fn watch(events: Sender<SessionEvent>) -> Result<(), SessionError> {
             signal.args().ok()?.going_to_sleep.then_some(SessionEvent::AboutToSuspend)
         });
 
-    let locking = saver
-        .receive_active_changed()
-        .await
-        .map_err(SessionError::Session)?
-        .filter_map(|signal| async move {
-            signal.args().ok()?.active.then_some(SessionEvent::ScreenLocked)
-        });
+    let locking = saver.receive_active_changed().await.map_err(SessionError::Session)?.filter_map(
+        |signal| async move { signal.args().ok()?.active.then_some(SessionEvent::ScreenLocked) },
+    );
 
     let mut both = std::pin::pin!(futures_util::stream::select(sleeping, locking));
     while let Some(event) = both.next().await {

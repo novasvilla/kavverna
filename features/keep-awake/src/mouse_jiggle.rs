@@ -205,9 +205,10 @@ impl MouseJiggle {
     /// Each key is pressed and released in one call, so an interrupted run cannot leave a
     /// modifier stuck down.
     fn press(&self) -> bool {
-        self.keystroke.codes().iter().all(|code| {
-            Self::run(&["key", &format!("{code}:1"), &format!("{code}:0")])
-        })
+        self.keystroke
+            .codes()
+            .iter()
+            .all(|code| Self::run(&["key", &format!("{code}:1"), &format!("{code}:0")]))
     }
 
     fn move_to(x: i32, y: i32) -> bool {
@@ -366,8 +367,7 @@ mod tests {
     #[test]
     fn the_point_lands_somewhere_different_each_time() {
         let screen = Screen { width: 1920, height: 1080 };
-        let points: std::collections::BTreeSet<_> =
-            (0..100).map(|_| pick_point(screen)).collect();
+        let points: std::collections::BTreeSet<_> = (0..100).map(|_| pick_point(screen)).collect();
 
         assert!(points.len() > 50, "only {} distinct points", points.len());
     }

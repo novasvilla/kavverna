@@ -153,11 +153,7 @@ impl qobject::VitalsView {
         self.as_mut().set_card_names(names);
 
         let index = usize::try_from(*self.chosen_card()).unwrap_or(0);
-        let card = vitals
-            .graphics
-            .cards
-            .get(index)
-            .or_else(|| vitals.graphics.preferred());
+        let card = vitals.graphics.cards.get(index).or_else(|| vitals.graphics.preferred());
 
         let reading = card.map(|card| &card.reading);
         self.as_mut().set_gpu_usage(reading.and_then(|r| r.utilisation).unwrap_or(0.0));

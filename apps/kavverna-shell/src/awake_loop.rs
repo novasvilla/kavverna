@@ -42,7 +42,8 @@ pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
     loop {
         match commands.recv_timeout(TICK) {
             Ok(Command::Engage(hold, requested)) => {
-                if let Err(err) = runtime.block_on(keep_awake.engage(hold, requested, Trigger::Manual))
+                if let Err(err) =
+                    runtime.block_on(keep_awake.engage(hold, requested, Trigger::Manual))
                 {
                     tracing::error!(%err, "could not engage keep awake");
                 }
@@ -122,9 +123,7 @@ fn default_hold() -> Hold {
 }
 
 fn jiggle_activity() -> (Activity, Keystroke) {
-    let read = |key, fallback| {
-        i32::try_from(settings::integer_at(key, fallback)).unwrap_or(0)
-    };
+    let read = |key, fallback| i32::try_from(settings::integer_at(key, fallback)).unwrap_or(0);
 
     (
         Activity::from_id(read(settings::JIGGLE_ACTIVITY, settings::JIGGLE_ACTIVITY_DEFAULT)),

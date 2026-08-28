@@ -5,3 +5,6 @@
 
 # Working notes, never published. See CLAUDE.md for how this repo goes public.
 /ROADMAP.md
+
+# Editor state with machine-local paths in it.
+.qmlls.ini

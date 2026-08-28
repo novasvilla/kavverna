@@ -1,12 +1,13 @@
 use crate::command::{self, Command};
 use crate::{awake_state, panel};
 use keep_awake::Hold;
-use std::time::Duration;
 use keep_awake::{format_compact, format_duration};
+use std::time::Duration;
 use zbus::fdo::{RequestNameFlags, RequestNameReply};
 use zbus::interface;
 
 pub const SERVICE: &str = "dev.kavverna.Shell";
+const INTERFACE: &str = "dev.kavverna.Shell";
 const PATH: &str = "/dev/kavverna/Shell";
 
 struct Shell;
@@ -57,9 +58,9 @@ impl Shell {
         match snapshot.next_in_cycle(&cycle) {
             Some(name) => {
                 let name = name.clone();
-                crate::mixer_state::send(
-                    sound_mixer::MixerCommand::MakeDefaultOutput(name.clone()),
-                );
+                crate::mixer_state::send(sound_mixer::MixerCommand::MakeDefaultOutput(
+                    name.clone(),
+                ));
                 name
             }
             None => "no outputs".into(),
@@ -120,7 +121,7 @@ pub enum Claim {
 ///
 /// The name is requested with `DoNotQueue`: the default would leave a second launch waiting
 /// in line for the name and running a full second copy of the app in the meantime.
-pub async fn claim() -> zbus::Result<Claim> {
+pub async fn claim(wanted: &Wanted) -> zbus::Result<Claim> {
     let connection = zbus::connection::Builder::session()?.serve_at(PATH, Shell)?.build().await?;
 
     // The bus reports a taken name as an error rather than a reply variant, so both have to
@@ -132,7 +133,7 @@ pub async fn claim() -> zbus::Result<Claim> {
         Ok(reply) => reply,
         Err(zbus::Error::NameTaken) => {
             drop(connection);
-            raise_running_instance().await;
+            raise_running_instance(wanted).await;
             return Ok(Claim::AlreadyRunning);
         }
         Err(err) => return Err(err),
@@ -146,22 +147,78 @@ pub async fn claim() -> zbus::Result<Claim> {
         }
         RequestNameReply::Exists | RequestNameReply::InQueue => {
             drop(connection);
-            raise_running_instance().await;
+            raise_running_instance(wanted).await;
             Ok(Claim::AlreadyRunning)
         }
     }
 }
 
-async fn raise_running_instance() {
+/// What a launch asks the running instance to show. The desktop entry's actions are these, so
+/// a right click on the icon in a launcher reaches the same places the panel does.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Wanted {
+    Panel,
+    Page(String),
+    Settings,
+}
+
+impl Wanted {
+    pub fn from_arguments(arguments: impl Iterator<Item = String>) -> Self {
+        let mut arguments = arguments.skip(1);
+        match arguments.next().as_deref() {
+            Some("--settings") => Self::Settings,
+            Some("--page") => arguments.next().map_or(Self::Panel, Self::Page),
+            _ => Self::Panel,
+        }
+    }
+}
+
+async fn raise_running_instance(wanted: &Wanted) {
     let Ok(connection) = zbus::Connection::session().await else {
         return;
     };
 
-    let call = connection
-        .call_method(Some(SERVICE), PATH, Some("dev.kavverna.Shell"), "Activate", &())
-        .await;
+    let call = match wanted {
+        Wanted::Panel => {
+            connection.call_method(Some(SERVICE), PATH, Some(INTERFACE), "Activate", &()).await
+        }
+        Wanted::Settings => {
+            connection.call_method(Some(SERVICE), PATH, Some(INTERFACE), "ShowSettings", &()).await
+        }
+        Wanted::Page(name) => {
+            connection.call_method(Some(SERVICE), PATH, Some(INTERFACE), "ShowPage", &(name,)).await
+        }
+    };
 
     if let Err(err) = call {
         tracing::warn!(%err, "another instance holds the name but did not answer");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn wanted(arguments: &[&str]) -> Wanted {
+        let mut all = vec!["kavverna-shell"];
+        all.extend_from_slice(arguments);
+        Wanted::from_arguments(all.into_iter().map(str::to_owned))
+    }
+
+    #[test]
+    fn a_plain_launch_asks_for_the_panel() {
+        assert_eq!(wanted(&[]), Wanted::Panel);
+        assert_eq!(wanted(&["--nonsense"]), Wanted::Panel);
+    }
+
+    #[test]
+    fn the_desktop_entry_actions_are_understood() {
+        assert_eq!(wanted(&["--settings"]), Wanted::Settings);
+        assert_eq!(wanted(&["--page", "clipboard"]), Wanted::Page("clipboard".into()));
+    }
+
+    #[test]
+    fn a_page_with_no_name_is_just_the_panel() {
+        assert_eq!(wanted(&["--page"]), Wanted::Panel);
     }
 }

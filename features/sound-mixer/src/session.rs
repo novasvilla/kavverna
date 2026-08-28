@@ -23,8 +23,14 @@ pub enum MixerError {
 
 #[derive(Debug, Clone)]
 pub enum MixerCommand {
-    SetVolume { node_id: u32, volume: Volume },
-    SetMute { node_id: u32, muted: bool },
+    SetVolume {
+        node_id: u32,
+        volume: Volume,
+    },
+    SetMute {
+        node_id: u32,
+        muted: bool,
+    },
     /// `node.name` of the device, which is what survives a restart.
     MakeDefaultOutput(String),
     MakeDefaultInput(String),
@@ -88,15 +94,12 @@ struct Tracked {
 
 /// The framework process is the one holding the arguments that name the application.
 fn process_id(node: &Properties, client: Option<&Properties>) -> Option<u32> {
-    [Some(node), client]
-        .into_iter()
-        .flatten()
-        .find_map(|bag| {
-            ["application.process.id", "pipewire.sec.pid"]
-                .iter()
-                .find_map(|key| bag.get(*key))
-                .and_then(|value| value.parse().ok())
-        })
+    [Some(node), client].into_iter().flatten().find_map(|bag| {
+        ["application.process.id", "pipewire.sec.pid"]
+            .iter()
+            .find_map(|key| bag.get(*key))
+            .and_then(|value| value.parse().ok())
+    })
 }
 
 impl Tracked {
@@ -172,10 +175,8 @@ impl Tracked {
 }
 
 fn properties_of(dict: Option<&DictRef>) -> Properties {
-    dict.map(|dict| {
-        dict.iter().map(|(key, value)| (key.to_owned(), value.to_owned())).collect()
-    })
-    .unwrap_or_default()
+    dict.map(|dict| dict.iter().map(|(key, value)| (key.to_owned(), value.to_owned())).collect())
+        .unwrap_or_default()
 }
 
 fn run(
@@ -273,7 +274,11 @@ fn run(
                 apply(&nodes, node_id, volume_property(volume));
             }
             MixerCommand::SetMute { node_id, muted } => {
-                apply(&nodes, node_id, Property::new(libspa::sys::SPA_PROP_mute, Value::Bool(muted)));
+                apply(
+                    &nodes,
+                    node_id,
+                    Property::new(libspa::sys::SPA_PROP_mute, Value::Bool(muted)),
+                );
             }
             MixerCommand::MakeDefaultOutput(name) => {
                 choose_default(&defaults, "default.configured.audio.sink", &name);
@@ -476,7 +481,10 @@ fn read_props(bytes: &[u8]) -> Option<(Option<Volume>, Option<bool>)> {
 
     for property in object.properties {
         match (property.key, property.value) {
-            (libspa::sys::SPA_PROP_channelVolumes, Value::ValueArray(ValueArray::Float(levels))) => {
+            (
+                libspa::sys::SPA_PROP_channelVolumes,
+                Value::ValueArray(ValueArray::Float(levels)),
+            ) => {
                 if let Some(level) = levels.first() {
                     volume = Some(Volume::from_amplitude(*level));
                 }
@@ -547,10 +555,7 @@ mod tests {
             parse_default_name(r#"{"name":"alsa_output.pci-0000_0c_00.6.iec958-stereo"}"#),
             Some("alsa_output.pci-0000_0c_00.6.iec958-stereo".to_owned())
         );
-        assert_eq!(
-            parse_default_name(r#"{ "name" : "headset" }"#),
-            Some("headset".to_owned())
-        );
+        assert_eq!(parse_default_name(r#"{ "name" : "headset" }"#), Some("headset".to_owned()));
     }
 
     #[test]

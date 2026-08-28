@@ -59,7 +59,11 @@ mod tests {
     fn reading_an_amplitude_gives_the_slider_back() {
         for percent in [0.0, 25.0, 50.0, 100.0, 150.0, 200.0] {
             let round_trip = Volume::from_amplitude(Volume::from_percent(percent).amplitude());
-            assert!(close(round_trip.percent(), percent), "{percent} became {}", round_trip.percent());
+            assert!(
+                close(round_trip.percent(), percent),
+                "{percent} became {}",
+                round_trip.percent()
+            );
         }
     }
 

@@ -41,17 +41,16 @@ pub struct GraphicsReading {
 impl GraphicsReading {
     /// The discrete card when there is one, since that is what the machine renders with.
     pub fn preferred(&self) -> Option<&Gpu> {
-        self.cards
-            .iter()
-            .find(|card| card.role == GpuRole::Discrete)
-            .or_else(|| self.cards.first())
+        self.cards.iter().find(|card| card.role == GpuRole::Discrete).or_else(|| self.cards.first())
     }
 
     pub fn chosen(&self, name: Option<&str>) -> Option<&Gpu> {
         match name {
-            Some(name) => {
-                self.cards.iter().find(|card| card.reading.name == name).or_else(|| self.preferred())
-            }
+            Some(name) => self
+                .cards
+                .iter()
+                .find(|card| card.reading.name == name)
+                .or_else(|| self.preferred()),
             None => self.preferred(),
         }
     }
@@ -155,7 +154,10 @@ mod tests {
     #[test]
     fn the_discrete_card_is_preferred_whatever_the_order() {
         let graphics = GraphicsReading {
-            cards: vec![card("AMD card0", GpuRole::Integrated), card("RTX 5070", GpuRole::Discrete)],
+            cards: vec![
+                card("AMD card0", GpuRole::Integrated),
+                card("RTX 5070", GpuRole::Discrete),
+            ],
         };
 
         assert_eq!(graphics.preferred().unwrap().reading.name, "RTX 5070");
@@ -172,7 +174,10 @@ mod tests {
     #[test]
     fn the_user_can_pin_a_card_by_name() {
         let graphics = GraphicsReading {
-            cards: vec![card("RTX 5070", GpuRole::Discrete), card("AMD card0", GpuRole::Integrated)],
+            cards: vec![
+                card("RTX 5070", GpuRole::Discrete),
+                card("AMD card0", GpuRole::Integrated),
+            ],
         };
 
         assert_eq!(graphics.chosen(Some("AMD card0")).unwrap().reading.name, "AMD card0");

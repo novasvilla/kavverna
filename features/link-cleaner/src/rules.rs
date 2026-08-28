@@ -111,10 +111,7 @@ fn built_in(host: &str, name: &str) -> bool {
     if name.starts_with(EVERYWHERE_PREFIX) || EVERYWHERE.contains(&name) {
         return true;
     }
-    PER_SITE
-        .iter()
-        .filter(|(site, _)| covers(site, host))
-        .any(|(_, names)| names.contains(&name))
+    PER_SITE.iter().filter(|(site, _)| covers(site, host)).any(|(_, names)| names.contains(&name))
 }
 
 /// A rule for a site covers its subdomains, so a link from `m.youtube.com` is cleaned too.
@@ -172,19 +169,18 @@ mod tests {
 
     #[test]
     fn a_name_of_your_own_can_be_kept_to_one_site() {
-        let rules =
-            Rules { added_per_site: vec![("shop.example".into(), "aff".into())], ..Rules::default() };
+        let rules = Rules {
+            added_per_site: vec![("shop.example".into(), "aff".into())],
+            ..Rules::default()
+        };
         assert!(rules.removes("shop.example", "aff"));
         assert!(!rules.removes("other.example", "aff"));
     }
 
     #[test]
     fn switching_a_rule_off_beats_adding_it() {
-        let rules = Rules {
-            added: vec!["ref".into()],
-            disabled: vec!["ref".into()],
-            ..Rules::default()
-        };
+        let rules =
+            Rules { added: vec!["ref".into()], disabled: vec!["ref".into()], ..Rules::default() };
         assert!(!rules.removes("example.org", "ref"));
     }
 }

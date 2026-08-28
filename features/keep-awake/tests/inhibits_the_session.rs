@@ -41,6 +41,9 @@ fn settles_on(expected: bool, probe: fn() -> bool) -> bool {
     false
 }
 
+// These tests share the machine's inhibitor list, so they take turns. The lock is held across
+// the awaits on purpose: releasing it early is exactly what would let them interfere.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "multi_thread")]
 async fn the_power_daemon_honours_the_hold() {
     let _exclusive = exclusive();
@@ -73,6 +76,9 @@ async fn the_power_daemon_honours_the_hold() {
     assert!(settles_on(false, power_daemon_lists_kavverna), "the inhibition outlived its hold");
 }
 
+// These tests share the machine's inhibitor list, so they take turns. The lock is held across
+// the awaits on purpose: releasing it early is exactly what would let them interfere.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "multi_thread")]
 async fn a_lapsed_hold_releases_itself() {
     let _exclusive = exclusive();
@@ -93,6 +99,9 @@ async fn a_lapsed_hold_releases_itself() {
     assert!(!keep_awake.is_active());
 }
 
+// These tests share the machine's inhibitor list, so they take turns. The lock is held across
+// the awaits on purpose: releasing it early is exactly what would let them interfere.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "multi_thread")]
 async fn extending_pushes_the_deadline_out() {
     let _exclusive = exclusive();
@@ -116,6 +125,9 @@ async fn extending_pushes_the_deadline_out() {
     keep_awake.release().await;
 }
 
+// These tests share the machine's inhibitor list, so they take turns. The lock is held across
+// the awaits on purpose: releasing it early is exactly what would let them interfere.
+#[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "multi_thread")]
 async fn an_indefinite_hold_has_nothing_to_extend() {
     let _exclusive = exclusive();
@@ -125,10 +137,7 @@ async fn an_indefinite_hold_has_nothing_to_extend() {
         return;
     };
 
-    keep_awake
-        .engage(Hold::Indefinite, Scope::SystemOnly, Trigger::Manual)
-        .await
-        .expect("engage");
+    keep_awake.engage(Hold::Indefinite, Scope::SystemOnly, Trigger::Manual).await.expect("engage");
 
     assert!(!keep_awake.is_timed());
     assert!(!keep_awake.extend(Duration::from_secs(900)));

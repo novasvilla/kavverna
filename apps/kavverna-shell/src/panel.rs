@@ -85,7 +85,6 @@ use core::pin::Pin;
 
 static PANEL: Mutex<Option<cxx_qt::CxxQtThread<qobject::KavvernaPanel>>> = Mutex::new(None);
 
-
 pub struct KavvernaPanelRust {
     panel_open: bool,
     showing_settings: bool,
@@ -111,10 +110,8 @@ pub struct KavvernaPanelRust {
 
 impl Default for KavvernaPanelRust {
     fn default() -> Self {
-        let allow_display_sleep = settings::bool_at(
-            settings::ALLOW_DISPLAY_SLEEP,
-            settings::ALLOW_DISPLAY_SLEEP_DEFAULT,
-        );
+        let allow_display_sleep =
+            settings::bool_at(settings::ALLOW_DISPLAY_SLEEP, settings::ALLOW_DISPLAY_SLEEP_DEFAULT);
         let restore_on_start =
             settings::bool_at(settings::RESTORE_ON_START, settings::RESTORE_ON_START_DEFAULT);
         Self {
@@ -139,7 +136,10 @@ impl Default for KavvernaPanelRust {
                 0,
             ),
             jiggle_keystroke: as_i32(
-                settings::integer_at(settings::JIGGLE_KEYSTROKE, settings::JIGGLE_KEYSTROKE_DEFAULT),
+                settings::integer_at(
+                    settings::JIGGLE_KEYSTROKE,
+                    settings::JIGGLE_KEYSTROKE_DEFAULT,
+                ),
                 0,
             ),
             default_minutes: as_i32(
@@ -182,7 +182,12 @@ fn describe_jiggle(state: crate::jiggle_state::JiggleState) -> String {
     let waiting = state.waiting_seconds / 60;
     match state.seconds_until_next {
         Some(seconds) if seconds >= 60 => {
-            format!("Next in {}m {:02}s of {waiting}m  ·  {} so far", seconds / 60, seconds % 60, state.nudges)
+            format!(
+                "Next in {}m {:02}s of {waiting}m  ·  {} so far",
+                seconds / 60,
+                seconds % 60,
+                state.nudges
+            )
         }
         Some(seconds) => format!("Next in {seconds}s of {waiting}m  ·  {} so far", state.nudges),
         None => "Starting".into(),
@@ -198,8 +203,15 @@ fn summarise(active: bool, remaining: Option<Duration>) -> String {
 }
 
 impl qobject::KavvernaPanel {
-    fn attach(self: Pin<&mut Self>) {
-        let thread = self.qt_thread();
+    fn attach(mut self: Pin<&mut Self>) {
+        let thread = self.as_mut().qt_thread();
+        if let Some(wanted) = REQUESTED.lock().ok().and_then(|mut held| held.take()) {
+            match wanted {
+                Requested::Settings => self.as_mut().set_showing_settings(true),
+                Requested::Page(name) => self.as_mut().set_page(page_number(&name)),
+            }
+            self.as_mut().set_panel_open(true);
+        }
         if let Ok(mut panel) = PANEL.lock() {
             *panel = Some(thread);
         }
@@ -369,14 +381,33 @@ pub fn open_hub() {
 }
 
 /// Named rather than numbered so a script does not have to know the tab order.
-pub fn open_page(name: &str) {
-    let page = match name {
+fn page_number(name: &str) -> i32 {
+    match name {
         "sound" => 1,
         "monitoring" => 2,
         "clipboard" => 3,
         "tools" => 4,
         _ => 0,
-    };
+    }
+}
+
+/// What a launch asked for, applied once the interface exists rather than guessed at with a
+/// delay, since nothing can be shown before then.
+pub enum Requested {
+    Page(String),
+    Settings,
+}
+
+static REQUESTED: Mutex<Option<Requested>> = Mutex::new(None);
+
+pub fn request(wanted: Requested) {
+    if let Ok(mut held) = REQUESTED.lock() {
+        *held = Some(wanted);
+    }
+}
+
+pub fn open_page(name: &str) {
+    let page = page_number(name);
 
     with_panel(move |mut panel| {
         panel.as_mut().set_showing_settings(false);

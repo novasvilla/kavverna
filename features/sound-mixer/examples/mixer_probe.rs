@@ -63,15 +63,17 @@ fn main() {
     if let Some(stream) = snapshot.streams.first() {
         let original = stream.volume;
         println!("\nsetting {} to 40%", stream.name);
-        handle.send(MixerCommand::SetVolume { node_id: stream.node_id, volume: Volume::from_percent(40.0) });
+        handle.send(MixerCommand::SetVolume {
+            node_id: stream.node_id,
+            volume: Volume::from_percent(40.0),
+        });
         std::thread::sleep(Duration::from_millis(600));
 
         while let Ok(fresh) = changes.try_recv() {
             latest = Some(fresh);
         }
-        if let Some(updated) = latest
-            .as_ref()
-            .and_then(|s| s.streams.iter().find(|s| s.node_id == stream.node_id))
+        if let Some(updated) =
+            latest.as_ref().and_then(|s| s.streams.iter().find(|s| s.node_id == stream.node_id))
         {
             println!("read back: {}%", updated.volume.percent().round());
         }

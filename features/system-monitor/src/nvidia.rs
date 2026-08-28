@@ -35,7 +35,9 @@ impl NvidiaCards {
                             .ok()
                             .map(|rates| rates.gpu as f32 / 100.0),
                         temperature: device
-                            .temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
+                            .temperature(
+                                nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu,
+                            )
                             .ok()
                             .map(|celsius| celsius as f32),
                         // Reported in milliwatts.

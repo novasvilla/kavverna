@@ -1,7 +1,7 @@
 //! Prints a reading so it can be compared against nvidia-smi, sensors and free.
 
-use system_monitor::Vitalsigns;
 use std::time::Duration;
+use system_monitor::Vitalsigns;
 
 fn gib(bytes: u64) -> f64 {
     bytes as f64 / (1024.0 * 1024.0 * 1024.0)

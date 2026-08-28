@@ -219,10 +219,10 @@ impl qobject::ClipboardView {
         self.as_mut().set_recent_count(snapshot.recent as i32);
         self.as_mut().set_available(clipboard_state::is_running());
         self.as_mut().set_enabled(clipboard_state::wanted());
-        self.as_mut().set_limit(
-            settings::integer_at(settings::CLIPBOARD_LIMIT, settings::CLIPBOARD_LIMIT_DEFAULT)
-                as i32,
-        );
+        self.as_mut().set_limit(settings::integer_at(
+            settings::CLIPBOARD_LIMIT,
+            settings::CLIPBOARD_LIMIT_DEFAULT,
+        ) as i32);
         self.as_mut().set_images_and_files(settings::bool_at(
             settings::CLIPBOARD_IMAGES_AND_FILES,
             settings::CLIPBOARD_IMAGES_AND_FILES_DEFAULT,
@@ -231,12 +231,10 @@ impl qobject::ClipboardView {
             settings::CLIPBOARD_SKIP_SENSITIVE,
             settings::CLIPBOARD_SKIP_SENSITIVE_DEFAULT,
         ));
-        self.as_mut().set_clear_after(
-            settings::integer_at(
-                settings::CLEAR_AFTER_SECONDS,
-                settings::CLEAR_AFTER_SECONDS_DEFAULT,
-            ) as i32,
-        );
+        self.as_mut().set_clear_after(settings::integer_at(
+            settings::CLEAR_AFTER_SECONDS,
+            settings::CLEAR_AFTER_SECONDS_DEFAULT,
+        ) as i32);
         self.as_mut().set_clear_on_suspend(clipboard_state::clears_on_suspend());
         self.as_mut().set_clear_on_screen_lock(clipboard_state::clears_on_screen_lock());
         self.as_mut().set_clean_links(clipboard_state::cleans_links());

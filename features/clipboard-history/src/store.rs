@@ -122,7 +122,7 @@ impl Store {
              FROM entry
              ORDER BY (pinned_at IS NULL), position DESC",
         )?;
-        let rows = statement.query_map([], |row| summary_from(row))?;
+        let rows = statement.query_map([], summary_from)?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
@@ -137,7 +137,7 @@ impl Store {
              WHERE entry_search MATCH ?1
              ORDER BY e.position DESC",
         )?;
-        let rows = statement.query_map(params![pattern], |row| summary_from(row))?;
+        let rows = statement.query_map(params![pattern], summary_from)?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
 
@@ -149,7 +149,7 @@ impl Store {
                         copied_at, pinned_at
                  FROM entry WHERE id = ?1",
                 params![id],
-                |row| entry_from(row),
+                entry_from,
             )
             .optional()?;
         Ok(found)
@@ -246,10 +246,8 @@ impl Store {
             return Ok(false);
         }
         self.db.execute("DELETE FROM entry_search WHERE rowid = ?1", params![id])?;
-        self.db.execute(
-            "INSERT INTO entry_search(rowid, body) VALUES (?1, ?2)",
-            params![id, text],
-        )?;
+        self.db
+            .execute("INSERT INTO entry_search(rowid, body) VALUES (?1, ?2)", params![id, text])?;
         Ok(true)
     }
 
@@ -339,29 +337,28 @@ impl Store {
     }
 
     pub fn counts(&self) -> Result<(usize, usize), StoreError> {
-        let pinned: i64 = self
-            .db
-            .query_row("SELECT COUNT(*) FROM entry WHERE pinned_at IS NOT NULL", [], |row| {
+        let pinned: i64 = self.db.query_row(
+            "SELECT COUNT(*) FROM entry WHERE pinned_at IS NOT NULL",
+            [],
+            |row| row.get(0),
+        )?;
+        let recent: i64 =
+            self.db.query_row("SELECT COUNT(*) FROM entry WHERE pinned_at IS NULL", [], |row| {
                 row.get(0)
             })?;
-        let recent: i64 = self
-            .db
-            .query_row("SELECT COUNT(*) FROM entry WHERE pinned_at IS NULL", [], |row| row.get(0))?;
         Ok((pinned as usize, recent as usize))
     }
 
     fn next_position(&self) -> Result<i64, StoreError> {
         let highest: i64 =
-            self.db.query_row("SELECT COALESCE(MAX(position), 0) FROM entry", [], |row| {
-                row.get(0)
-            })?;
+            self.db
+                .query_row("SELECT COALESCE(MAX(position), 0) FROM entry", [], |row| row.get(0))?;
         Ok(highest + 1)
     }
 
     fn sweep_images(&self) -> Result<(), StoreError> {
-        let mut statement = self
-            .db
-            .prepare("SELECT image_digest FROM entry WHERE image_digest IS NOT NULL")?;
+        let mut statement =
+            self.db.prepare("SELECT image_digest FROM entry WHERE image_digest IS NOT NULL")?;
         let kept: Vec<String> =
             statement.query_map([], |row| row.get(0))?.collect::<Result<_, _>>()?;
 
@@ -462,20 +459,14 @@ mod tests {
     }
 
     fn text(body: &str) -> Captured {
-        Captured {
-            kind: Kind::Text,
-            text: body.into(),
-            file_paths: Vec::new(),
-            image: None,
-        }
+        Captured { kind: Kind::Text, text: body.into(), file_paths: Vec::new(), image: None }
     }
 
     #[test]
     fn a_new_database_is_stamped_with_its_version() {
         let room = tempfile::tempdir().expect("a temporary directory");
         let store = Store::open(room.path()).unwrap();
-        let stamped: i64 =
-            store.db.query_row("PRAGMA user_version", [], |row| row.get(0)).unwrap();
+        let stamped: i64 = store.db.query_row("PRAGMA user_version", [], |row| row.get(0)).unwrap();
         assert_eq!(stamped, SCHEMA_VERSION);
     }
 

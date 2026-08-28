@@ -1,0 +1,21 @@
+[Desktop Entry]
+Type=Application
+Name=Kavverna
+GenericName=Desktop utilities
+Comment=Volume per application, system monitor, clipboard history and keep awake, in one tray icon
+Exec=kavverna-shell
+Icon=dev.kavverna.Kavverna
+Terminal=false
+Categories=Utility;System;Qt;KDE;
+Keywords=clipboard;volume;mixer;monitor;keep awake;tray;
+StartupNotify=false
+X-KDE-autostart-phase=2
+X-GNOME-UsesNotifications=true
+
+[Desktop Action ShowClipboard]
+Name=Clipboard history
+Exec=kavverna-shell --page clipboard
+
+[Desktop Action ShowSettings]
+Name=Settings
+Exec=kavverna-shell --settings

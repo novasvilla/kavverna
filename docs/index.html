@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kavverna</title>
+<meta name="description" content="One tray icon for the utilities a KDE Plasma desktop is missing. Free, open source, and everything runs on your own machine.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<style>
+  :root {
+    --stone: #15161a;
+    --stone-raised: #1d1f24;
+    --hairline: #2a2d34;
+    --ink: #f2f3f5;
+    --ink-dim: #a2a7b3;
+    --ink-faint: #6d7280;
+    --torch: #e9b44c;
+    --torch-bright: #f2c868;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--stone);
+    color: var(--ink);
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--torch); text-decoration: none; }
+  a:hover { color: var(--torch-bright); text-decoration: underline; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+
+  header { padding: 88px 0 56px; text-align: center; }
+  header img { width: 108px; height: 108px; }
+  h1 { margin: 20px 0 8px; font-size: 44px; letter-spacing: -0.02em; }
+  .tagline { margin: 0 auto; max-width: 30em; color: var(--ink-dim); font-size: 19px; }
+
+  nav { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; }
+  nav a { color: var(--ink-dim); font-size: 15px; }
+  nav a:hover { color: var(--torch); }
+
+  .cta { margin-top: 30px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .cta a {
+    display: inline-block; padding: 11px 20px; border-radius: 9px;
+    border: 1px solid var(--hairline); color: var(--ink); font-size: 15px;
+  }
+  .cta a.primary { background: var(--torch); border-color: var(--torch); color: #1b1500; font-weight: 600; }
+  .cta a:hover { text-decoration: none; border-color: var(--torch); }
+
+  section { padding: 40px 0; border-top: 1px solid var(--hairline); }
+  h2 { font-size: 24px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h3 { font-size: 15px; margin: 26px 0 8px; color: var(--torch); text-transform: uppercase; letter-spacing: 0.08em; }
+  p { color: var(--ink-dim); }
+  ul { padding-left: 20px; color: var(--ink-dim); }
+  li { margin: 7px 0; }
+  li strong { color: var(--ink); font-weight: 600; }
+
+  pre {
+    background: var(--stone-raised); border: 1px solid var(--hairline);
+    border-radius: 10px; padding: 16px; overflow-x: auto;
+    font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink);
+  }
+  .note {
+    background: var(--stone-raised); border: 1px solid var(--hairline);
+    border-left: 3px solid var(--torch); border-radius: 8px; padding: 14px 18px; margin: 18px 0;
+  }
+  .note p { margin: 0; }
+  footer { padding: 48px 0 72px; border-top: 1px solid var(--hairline); color: var(--ink-faint); font-size: 14px; }
+  footer a { color: var(--ink-dim); }
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <img src="assets/logo.svg" alt="Kavverna">
+  <h1>Kavverna</h1>
+  <p class="tagline">One tray icon for the utilities a Linux desktop is missing. Free, open
+  source, and everything runs on your own machine.</p>
+  <nav>
+    <a href="#features">Features</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com/novasvilla/kavverna/blob/main/docs/PRIVACY.md">Privacy</a>
+    <a href="https://github.com/novasvilla/kavverna/blob/main/CHANGELOG.md">Changelog</a>
+    <a href="https://www.linkedin.com/in/novasvilla/">Contact</a>
+    <a href="https://github.com/sponsors/novasvilla">Buy Me a Coffee</a>
+  </nav>
+  <div class="cta">
+    <a class="primary" href="https://github.com/novasvilla/kavverna">Source on GitHub</a>
+    <a href="https://github.com/novasvilla/kavverna/releases">Releases</a>
+  </div>
+</header>
+
+<section class="wrap" id="why">
+  <h2>Why this exists</h2>
+  <p>I use <a href="https://github.com/vorssaintapp/vorssaint-utils">Vorssaint</a> every day on
+  my Mac. It puts a per-application mixer, a system monitor, clipboard history and keep awake
+  behind one menu bar icon. Moving to Linux on my desktop, I could not find anything covering
+  the same ground. Plasma ships pieces of it, spread across separate applets, and none of them
+  go as far.</p>
+  <p>Kavverna is the missing tool, written from scratch in Rust with its interface in Qt and
+  QML. It is not a port: no line of the original was copied, and several things here work
+  better because Linux allows what macOS does not.</p>
+</section>
+
+<section class="wrap" id="features">
+  <h2>Everything it does</h2>
+
+  <h3>Sound</h3>
+  <ul>
+    <li><strong>Volume per application.</strong> One row per application rather than per stream,
+    because a single application can hold several and PipeWire gives them nothing to tell apart.
+    The row shows its loudest stream and a change reaches all of them.</li>
+    <li><strong>Every output and input</strong> with live volumes, mute, and switching which one
+    is the default.</li>
+    <li><strong>Mute every microphone</strong> in one click.</li>
+  </ul>
+
+  <h3>Monitoring</h3>
+  <ul>
+    <li><strong>Processor</strong> load overall and a bar per thread, with temperature read from
+    the chip by name rather than by index, since those move between boots.</li>
+    <li><strong>Memory</strong> with the page cache excluded, what applications actually hold,
+    and pressure from the kernel's own PSI rather than a guess.</li>
+    <li><strong>Compressed swap</strong> priced by what it really costs in RAM.</li>
+    <li><strong>Both graphics cards</strong>, never summed: usage, temperature, power and VRAM,
+    with the discrete one chosen by default.</li>
+  </ul>
+
+  <h3>Clipboard</h3>
+  <ul>
+    <li><strong>History</strong> of text, images and files, with search, pinning, manual
+    ordering and a size limit that pinned entries do not count toward.</li>
+    <li><strong>Ctrl+Alt+V</strong> opens it from anywhere with the search field ready. Arrows
+    walk the list, Enter or Ctrl+1 to Ctrl+9 put an entry back.</li>
+    <li><strong>Nothing marked as a secret is ever read.</strong> A password manager's copy
+    carries a mime type that says so, and the content is never taken.</li>
+    <li><strong>Take over from Plasma.</strong> Klipper's saved history can be adopted, keeping
+    the times it already had.</li>
+    <li><strong>Empty the clipboard on its own</strong>, on a timer, on suspend or on screen
+    lock, without touching a saved entry.</li>
+    <li><strong>Take the tracking out of copied links</strong>, and leave everything else byte
+    for byte as it was.</li>
+  </ul>
+
+  <h3>Energy and tools</h3>
+  <ul>
+    <li><strong>Keep awake</strong> for a set time or until switched off, with a live countdown,
+    and a choice between holding off sleep alone or the displays as well. It talks to the power
+    daemon, so it is honoured rather than hoped for.</li>
+    <li><strong>Move the pointer</strong> to a random place at a random interval, and press a key
+    as well or instead, for the idle watchers that only count the keyboard.</li>
+  </ul>
+</section>
+
+<section class="wrap" id="install">
+  <h2>Install</h2>
+  <p>Nothing is packaged yet. Building it takes Rust and Qt 6:</p>
+<pre>git clone https://github.com/novasvilla/kavverna
+cd kavverna
+cargo build --release
+./target/release/kavverna-shell</pre>
+  <p>A PKGBUILD is in the repository for anyone who wants an Arch package today. An AUR package
+  will follow once the feature set is worth installing.</p>
+  <div class="note">
+    <p>Tested on CachyOS with KDE Plasma 6.7 on Wayland and Qt 6.11. Other distributions are
+    untested rather than refused: everything KDE specific is reached over D-Bus and QML imports
+    rather than linked, so widening support means adding backends, not rewriting.</p>
+  </div>
+</section>
+
+<section class="wrap" id="limits">
+  <h2>What Wayland does not allow</h2>
+  <p>Worth saying up front, because these limits are not going away.</p>
+  <ul>
+    <li><strong>Which application copied something cannot be known.</strong> A selection carries
+    no client identity. Exclusions work by the mime type a password manager sets instead.</li>
+    <li><strong>The tray icon cannot show text.</strong> Live readings need a panel applet.</li>
+    <li><strong>A window cannot place itself.</strong> The panel anchors to a screen edge.</li>
+    <li><strong>Emptying the clipboard fights Plasma</strong> until Klipper's Prevent empty
+    clipboard option is turned off.</li>
+  </ul>
+</section>
+
+<section class="wrap" id="contribute">
+  <h2>More tools are welcome</h2>
+  <p>Adding one is smaller than it looks: a descriptor in the feature catalogue, a crate that
+  knows nothing about Qt, and one file for its section of the panel. The
+  <a href="https://github.com/novasvilla/kavverna/blob/main/CONTRIBUTING.md">contributing
+  guide</a> walks through it.</p>
+</section>
+
+<footer class="wrap">
+  <p>Written by <a href="https://github.com/novasvilla">@novasvilla</a>,
+  <a href="https://www.linkedin.com/in/novasvilla/">on LinkedIn</a>.
+  Inspired by <a href="https://github.com/vorssaintapp/vorssaint-utils">Vorssaint</a>.
+  GPL-3.0-or-later.</p>
+</footer>
+
+</body>
+</html>

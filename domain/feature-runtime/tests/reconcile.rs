@@ -5,8 +5,8 @@ use feature_runtime::{
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Default)]
 struct Wanted(BTreeSet<Feature>);
@@ -113,8 +113,8 @@ fn a_feature_that_fails_to_start_is_reported_and_left_stopped() {
     }
 
     let mut registry = FeatureRegistry::new();
-    let failures = registry
-        .reconcile(&Wanted([Feature::FanControl].into_iter().collect()), &Assembly);
+    let failures =
+        registry.reconcile(&Wanted([Feature::FanControl].into_iter().collect()), &Assembly);
 
     assert_eq!(failures.len(), 1);
     assert!(!registry.is_running(Feature::FanControl));

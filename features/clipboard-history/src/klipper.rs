@@ -11,9 +11,9 @@ use crate::store::{Captured, Store, StoreError};
 const DATABASE: &str = "klipper/history3.sqlite";
 
 pub fn history_path() -> Option<PathBuf> {
-    let base = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share")))?;
+    let base = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).or_else(|| {
+        std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share"))
+    })?;
     let path = base.join(DATABASE);
     path.is_file().then_some(path)
 }

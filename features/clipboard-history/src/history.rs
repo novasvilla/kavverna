@@ -5,11 +5,11 @@
 
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, SyncSender, channel, sync_channel};
 use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
 use crate::auto_clear::AutoClear;
 use crate::entry::{self, Entry, Kind, MAX_FILES, MAX_IMAGE_BYTES, StoredImage};
@@ -335,7 +335,9 @@ fn save(store: &mut Store, payload: Payload, settings: Settings) -> bool {
     let Some(captured) = worth_keeping(payload, settings) else {
         return false;
     };
-    match store.remember(captured).and_then(|_| store.trim_to(entry::sanitized_limit(settings.limit)))
+    match store
+        .remember(captured)
+        .and_then(|_| store.trim_to(entry::sanitized_limit(settings.limit)))
     {
         Ok(()) => true,
         Err(err) => {
@@ -428,7 +430,9 @@ mod tests {
 
     #[test]
     fn something_that_is_not_a_picture_is_not_stored_as_one() {
-        assert!(worth_keeping(Payload::Image(b"not a png".to_vec()), Settings::default()).is_none());
+        assert!(
+            worth_keeping(Payload::Image(b"not a png".to_vec()), Settings::default()).is_none()
+        );
     }
 
     #[test]

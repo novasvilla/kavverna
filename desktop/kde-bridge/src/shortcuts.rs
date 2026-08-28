@@ -68,13 +68,16 @@ pub async fn serve(
     presses: Sender<String>,
 ) -> Result<(), ShortcutError> {
     let connection = zbus::Connection::session().await?;
-    let accel = KGlobalAccelProxy::new(&connection).await.map_err(|_| ShortcutError::Unavailable)?;
+    let accel =
+        KGlobalAccelProxy::new(&connection).await.map_err(|_| ShortcutError::Unavailable)?;
 
     for shortcut in shortcuts {
         let action_id = [component, shortcut.action, friendly, shortcut.friendly];
         accel.do_register(&action_id).await?;
 
-        match accel.set_shortcut(&action_id, &[shortcut.keys], SET_PRESENT_WITHOUT_AUTOLOADING).await
+        match accel
+            .set_shortcut(&action_id, &[shortcut.keys], SET_PRESENT_WITHOUT_AUTOLOADING)
+            .await
         {
             Ok(given) if given.first() == Some(&shortcut.keys) => {
                 tracing::info!(action = shortcut.action, "global shortcut registered")

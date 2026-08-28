@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # Everything except the shell, which needs Qt and a KDE session. Those crates are the ones
+  # worth gating a merge on anyway: all the logic lives in them.
+  crates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install what the crates link against
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libpipewire-0.3-dev libspa-0.2-dev libudev-dev libwayland-dev \
+            libsqlite3-dev libclang-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo fmt --all --check
+
+      - name: Lint
+        run: >
+          cargo clippy --all-targets
+          -p feature-catalog -p feature-runtime -p preferences
+          -p kde-bridge -p keep-awake -p clipboard-history -p link-cleaner
+          -p sound-mixer -p system-monitor
+
+      # The tests under features/*/tests talk to a live compositor and a live session bus, so
+      # they belong on a real desktop rather than on a runner. Running them here would either
+      # fail or, worse, pass by doing nothing.
+      - name: Test
+        run: >
+          cargo test --lib
+          -p feature-catalog -p feature-runtime -p preferences
+          -p kde-bridge -p keep-awake -p clipboard-history -p link-cleaner
+          -p sound-mixer -p system-monitor
+
+  # Proves the whole thing still builds where it is meant to run.
+  shell:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install the desktop it targets
+        run: |
+          pacman -Syu --noconfirm --needed \
+            git rust qt6-base qt6-declarative layer-shell-qt \
+            pipewire libpipewire clang pkgconf sqlite
+
+      - uses: actions/checkout@v5
+
+      - run: cargo build --workspace --locked

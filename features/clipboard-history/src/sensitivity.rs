@@ -37,12 +37,9 @@ fn is_an_identifier(text: &str) -> bool {
     let lengths = [8, 4, 4, 4, 12];
 
     groups.len() == lengths.len()
-        && groups
-            .iter()
-            .zip(lengths)
-            .all(|(group, wanted)| {
-                group.len() == wanted && group.chars().all(|c| c.is_ascii_hexdigit())
-            })
+        && groups.iter().zip(lengths).all(|(group, wanted)| {
+            group.len() == wanted && group.chars().all(|c| c.is_ascii_hexdigit())
+        })
 }
 
 #[cfg(test)]

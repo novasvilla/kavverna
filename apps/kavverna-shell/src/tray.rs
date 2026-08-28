@@ -42,7 +42,6 @@ impl StatusIcon {
             (true, None) => "Awake until switched off".into(),
         }
     }
-
 }
 
 impl Tray for StatusIcon {

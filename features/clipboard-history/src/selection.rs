@@ -18,7 +18,9 @@ use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 use wayland_client::globals::{BindError, GlobalError, GlobalListContents, registry_queue_init};
 use wayland_client::protocol::wl_registry::WlRegistry;
 use wayland_client::protocol::wl_seat::{self, WlSeat};
-use wayland_client::{Connection, Dispatch, DispatchError, Proxy, QueueHandle, event_created_child};
+use wayland_client::{
+    Connection, Dispatch, DispatchError, Proxy, QueueHandle, event_created_child,
+};
 use wayland_protocols::ext::data_control::v1::client::ext_data_control_device_v1::{
     self, EVT_DATA_OFFER_OPCODE, ExtDataControlDeviceV1,
 };
@@ -239,10 +241,8 @@ fn run(
         };
 
         let display = conn.as_fd();
-        let mut fds = [
-            PollFd::new(display, PollFlags::POLLIN),
-            PollFd::new(wake.as_fd(), PollFlags::POLLIN),
-        ];
+        let mut fds =
+            [PollFd::new(display, PollFlags::POLLIN), PollFd::new(wake.as_fd(), PollFlags::POLLIN)];
         if poll(&mut fds, PollTimeout::NONE).is_err() {
             break;
         }
@@ -349,7 +349,12 @@ impl Watcher {
         }
     }
 
-    fn capture(&mut self, selection: Selection, offer: Option<ExtDataControlOfferV1>, conn: &Connection) {
+    fn capture(
+        &mut self,
+        selection: Selection,
+        offer: Option<ExtDataControlOfferV1>,
+        conn: &Connection,
+    ) {
         let replay = !self.replayed.contains(&selection);
         if replay {
             self.replayed.push(selection);
@@ -656,7 +661,7 @@ mod tests {
 
     #[test]
     fn a_uri_list_survives_a_round_trip() {
-        let paths = vec![PathBuf::from("/home/novas/a file.txt"), PathBuf::from("/tmp/b.png")];
+        let paths = vec![PathBuf::from("/home/someone/a file.txt"), PathBuf::from("/tmp/b.png")];
         assert_eq!(parse_uri_list(&uri_list(&paths)), paths);
     }
 

@@ -33,7 +33,7 @@ fn fraction(part: u64, whole: u64) -> f32 {
 
 /// Parses `/proc/meminfo`, whose values are in kibibytes.
 pub fn parse_meminfo(contents: &str) -> MemoryReading {
-    let mut field = |name: &str| -> u64 {
+    let field = |name: &str| -> u64 {
         contents
             .lines()
             .find(|line| line.starts_with(name) && line.as_bytes().get(name.len()) == Some(&b':'))

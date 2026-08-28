@@ -9,9 +9,7 @@ const FILE_MODE: u32 = 0o600;
 /// Writes through a temporary file in the same directory so an interrupted save leaves the
 /// previous settings intact rather than a truncated file.
 pub fn write(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| io::Error::other("settings path has no directory"))?;
+    let parent = path.parent().ok_or_else(|| io::Error::other("settings path has no directory"))?;
 
     fs::create_dir_all(parent)?;
     fs::set_permissions(parent, fs::Permissions::from_mode(DIR_MODE))?;

@@ -73,14 +73,13 @@ mod tests {
             set(true).expect("enable");
 
             assert!(is_enabled());
-            let entry = std::fs::read_to_string(home.join("autostart").join(ENTRY))
-                .expect("entry written");
+            let entry =
+                std::fs::read_to_string(home.join("autostart").join(ENTRY)).expect("entry written");
             assert!(entry.contains("Type=Application"));
             assert!(entry.contains("Name=Kavverna"));
-            assert!(entry.contains(&format!(
-                "Exec={}",
-                std::env::current_exe().unwrap().display()
-            )));
+            assert!(
+                entry.contains(&format!("Exec={}", std::env::current_exe().unwrap().display()))
+            );
         });
     }
 

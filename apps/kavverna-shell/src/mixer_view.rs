@@ -200,10 +200,7 @@ fn siblings(node_id: i32) -> Vec<i32> {
 fn device_name(node_id: i32, output: bool) -> Option<String> {
     let snapshot = mixer_state::get();
     let devices = if output { snapshot.outputs } else { snapshot.inputs };
-    devices
-        .into_iter()
-        .find(|device| device.node_id as i32 == node_id)
-        .map(|device| device.name)
+    devices.into_iter().find(|device| device.node_id as i32 == node_id).map(|device| device.name)
 }
 
 fn send_volume(node_id: i32, percent: i32) {

@@ -37,11 +37,7 @@ fn the_file_and_its_directory_are_private() {
     prefs.save().expect("save");
 
     let file_mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
-    let dir_mode = std::fs::metadata(path.parent().unwrap())
-        .unwrap()
-        .permissions()
-        .mode()
-        & 0o777;
+    let dir_mode = std::fs::metadata(path.parent().unwrap()).unwrap().permissions().mode() & 0o777;
 
     assert_eq!(file_mode, 0o600, "settings file is readable by others");
     assert_eq!(dir_mode, 0o700, "settings directory is readable by others");

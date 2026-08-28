@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Kavverna">
+  <defs>
+    <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#23242A"/>
+      <stop offset="1" stop-color="#15161A"/>
+    </linearGradient>
+    <linearGradient id="torch" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F2C868"/>
+      <stop offset="1" stop-color="#E9B44C"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="256" height="256" rx="56" fill="url(#stone)"/>
+
+  <!-- The mouth of the cavern you walk into to pick something up. -->
+  <path d="M60 208 V116 a68 68 0 0 1 136 0 v92 h-28 v-92 a40 40 0 0 0-80 0 v92 z"
+        fill="url(#torch)" opacity="0.22"/>
+
+  <path d="M92 68 v120 h26 v-44 l12-13 34 57 h30 l-46-77 43-43 h-33 l-40 41 V68 z"
+        fill="url(#torch)"/>
+</svg>

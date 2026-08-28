@@ -94,9 +94,7 @@ impl Entry {
     pub fn preview(&self) -> String {
         match self.kind {
             Kind::Text => shorten(&self.text),
-            Kind::Image => {
-                self.image.as_ref().map(StoredImage::dimensions).unwrap_or_default()
-            }
+            Kind::Image => self.image.as_ref().map(StoredImage::dimensions).unwrap_or_default(),
             Kind::Files => self.file_names().join(", "),
         }
     }
@@ -119,7 +117,6 @@ impl Entry {
             }
         }
     }
-
 }
 
 fn shorten(text: &str) -> String {

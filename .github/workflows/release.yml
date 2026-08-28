@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install the desktop it targets
+        run: |
+          pacman -Syu --noconfirm --needed \
+            git rust qt6-base qt6-declarative layer-shell-qt \
+            pipewire libpipewire clang pkgconf sqlite
+
+      - uses: actions/checkout@v5
+
+      # Cargo versions are three numbers and the release scheme asks for four. The fourth is
+      # the build that produced this binary, and a build made by hand reads zero.
+      - name: Build
+        env:
+          KAVVERNA_BUILD: ${{ github.run_number }}
+        run: cargo build --release --locked
+
+      - name: Package
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          name="kavverna-${TAG#v}-x86_64"
+          mkdir -p "dist/$name"
+          cp target/release/kavverna-shell "dist/$name/"
+          cp README.md LICENSE CHANGELOG.md CREDITS.md "dist/$name/"
+          tar -czf "dist/$name.tar.gz" -C dist "$name"
+          sha256sum "dist/$name.tar.gz" > "dist/$name.tar.gz.sha256"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
+          generate_release_notes: true
+          body: |
+            Built on Arch with Qt 6 for KDE Plasma 6 on Wayland. See CHANGELOG.md for what
+            changed, and the README for what this still cannot do.

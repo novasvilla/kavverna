@@ -68,10 +68,9 @@ impl Vitalsigns {
         self.previous = Some(ticks);
 
         let mut cards = self.nvidia.as_ref().map(NvidiaCards::read).unwrap_or_default();
-        cards.extend(self.amd.iter().map(|card| Gpu {
-            role: GpuRole::Integrated,
-            reading: card.read(),
-        }));
+        cards.extend(
+            self.amd.iter().map(|card| Gpu { role: GpuRole::Integrated, reading: card.read() }),
+        );
         cards.sort_by_key(|card| card.role);
 
         Vitals {
