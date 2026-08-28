@@ -3,7 +3,9 @@ use std::process::Command;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
-/// The power daemon's inhibition list is session-wide state, so these tests cannot overlap.
+/// The power daemon's inhibition list is session-wide state, so these tests take turns. Each
+/// holds the guard across its awaits on purpose: releasing it early is what would let them
+/// interfere, which is why they carry `allow(clippy::await_holding_lock)`.
 static POWER_DAEMON: Mutex<()> = Mutex::new(());
 
 fn exclusive() -> MutexGuard<'static, ()> {
@@ -41,10 +43,9 @@ fn settles_on(expected: bool, probe: fn() -> bool) -> bool {
     false
 }
 
-// These tests share the machine's inhibitor list, so they take turns. The lock is held across
-// the awaits on purpose: releasing it early is exactly what would let them interfere.
 #[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs a live session bus with PowerDevil on it"]
 async fn the_power_daemon_honours_the_hold() {
     let _exclusive = exclusive();
 
@@ -76,10 +77,9 @@ async fn the_power_daemon_honours_the_hold() {
     assert!(settles_on(false, power_daemon_lists_kavverna), "the inhibition outlived its hold");
 }
 
-// These tests share the machine's inhibitor list, so they take turns. The lock is held across
-// the awaits on purpose: releasing it early is exactly what would let them interfere.
 #[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs a live session bus with PowerDevil on it"]
 async fn a_lapsed_hold_releases_itself() {
     let _exclusive = exclusive();
 
@@ -99,10 +99,9 @@ async fn a_lapsed_hold_releases_itself() {
     assert!(!keep_awake.is_active());
 }
 
-// These tests share the machine's inhibitor list, so they take turns. The lock is held across
-// the awaits on purpose: releasing it early is exactly what would let them interfere.
 #[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs a live session bus with PowerDevil on it"]
 async fn extending_pushes_the_deadline_out() {
     let _exclusive = exclusive();
 
@@ -125,10 +124,9 @@ async fn extending_pushes_the_deadline_out() {
     keep_awake.release().await;
 }
 
-// These tests share the machine's inhibitor list, so they take turns. The lock is held across
-// the awaits on purpose: releasing it early is exactly what would let them interfere.
 #[allow(clippy::await_holding_lock)]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs a live session bus with PowerDevil on it"]
 async fn an_indefinite_hold_has_nothing_to_extend() {
     let _exclusive = exclusive();
 

@@ -19,9 +19,17 @@ const PROCESSOR_CHIPS: [&str; 3] = ["k10temp", "coretemp", "zenpower"];
 /// AMD reports the control temperature under this label, which is the one to show.
 const PROCESSOR_LABELS: [&str; 3] = ["Tctl", "Tdie", "Package id 0"];
 
+const HWMON: &str = "/sys/class/hwmon";
+
 impl Thermometer {
     pub fn discover() -> Self {
-        let Ok(entries) = std::fs::read_dir("/sys/class/hwmon") else {
+        Self::discover_in(Path::new(HWMON))
+    }
+
+    /// Takes the root so a test can point it at a tree it wrote itself. Reading the machine's own
+    /// `/sys` from a unit test makes the result depend on which machine runs it.
+    pub fn discover_in(root: &Path) -> Self {
+        let Ok(entries) = std::fs::read_dir(root) else {
             return Self::default();
         };
 
@@ -102,19 +110,62 @@ mod tests {
         assert_eq!(PROCESSOR_LABELS[0], "Tctl");
     }
 
-    #[test]
-    fn discovery_finds_the_chips_on_this_machine() {
-        let thermometer = Thermometer::discover();
-        let chips = thermometer.chips();
-
-        if chips.is_empty() {
-            eprintln!("skipped: no hwmon on this machine");
-            return;
+    fn chip(root: &Path, directory: &str, name: &str, readings: &[(&str, &str)]) {
+        let path = root.join(directory);
+        std::fs::create_dir_all(&path).unwrap();
+        std::fs::write(path.join("name"), format!("{name}\n")).unwrap();
+        for (file, value) in readings {
+            std::fs::write(path.join(file), format!("{value}\n")).unwrap();
         }
+    }
 
-        assert!(
-            thermometer.processor_celsius().is_some_and(|c| (10.0..120.0).contains(&c)),
-            "processor temperature out of range, chips: {chips:?}"
+    #[test]
+    fn the_control_temperature_is_read_from_the_processor_chip() {
+        let room = tempfile::tempdir().unwrap();
+        chip(room.path(), "hwmon2", "nvme", &[("temp1_input", "38000")]);
+        chip(
+            room.path(),
+            "hwmon0",
+            "k10temp",
+            &[
+                ("temp1_label", "Tctl"),
+                ("temp1_input", "51500"),
+                ("temp2_label", "Tccd1"),
+                ("temp2_input", "47000"),
+            ],
         );
+
+        let thermometer = Thermometer::discover_in(room.path());
+
+        assert_eq!(thermometer.processor_celsius(), Some(51.5));
+    }
+
+    /// A machine with sensors but none of the processor chips reports nothing rather than
+    /// handing back whatever it did find, which is how a disk temperature would end up on the
+    /// processor row.
+    #[test]
+    fn a_machine_with_no_processor_chip_reports_no_temperature() {
+        let room = tempfile::tempdir().unwrap();
+        chip(room.path(), "hwmon0", "nvme", &[("temp1_input", "38000")]);
+
+        let thermometer = Thermometer::discover_in(room.path());
+
+        assert_eq!(thermometer.chips(), vec!["nvme"]);
+        assert_eq!(thermometer.processor_celsius(), None);
+    }
+
+    #[test]
+    fn a_chip_that_labels_nothing_falls_back_to_its_first_reading() {
+        let room = tempfile::tempdir().unwrap();
+        chip(room.path(), "hwmon0", "coretemp", &[("temp1_input", "44000")]);
+
+        assert_eq!(Thermometer::discover_in(room.path()).processor_celsius(), Some(44.0));
+    }
+
+    #[test]
+    fn nothing_at_the_root_is_not_an_error() {
+        let room = tempfile::tempdir().unwrap();
+
+        assert!(Thermometer::discover_in(&room.path().join("absent")).chips().is_empty());
     }
 }

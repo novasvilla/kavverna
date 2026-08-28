@@ -104,9 +104,16 @@ fn micros_to_units(value: u64) -> f32 {
     value as f32 / 1_000_000.0
 }
 
-/// Finds amdgpu cards and the hwmon directory each one owns.
+const DRM: &str = "/sys/class/drm";
+
 pub fn discover_sysfs_cards() -> Vec<SysfsCard> {
-    let Ok(entries) = std::fs::read_dir("/sys/class/drm") else {
+    discover_sysfs_cards_in(Path::new(DRM))
+}
+
+/// Takes the root so a test can point it at a tree it wrote itself, rather than at whichever
+/// cards the machine running the test happens to have.
+pub fn discover_sysfs_cards_in(root: &Path) -> Vec<SysfsCard> {
+    let Ok(entries) = std::fs::read_dir(root) else {
         return Vec::new();
     };
 
@@ -149,6 +156,30 @@ mod tests {
 
     fn card(name: &str, role: GpuRole) -> Gpu {
         Gpu { role, reading: GpuReading { name: name.into(), ..Default::default() } }
+    }
+
+    #[test]
+    fn only_amd_cards_are_taken_and_connectors_are_not_cards() {
+        let room = tempfile::tempdir().unwrap();
+        let entry = |name: &str, driver: Option<&str>| {
+            let device = room.path().join(name).join("device");
+            std::fs::create_dir_all(&device).unwrap();
+            if let Some(driver) = driver {
+                std::os::unix::fs::symlink(
+                    format!("../../bus/pci/drivers/{driver}"),
+                    device.join("driver"),
+                )
+                .unwrap();
+            }
+        };
+        entry("card0", Some("amdgpu"));
+        entry("card1", Some("nvidia"));
+        entry("card0-HDMI-A-1", Some("amdgpu"));
+
+        let cards = discover_sysfs_cards_in(room.path());
+
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].name, "AMD card0");
     }
 
     #[test]

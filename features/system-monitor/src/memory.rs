@@ -89,9 +89,16 @@ pub fn parse_mm_stat(device: &str, contents: &str) -> Option<CompressedSwap> {
     })
 }
 
-/// Finds every zram device backing swap.
+const BLOCK_DEVICES: &str = "/sys/block";
+
 pub fn discover_compressed_swap() -> Vec<CompressedSwap> {
-    let Ok(entries) = std::fs::read_dir("/sys/block") else {
+    discover_compressed_swap_in(std::path::Path::new(BLOCK_DEVICES))
+}
+
+/// Takes the root so a test can point it at a tree it wrote itself. A machine with no zram would
+/// otherwise let the test pass by finding nothing at all.
+pub fn discover_compressed_swap_in(root: &std::path::Path) -> Vec<CompressedSwap> {
+    let Ok(entries) = std::fs::read_dir(root) else {
         return Vec::new();
     };
 
@@ -236,6 +243,26 @@ SReclaimable:     581160 kB
     fn a_truncated_mm_stat_is_ignored_rather_than_half_read() {
         assert_eq!(parse_mm_stat("zram0", "123 456"), None);
         assert_eq!(parse_mm_stat("zram0", ""), None);
+    }
+
+    #[test]
+    fn only_the_zram_devices_are_read_out_of_the_block_directory() {
+        let room = tempfile::tempdir().unwrap();
+        let device = |name: &str, stat: Option<&str>| {
+            let path = room.path().join(name);
+            std::fs::create_dir_all(&path).unwrap();
+            if let Some(stat) = stat {
+                std::fs::write(path.join("mm_stat"), stat).unwrap();
+            }
+        };
+        device("zram0", Some("4299317248 1121926831 1167548416 0 0 0 0 0"));
+        device("nvme0n1", None);
+        device("sda", None);
+
+        let found = discover_compressed_swap_in(room.path());
+
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].device, "zram0");
     }
 
     #[test]

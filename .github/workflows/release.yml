@@ -20,6 +20,11 @@ jobs:
 
       - uses: actions/checkout@v5
 
+      # A tag can be pushed at any commit, so the suite runs here too rather than trusting that
+      # CI was green on whatever this points at.
+      - name: Test
+        run: cargo test --workspace --exclude kavverna-shell --locked
+
       # Cargo versions are three numbers and the release scheme asks for four. The fourth is
       # the build that produced this binary, and a build made by hand reads zero.
       - name: Build

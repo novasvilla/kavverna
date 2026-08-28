@@ -37,11 +37,12 @@ jobs:
       - name: Lint
         run: cargo clippy --all-targets --workspace --exclude kavverna-shell
 
-      # The tests under features/*/tests talk to a live compositor and a live session bus, so
-      # they belong on a real desktop rather than on a runner. Running them here would either
-      # fail or, worse, pass by doing nothing.
+      # The tests that need a live compositor, a live session bus or real sensors carry
+      # `#[ignore]` and say what they need, so this picks up everything else. Selecting with
+      # `--lib` instead would drop the integration tests that are perfectly happy on a runner,
+      # among them the one guarding the persisted feature ids.
       - name: Test
-        run: cargo test --lib --workspace --exclude kavverna-shell
+        run: cargo test --workspace --exclude kavverna-shell
 
   # Proves the whole thing still builds where it is meant to run.
   shell:

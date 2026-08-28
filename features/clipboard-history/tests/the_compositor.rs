@@ -3,6 +3,8 @@
 //! selection we set coming back at us as a fresh copy, a read that never sees end of file.
 //!
 //! These tests take over the clipboard, so they run one at a time and put back what they found.
+//! Ignored by default for the same reason: run them with `-- --include-ignored` on a desktop, and
+//! stop Kavverna first or their copies land in your real history.
 
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
@@ -93,6 +95,7 @@ fn next_copy(events: &Receiver<SelectionEvent>) -> Payload {
 }
 
 #[test]
+#[ignore = "needs a live compositor offering ext-data-control"]
 fn a_copy_from_another_application_arrives() {
     let _guard = one_at_a_time();
     let _restore = RestoredClipboard::save();
@@ -105,6 +108,7 @@ fn a_copy_from_another_application_arrives() {
 }
 
 #[test]
+#[ignore = "needs a live compositor offering ext-data-control"]
 fn what_was_already_there_is_not_captured() {
     let _guard = one_at_a_time();
     let _restore = RestoredClipboard::save();
@@ -122,6 +126,7 @@ fn what_was_already_there_is_not_captured() {
 }
 
 #[test]
+#[ignore = "needs a live compositor offering ext-data-control"]
 fn what_we_put_back_is_readable_and_is_not_a_new_copy() {
     let _guard = one_at_a_time();
     let _restore = RestoredClipboard::save();
@@ -152,6 +157,7 @@ fn what_we_put_back_is_readable_and_is_not_a_new_copy() {
 }
 
 #[test]
+#[ignore = "needs a live compositor offering ext-data-control"]
 fn a_copy_marked_as_a_secret_is_noticed_but_never_read() {
     let _guard = one_at_a_time();
     let _restore = RestoredClipboard::save();
@@ -173,6 +179,7 @@ fn a_copy_marked_as_a_secret_is_noticed_but_never_read() {
 }
 
 #[test]
+#[ignore = "needs a live compositor offering ext-data-control"]
 fn a_copy_reaches_the_history_and_can_be_put_back() {
     use clipboard_history::history::{Command, History, Settings, Snapshot};
 
@@ -222,6 +229,7 @@ fn a_copy_reaches_the_history_and_can_be_put_back() {
 /// re-assertion as a fresh copy restarts the auto clear timer, and the two then fight once a
 /// second until one of them stops.
 #[test]
+#[ignore = "needs a live compositor offering ext-data-control"]
 fn plasma_putting_the_clipboard_back_is_not_a_new_copy() {
     let _guard = one_at_a_time();
     let _restore = RestoredClipboard::save();
@@ -243,6 +251,7 @@ fn plasma_putting_the_clipboard_back_is_not_a_new_copy() {
 /// only worth making if it is true, and it was not: an edit meant to gate the read never landed
 /// in the file and nothing noticed.
 #[test]
+#[ignore = "needs a live compositor offering ext-data-control"]
 fn with_reading_off_the_content_is_never_taken() {
     use std::sync::atomic::AtomicBool;
 

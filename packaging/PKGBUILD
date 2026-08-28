@@ -23,12 +23,10 @@ build() {
 check() {
   cd "$pkgname-$pkgver"
   export RUSTUP_TOOLCHAIN=stable
-  # Only the library tests. The rest talk to a live compositor and a live session bus, which a
-  # build chroot does not have.
-  cargo test --frozen --release --lib \
-    -p feature-catalog -p feature-runtime -p preferences \
-    -p keep-awake -p clipboard-history -p link-cleaner \
-    -p sound-mixer -p system-monitor
+  # Named by exclusion, or the list rots the next time a crate arrives or leaves. Anything
+  # needing a live compositor, session bus or real sensors carries `#[ignore]`, none of which a
+  # build chroot has.
+  cargo test --frozen --release --workspace --exclude kavverna-shell
 }
 
 package() {
