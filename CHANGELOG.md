@@ -3,6 +3,20 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## 0.1.3
+
+### Fixed
+
+- **The settings page was the height of the screen.** Every page now keeps to the height the
+  rest of them use and anything longer scrolls, rather than growing into a column nobody can
+  read.
+- **The pointer nudge looked unavailable on a working machine.** It was looking for ydotool's
+  socket in `/tmp` only; `ydotoold` puts it in the runtime directory when it has one.
+
+### Added
+
+- Screenshots, and install instructions that do not need the AUR.
+
 ## 0.1.2
 
 ### Fixed

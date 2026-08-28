@@ -88,6 +88,12 @@
     <a class="primary" href="https://github.com/novasvilla/kavverna">Source on GitHub</a>
     <a href="https://github.com/novasvilla/kavverna/releases">Releases</a>
   </div>
+  <p style="margin-top:44px">
+    <img src="assets/readme/sound.png" width="176" alt="Sound" style="border-radius:12px;margin:4px">
+    <img src="assets/readme/monitoring.png" width="176" alt="Monitoring" style="border-radius:12px;margin:4px">
+    <img src="assets/readme/clipboard.png" width="176" alt="Clipboard" style="border-radius:12px;margin:4px">
+    <img src="assets/readme/settings.png" width="176" alt="Settings" style="border-radius:12px;margin:4px">
+  </p>
 </header>
 
 <section class="wrap" id="why">
@@ -154,13 +160,18 @@
 
 <section class="wrap" id="install">
   <h2>Install</h2>
-  <p>Nothing is packaged yet. Building it takes Rust and Qt 6:</p>
+  <p>On Arch, as a package. This installs the binary, the desktop entry and the icon the way
+  anything else on the system does, and <code>pacman -R kavverna</code> removes it again.</p>
 <pre>git clone https://github.com/novasvilla/kavverna
-cd kavverna
-cargo build --release
+cd kavverna/packaging
+makepkg -si</pre>
+  <p>There is no AUR package yet: new AUR accounts are closed at the moment, so this is the way
+  in until they reopen. It is the same package the AUR would hand you.</p>
+  <p>Anywhere else, or to run it without installing:</p>
+<pre>cargo build --release
 ./target/release/kavverna-shell</pre>
-  <p>A PKGBUILD is in the repository for anyone who wants an Arch package today. An AUR package
-  will follow once the feature set is worth installing.</p>
+  <p>A prebuilt binary is attached to every
+  <a href="https://github.com/novasvilla/kavverna/releases">release</a>.</p>
   <div class="note">
     <p>Tested on CachyOS with KDE Plasma 6.7 on Wayland and Qt 6.11. Other distributions are
     untested rather than refused: everything KDE specific is reached over D-Bus and QML imports

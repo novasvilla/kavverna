@@ -1,7 +1,7 @@
 # Maintainer: novasvilla <https://github.com/novasvilla>
 
 pkgname=kavverna
-pkgver=0.1.2
+pkgver=0.1.3
 pkgrel=1
 pkgdesc="One tray icon for the utilities a KDE Plasma desktop is missing"
 arch=('x86_64')

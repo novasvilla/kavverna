@@ -26,6 +26,13 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License GPL 3.0 or later"></a>
 </p>
 
+<p align="center">
+  <img src="docs/assets/readme/sound.png" width="186" alt="Sound: every output with live volumes, and one row per application">
+  <img src="docs/assets/readme/monitoring.png" width="186" alt="Monitoring: processor, memory, pressure and both graphics cards">
+  <img src="docs/assets/readme/clipboard.png" width="186" alt="Clipboard history with search and quick paste shortcuts">
+  <img src="docs/assets/readme/settings.png" width="186" alt="Settings for startup, energy and the clipboard">
+</p>
+
 Per application volume, a real system monitor, clipboard history with a picker on a shortcut,
 keep awake, and a pointer that refuses to go idle. The tools a Plasma desktop spreads across
 half a dozen applets, or does not ship at all, behind one icon in the tray, with no account, no
@@ -87,7 +94,22 @@ not. See [CREDITS.md](CREDITS.md).
 
 ## Install
 
-Nothing is packaged yet. Building it takes Rust and Qt 6:
+### On Arch, as a package
+
+The `PKGBUILD` builds from the tagged release and installs the binary, the desktop entry and
+the icon the way anything else on the system does:
+
+```sh
+git clone https://github.com/novasvilla/kavverna
+cd kavverna/packaging
+makepkg -si
+```
+
+`pacman -R kavverna` removes it again. There is no AUR package yet: new AUR accounts are
+closed at the moment, so this is the way in until they reopen. Nothing about it is temporary
+from your side, it is the same package the AUR would hand you.
+
+### Anywhere else
 
 ```sh
 git clone https://github.com/novasvilla/kavverna
@@ -96,14 +118,8 @@ cargo build --release
 ./target/release/kavverna-shell
 ```
 
-On Arch, [packaging/](packaging/) has a PKGBUILD that builds from the tagged release:
-
-```sh
-cd kavverna/packaging && makepkg -si
-```
-
-An AUR package is prepared and waiting on an account. Prebuilt binaries are attached to each
-[release](https://github.com/novasvilla/kavverna/releases).
+A prebuilt binary is attached to every
+[release](https://github.com/novasvilla/kavverna/releases), built on Arch with Qt 6.
 
 ## What you need
 

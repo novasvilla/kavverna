@@ -139,11 +139,20 @@ impl MouseJiggle {
     /// The binary alone is not enough. Without `ydotoold` running and a socket it can reach,
     /// every nudge fails and the switch would sit there looking as if it worked.
     pub fn is_available() -> bool {
-        let socket = std::env::var_os("YDOTOOL_SOCKET")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| std::path::PathBuf::from("/tmp/.ydotool_socket"));
+        // ydotoold puts its socket in the runtime directory when it has one, and falls back to
+        // /tmp when it does not. Both are worth looking at, and YDOTOOL_SOCKET beats either.
+        let candidates = std::env::var_os("YDOTOOL_SOCKET")
+            .map(|set| vec![std::path::PathBuf::from(set)])
+            .unwrap_or_else(|| {
+                let mut paths = Vec::new();
+                if let Some(runtime) = std::env::var_os("XDG_RUNTIME_DIR") {
+                    paths.push(std::path::PathBuf::from(runtime).join(".ydotool_socket"));
+                }
+                paths.push(std::path::PathBuf::from("/tmp/.ydotool_socket"));
+                paths
+            });
 
-        socket.exists()
+        candidates.iter().any(|socket| socket.exists())
             && Command::new("ydotool")
                 .arg("--help")
                 .stdout(Stdio::null())
