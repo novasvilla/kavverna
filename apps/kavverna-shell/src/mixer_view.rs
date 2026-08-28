@@ -52,6 +52,10 @@ pub mod qobject {
         fn mute_output(self: Pin<&mut MixerView>, node_id: i32, muted: bool);
         #[qinvokable]
         fn mute_every_input(self: Pin<&mut MixerView>, muted: bool);
+        #[qinvokable]
+        fn make_default_output(self: Pin<&mut MixerView>, node_id: i32);
+        #[qinvokable]
+        fn make_default_input(self: Pin<&mut MixerView>, node_id: i32);
     }
 }
 
@@ -106,6 +110,18 @@ impl qobject::MixerView {
     fn mute_every_input(self: Pin<&mut Self>, muted: bool) {
         for device in mixer_state::get().inputs {
             mixer_state::send(MixerCommand::SetMute { node_id: device.node_id, muted });
+        }
+    }
+
+    fn make_default_output(self: Pin<&mut Self>, node_id: i32) {
+        if let Some(name) = device_name(node_id, true) {
+            mixer_state::send(MixerCommand::MakeDefaultOutput(name));
+        }
+    }
+
+    fn make_default_input(self: Pin<&mut Self>, node_id: i32) {
+        if let Some(name) = device_name(node_id, false) {
+            mixer_state::send(MixerCommand::MakeDefaultInput(name));
         }
     }
 
@@ -166,6 +182,16 @@ impl qobject::MixerView {
         self.as_mut().set_inputs_muted(snapshot.every_input_muted());
         self.as_mut().set_available(mixer_state::is_running());
     }
+}
+
+/// Devices are addressed by name rather than node id, which is recycled between runs.
+fn device_name(node_id: i32, output: bool) -> Option<String> {
+    let snapshot = mixer_state::get();
+    let devices = if output { snapshot.outputs } else { snapshot.inputs };
+    devices
+        .into_iter()
+        .find(|device| device.node_id as i32 == node_id)
+        .map(|device| device.name)
 }
 
 fn send_volume(node_id: i32, percent: i32) {

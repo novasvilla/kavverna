@@ -464,6 +464,11 @@ Window {
                                         font.bold: parent.parent.isDefault
                                         color: root.primaryText
                                         elide: Text.ElideRight
+
+                                        TapHandler {
+                                            onTapped: mixer.make_default_output(
+                                                mixer.output_ids[parent.parent.parent.index])
+                                        }
                                     }
 
                                     Label {

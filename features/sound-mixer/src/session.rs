@@ -18,10 +18,13 @@ pub enum MixerError {
     Connect(String),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum MixerCommand {
     SetVolume { node_id: u32, volume: Volume },
     SetMute { node_id: u32, muted: bool },
+    /// `node.name` of the device, which is what survives a restart.
+    MakeDefaultOutput(String),
+    MakeDefaultInput(String),
     Stop,
 }
 
@@ -160,6 +163,7 @@ fn run(
     let nodes: Rc<RefCell<BTreeMap<u32, (pipewire::node::Node, pipewire::node::NodeListener)>>> =
         Rc::new(RefCell::new(BTreeMap::new()));
     let extras: Rc<RefCell<Vec<Box<dyn std::any::Any>>>> = Rc::new(RefCell::new(Vec::new()));
+    let defaults: Rc<RefCell<Option<pipewire::metadata::Metadata>>> = Rc::new(RefCell::new(None));
 
     let publish = {
         let tracked = Rc::clone(&tracked);
@@ -174,6 +178,7 @@ fn run(
             let tracked = Rc::clone(&tracked);
             let nodes = Rc::clone(&nodes);
             let extras = Rc::clone(&extras);
+            let defaults = Rc::clone(&defaults);
             let registry = registry.clone();
             let publish = publish.clone();
 
@@ -187,7 +192,10 @@ fn run(
                         state.reidentify(global.id);
                     }
                     ObjectType::Metadata => {
-                        if let Some(handle) = watch_defaults(&registry, global, &tracked, &publish) {
+                        if let Some((metadata, handle)) =
+                            watch_defaults(&registry, global, &tracked, &publish)
+                        {
+                            *defaults.borrow_mut() = Some(metadata);
                             extras.borrow_mut().push(handle);
                         }
                     }
@@ -220,6 +228,7 @@ fn run(
 
     let _receiver = {
         let nodes = Rc::clone(&nodes);
+        let defaults = Rc::clone(&defaults);
         let weak_loop = main_loop.downgrade();
 
         commands.attach(main_loop.loop_(), move |command| match command {
@@ -234,11 +243,35 @@ fn run(
             MixerCommand::SetMute { node_id, muted } => {
                 apply(&nodes, node_id, Property::new(libspa::sys::SPA_PROP_mute, Value::Bool(muted)));
             }
+            MixerCommand::MakeDefaultOutput(name) => {
+                choose_default(&defaults, "default.configured.audio.sink", &name);
+            }
+            MixerCommand::MakeDefaultInput(name) => {
+                choose_default(&defaults, "default.configured.audio.source", &name);
+            }
         })
     };
 
     main_loop.run();
     Ok(())
+}
+
+/// The session's `default` metadata is what WirePlumber reads, and it wants the device name
+/// wrapped in JSON rather than the bare string.
+fn choose_default(
+    defaults: &Rc<RefCell<Option<pipewire::metadata::Metadata>>>,
+    key: &str,
+    name: &str,
+) {
+    let defaults = defaults.borrow();
+    let Some(metadata) = defaults.as_ref() else {
+        tracing::warn!("no default metadata yet, cannot switch device");
+        return;
+    };
+
+    let value = format!("{{\"name\":\"{name}\"}}");
+    metadata.set_property(0, key, Some("Spa:String:JSON"), Some(&value));
+    tracing::info!(key, name, "default device changed");
 }
 
 fn volume_property(volume: Volume) -> Property {
@@ -431,7 +464,7 @@ fn watch_defaults(
     global: &pipewire::registry::GlobalObject<&DictRef>,
     tracked: &Rc<RefCell<Tracked>>,
     publish: &(impl Fn() + Clone + 'static),
-) -> Option<Box<dyn std::any::Any>> {
+) -> Option<(pipewire::metadata::Metadata, Box<dyn std::any::Any>)> {
     let props = properties_of(global.props);
     if props.get("metadata.name").map(String::as_str) != Some("default") {
         return None;
@@ -459,7 +492,7 @@ fn watch_defaults(
         })
         .register();
 
-    Some(Box::new((metadata, listener)))
+    Some((metadata, Box::new(listener)))
 }
 
 /// The metadata value is JSON of the shape `{"name":"alsa_output..."}`.
