@@ -27,6 +27,12 @@ fn main() {
         println!("cargo::rerun-if-changed={file}");
     }
 
+    // Cargo versions are three numbers. The fourth the release scheme asks for is the build
+    // that produced the binary, stamped by CI and zero for anything built by hand.
+    let build = std::env::var("KAVVERNA_BUILD").unwrap_or_else(|_| "0".to_owned());
+    println!("cargo::rerun-if-env-changed=KAVVERNA_BUILD");
+    println!("cargo::rustc-env=KAVVERNA_BUILD={build}");
+
     CxxQtBuilder::new_qml_module(QmlModule::new("dev.kavverna.shell").qml_files(QML))
         .files(RUST)
         .build();

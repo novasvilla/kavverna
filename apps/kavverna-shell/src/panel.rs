@@ -35,6 +35,7 @@ pub mod qobject {
         #[qproperty(QString, jiggle_status)]
         #[qproperty(bool, launch_at_login)]
         #[qproperty(QString, settings_path)]
+        #[qproperty(QString, version)]
         type KavvernaPanel = super::KavvernaPanelRust;
     }
 
@@ -105,6 +106,7 @@ pub struct KavvernaPanelRust {
     jiggle_status: QString,
     launch_at_login: bool,
     settings_path: QString,
+    version: QString,
 }
 
 impl Default for KavvernaPanelRust {
@@ -153,6 +155,11 @@ impl Default for KavvernaPanelRust {
             jiggle_status: QString::from("Off"),
             launch_at_login: launch_at_login::is_enabled(),
             settings_path: QString::from(&settings_location()),
+            version: QString::from(&format!(
+                "{}.{}",
+                env!("CARGO_PKG_VERSION"),
+                env!("KAVVERNA_BUILD")
+            )),
         }
     }
 }

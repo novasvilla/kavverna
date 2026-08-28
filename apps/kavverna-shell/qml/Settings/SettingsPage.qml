@@ -243,4 +243,90 @@ ColumnLayout {
             }
         }
     }
+
+    SectionLabel {
+        theme: page.theme
+        text: "ABOUT"
+    }
+
+    Card {
+        theme: page.theme
+        implicitHeight: about.implicitHeight + 24
+
+        ColumnLayout {
+            id: about
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 8
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Label {
+                    text: "Kavverna"
+                    font.pixelSize: 14
+                    font.bold: true
+                    color: page.theme.primaryText
+                }
+
+                Label {
+                    text: page.hub.version
+                    font.pixelSize: 11
+                    color: page.theme.mutedText
+                }
+
+                Item { Layout.fillWidth: true }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: "One tray icon for the utilities a Linux desktop is missing. Everything "
+                      + "runs on this machine, with no account and nothing sent anywhere."
+                font.pixelSize: 11
+                color: page.theme.secondaryText
+                wrapMode: Text.WordWrap
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: "Inspired by Vorssaint for macOS. Written from scratch in Rust, not "
+                      + "ported from it."
+                font.pixelSize: 11
+                color: page.theme.secondaryText
+                wrapMode: Text.WordWrap
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                Repeater {
+                    model: [
+                        { label: "Repository", url: "https://github.com/novasvilla/kavverna" },
+                        { label: "Issues",
+                          url: "https://github.com/novasvilla/kavverna/issues" },
+                        { label: "Author", url: "https://github.com/novasvilla" }
+                    ]
+
+                    delegate: Button {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        implicitHeight: 26
+                        text: modelData.label
+                        font.pixelSize: 11
+                        onClicked: Qt.openUrlExternally(modelData.url)
+                    }
+                }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: "GPL-3.0-or-later. Settings at " + page.hub.settings_path
+                font.pixelSize: 10
+                color: page.theme.mutedText
+                wrapMode: Text.WrapAnywhere
+            }
+        }
+    }
 }
