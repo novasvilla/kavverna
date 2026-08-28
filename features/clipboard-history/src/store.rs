@@ -8,6 +8,11 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::entry::{Entry, Kind, MAX_FILES, StoredImage};
 
+/// Raised whenever the shape below changes, with a step added to `migrate` for it. Without
+/// this an upgrade would meet a database it does not understand and there would be nothing to
+/// do about it but throw away what somebody had saved.
+const SCHEMA_VERSION: i64 = 1;
+
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS entry (
     id           INTEGER PRIMARY KEY,
@@ -24,6 +29,32 @@ CREATE TABLE IF NOT EXISTS entry (
 CREATE INDEX IF NOT EXISTS entry_order ON entry (pinned_at, position);
 CREATE VIRTUAL TABLE IF NOT EXISTS entry_search USING fts5(body);
 ";
+
+/// Applies whatever the database is missing and leaves what it already has alone. A version
+/// from the future is left as it is: the columns only ever grow, and every read here names the
+/// ones it wants, so the worst case is a newer field this build ignores.
+fn migrate(db: &Connection) -> Result<(), StoreError> {
+    let found: i64 = db.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+
+    if found > SCHEMA_VERSION {
+        tracing::error!(
+            found,
+            known = SCHEMA_VERSION,
+            "this clipboard database was written by a newer Kavverna"
+        );
+        return Ok(());
+    }
+
+    if found < 1 {
+        db.execute_batch(SCHEMA)?;
+    }
+
+    if found != SCHEMA_VERSION {
+        db.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        tracing::info!(from = found, to = SCHEMA_VERSION, "clipboard database brought up to date");
+    }
+    Ok(())
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -66,7 +97,7 @@ impl Store {
         let db = Connection::open(root.join("clipboard.db"))?;
         db.pragma_update(None, "journal_mode", "WAL")?;
         db.pragma_update(None, "foreign_keys", "ON")?;
-        db.execute_batch(SCHEMA)?;
+        migrate(&db)?;
 
         Ok(Self { db, images })
     }
@@ -74,7 +105,7 @@ impl Store {
     #[cfg(test)]
     fn in_memory(images: PathBuf) -> Result<Self, StoreError> {
         let db = Connection::open_in_memory()?;
-        db.execute_batch(SCHEMA)?;
+        migrate(&db)?;
         make_directory(&images)?;
         Ok(Self { db, images })
     }
@@ -437,6 +468,47 @@ mod tests {
             file_paths: Vec::new(),
             image: None,
         }
+    }
+
+    #[test]
+    fn a_new_database_is_stamped_with_its_version() {
+        let room = tempfile::tempdir().expect("a temporary directory");
+        let store = Store::open(room.path()).unwrap();
+        let stamped: i64 =
+            store.db.query_row("PRAGMA user_version", [], |row| row.get(0)).unwrap();
+        assert_eq!(stamped, SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn a_database_from_before_versioning_keeps_what_it_held() {
+        let room = tempfile::tempdir().expect("a temporary directory");
+        {
+            let mut store = Store::open(room.path()).unwrap();
+            store.remember(text("saved by an older build")).unwrap();
+            store.db.pragma_update(None, "user_version", 0).unwrap();
+        }
+
+        let reopened = Store::open(room.path()).unwrap();
+        assert_eq!(reopened.summaries().unwrap()[0].preview, "saved by an older build");
+        let stamped: i64 =
+            reopened.db.query_row("PRAGMA user_version", [], |row| row.get(0)).unwrap();
+        assert_eq!(stamped, SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn what_was_saved_is_still_there_after_a_restart() {
+        let room = tempfile::tempdir().expect("a temporary directory");
+        {
+            let mut store = Store::open(room.path()).unwrap();
+            let kept = store.remember(text("pinned across restarts")).unwrap();
+            store.set_pinned(kept, true).unwrap();
+            store.remember(text("just recent")).unwrap();
+        }
+
+        let reopened = Store::open(room.path()).unwrap();
+        assert_eq!(reopened.counts().unwrap(), (1, 1));
+        assert_eq!(reopened.summaries().unwrap()[0].preview, "pinned across restarts");
+        assert!(reopened.summaries().unwrap()[0].pinned);
     }
 
     #[test]

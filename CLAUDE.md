@@ -175,3 +175,19 @@ cannot land on a glyph the font does not carry.
 
 Running the test suite while Kavverna is running writes the tests' own copies into the real
 clipboard history. Stop the app first, or clear the history afterwards.
+
+## What has to survive an upgrade
+
+Two things on disk belong to the user and must never be lost by a new build:
+
+- `$XDG_DATA_HOME/kavverna/clipboard.db` and `clipboard-images/`, everything they copied.
+- `$XDG_CONFIG_HOME/kavverna/settings.json`, every choice they made.
+
+Changing the database shape means raising `SCHEMA_VERSION` in `store.rs` and adding a step to
+`migrate`, which applies only what a given file is missing. A file written by a newer build is
+left alone rather than rewritten: every read names its columns, so an unknown newer one is
+ignored instead of destroying anything. There are tests for reopening, for a database from
+before versioning, and for a pinned entry surviving both.
+
+Renaming a settings key or a feature id orphans what the user had set. Neither is worth doing
+after a release without a migration for it.
