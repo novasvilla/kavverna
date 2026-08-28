@@ -172,8 +172,13 @@ impl SelectionWatcher {
     }
 
     fn send(&self, request: Request) {
-        if self.requests.send(request).is_ok() {
-            let _ = nix::unistd::write(self.wake.as_fd(), &[1]);
+        match self.requests.send(request) {
+            Ok(()) => {
+                let _ = nix::unistd::write(self.wake.as_fd(), &[1]);
+            }
+            // Nothing reaches the clipboard once this happens, and silence would look like a
+            // dead button rather than a stopped connection.
+            Err(_) => tracing::error!("the clipboard connection has stopped"),
         }
     }
 }
@@ -379,9 +384,12 @@ impl Watcher {
             offer.destroy();
             return;
         }
+        // Left unread, but still reported: a password is the last thing that should sit on the
+        // clipboard until something else replaces it, so the clear timer has to start.
         if types.iter().any(|mime| mime == CONCEALED_HINT) {
             offer.destroy();
             tracing::debug!("a copy marked as a secret was left unread");
+            (self.report)(SelectionEvent::Changed(selection));
             return;
         }
 

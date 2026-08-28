@@ -44,3 +44,10 @@ read straight after switching it on proves nothing either way.
 
 Something else may have taken it. System Settings, Shortcuts, Kavverna shows what is
 registered, and conflicts are resolved there like any other shortcut.
+
+## Mute all leaves one microphone live
+
+Some devices, USB headsets in particular, report the mute as applied while `pactl` still shows
+the input unmuted. A node's mute and a device route's mute are different layers and each tool
+reads a different one. Until that is settled, mute all is not claimed to cover every input:
+check with `pactl list sources short` if it matters.

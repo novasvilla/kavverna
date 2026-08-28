@@ -19,7 +19,7 @@ Window {
     width: 360
     // Two nested margins sit between the layout and the window edge: the card's 6 and the
     // content's 12, on both sides.
-    height: body.implicitHeight + 36
+    height: Math.min(body.implicitHeight + 36, Screen.desktopAvailableHeight - 24)
     visible: hub.panel_open
     color: "transparent"
 
@@ -199,44 +199,60 @@ Window {
                 }
             }
 
-            EnergySection {
-                theme: theme
-                hub: hub
-                visible: !hub.showing_settings && root.page === root.energyPage
-            }
+            // The settings page is taller than some screens. The chrome stays put and the
+            // pages scroll, rather than the window growing past the display.
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                implicitHeight: pages.implicitHeight
+                contentWidth: availableWidth
+                clip: true
 
-            SoundSection {
-                theme: theme
-                mixer: mixer
-                visible: !hub.showing_settings && root.page === root.soundPage
-            }
+                ColumnLayout {
+                    id: pages
+                    width: parent.width
+                    spacing: 12
 
-            MonitoringSection {
-                theme: theme
-                vitals: vitals
-                visible: !hub.showing_settings && root.page === root.monitoringPage
-            }
+                EnergySection {
+                    theme: theme
+                    hub: hub
+                    visible: !hub.showing_settings && root.page === root.energyPage
+                }
 
-            ClipboardSection {
-                theme: theme
-                clipboard: clipboard
-                visible: !hub.showing_settings && root.page === root.clipboardPage
-                // Choosing an entry puts it on the clipboard, so the panel gets out of the way
-                // for the paste that follows.
-                onPicked: hub.dismiss()
-            }
+                SoundSection {
+                    theme: theme
+                    mixer: mixer
+                    visible: !hub.showing_settings && root.page === root.soundPage
+                }
 
-            ToolsSection {
-                theme: theme
-                hub: hub
-                visible: !hub.showing_settings && root.page === root.toolsPage
-            }
+                MonitoringSection {
+                    theme: theme
+                    vitals: vitals
+                    visible: !hub.showing_settings && root.page === root.monitoringPage
+                }
 
-            SettingsPage {
-                theme: theme
-                hub: hub
-                clipboard: clipboard
-                visible: hub.showing_settings
+                ClipboardSection {
+                    theme: theme
+                    clipboard: clipboard
+                    visible: !hub.showing_settings && root.page === root.clipboardPage
+                    // Choosing an entry puts it on the clipboard, so the panel gets out of the way
+                    // for the paste that follows.
+                    onPicked: hub.dismiss()
+                }
+
+                ToolsSection {
+                    theme: theme
+                    hub: hub
+                    visible: !hub.showing_settings && root.page === root.toolsPage
+                }
+
+                SettingsPage {
+                    theme: theme
+                    hub: hub
+                    clipboard: clipboard
+                    visible: hub.showing_settings
+                }
+                }
             }
 
             Rectangle {

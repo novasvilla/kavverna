@@ -12,9 +12,10 @@ pub const CONTROL: i32 = 0x0400_0000;
 pub const ALT: i32 = 0x0800_0000;
 pub const META: i32 = 0x1000_0000;
 
-/// Register what is asked for and never load a different key from the desktop's own store,
-/// which would silently move a shortcut we told the user about.
-const SET_PRESENT_WITHOUT_AUTOLOADING: u32 = 2 | 4;
+/// Registers the key below as the default and then lets the desktop's own store win, so a
+/// binding somebody changed in System Settings survives the next launch. Adding NoAutoloading
+/// here would quietly put ours back every time the application starts.
+const SET_AS_THE_DEFAULT: u32 = 2;
 
 pub struct Shortcut {
     pub action: &'static str,
@@ -75,19 +76,16 @@ pub async fn serve(
         let action_id = [component, shortcut.action, friendly, shortcut.friendly];
         accel.do_register(&action_id).await?;
 
-        match accel
-            .set_shortcut(&action_id, &[shortcut.keys], SET_PRESENT_WITHOUT_AUTOLOADING)
-            .await
-        {
+        match accel.set_shortcut(&action_id, &[shortcut.keys], SET_AS_THE_DEFAULT).await {
             Ok(given) if given.first() == Some(&shortcut.keys) => {
                 tracing::info!(action = shortcut.action, "global shortcut registered")
             }
-            // The desktop hands back what it could give, so a shortcut already taken by
-            // something else comes back empty or changed rather than as an error.
-            Ok(given) => tracing::warn!(
+            // The desktop hands back what it actually assigned, so a key the user changed or
+            // one already taken comes back different rather than as an error.
+            Ok(given) => tracing::info!(
                 action = shortcut.action,
                 ?given,
-                "the desktop gave a different key, most likely because ours was taken"
+                "the desktop had its own key for this and kept it"
             ),
             Err(err) => tracing::error!(%err, action = shortcut.action, "shortcut refused"),
         }

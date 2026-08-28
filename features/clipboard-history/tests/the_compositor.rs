@@ -152,7 +152,7 @@ fn what_we_put_back_is_readable_and_is_not_a_new_copy() {
 }
 
 #[test]
-fn a_copy_marked_as_a_secret_is_never_read() {
+fn a_copy_marked_as_a_secret_is_noticed_but_never_read() {
     let _guard = one_at_a_time();
     let _restore = RestoredClipboard::save();
 
@@ -163,10 +163,13 @@ fn a_copy_marked_as_a_secret_is_never_read() {
         .status();
     assert!(matches!(hinted, Ok(code) if code.success()), "wl-copy failed");
 
-    assert!(
-        matches!(events.recv_timeout(Duration::from_millis(800)), Err(RecvTimeoutError::Timeout)),
-        "a concealed copy is left unread"
-    );
+    // Unread, but not unnoticed: a password is the last thing that should sit on the clipboard
+    // until something else replaces it, so the clear timer still has to start.
+    match events.recv_timeout(PATIENCE) {
+        Ok(SelectionEvent::Changed(selection)) => assert_eq!(selection, Selection::Clipboard),
+        Ok(other) => panic!("the secret was read: {other:?}"),
+        Err(_) => panic!("a concealed copy has to start the clear timer"),
+    }
 }
 
 #[test]

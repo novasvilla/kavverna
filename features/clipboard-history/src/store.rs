@@ -1,6 +1,7 @@
 //! Where saved copies live.
 
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -94,7 +95,13 @@ impl Store {
         make_directory(root)?;
         make_directory(&images)?;
 
-        let db = Connection::open(root.join("clipboard.db"))?;
+        let file = root.join("clipboard.db");
+        let db = Connection::open(&file)?;
+        // Everything anybody copied is in here. Left at the default umask it is world readable,
+        // which the privacy page promises it is not.
+        for beside in ["", "-wal", "-shm"] {
+            keep_to_yourself(&PathBuf::from(format!("{}{beside}", file.display())));
+        }
         db.pragma_update(None, "journal_mode", "WAL")?;
         db.pragma_update(None, "foreign_keys", "ON")?;
         migrate(&db)?;
@@ -162,6 +169,7 @@ impl Store {
             if !path.exists() {
                 fs::write(&path, bytes)
                     .map_err(|source| StoreError::Directory { path: path.clone(), source })?;
+                keep_to_yourself(&path);
             }
         }
 
@@ -443,9 +451,22 @@ fn from_millis(millis: i64) -> SystemTime {
     UNIX_EPOCH + Duration::from_millis(millis.max(0) as u64)
 }
 
+const DIR_MODE: u32 = 0o700;
+const FILE_MODE: u32 = 0o600;
+
 fn make_directory(path: &Path) -> Result<(), StoreError> {
     fs::create_dir_all(path)
-        .map_err(|source| StoreError::Directory { path: path.to_path_buf(), source })
+        .map_err(|source| StoreError::Directory { path: path.to_path_buf(), source })?;
+    let _ = fs::set_permissions(path, fs::Permissions::from_mode(DIR_MODE));
+    Ok(())
+}
+
+/// Best effort: a file that does not exist yet has nothing to tighten, and one on a filesystem
+/// with no permissions to speak of cannot be helped.
+fn keep_to_yourself(path: &Path) {
+    if path.exists() {
+        let _ = fs::set_permissions(path, fs::Permissions::from_mode(FILE_MODE));
+    }
 }
 
 #[cfg(test)]
@@ -460,6 +481,28 @@ mod tests {
 
     fn text(body: &str) -> Captured {
         Captured { kind: Kind::Text, text: body.into(), file_paths: Vec::new(), image: None }
+    }
+
+    #[test]
+    fn nothing_it_writes_is_readable_by_anyone_else() {
+        let room = tempfile::tempdir().expect("a temporary directory");
+        let mut store = Store::open(room.path()).unwrap();
+        store
+            .remember(Captured {
+                kind: Kind::Image,
+                text: String::new(),
+                file_paths: Vec::new(),
+                image: Some((
+                    StoredImage { digest: "abc".into(), width: 1, height: 1 },
+                    b"not really a png".to_vec(),
+                )),
+            })
+            .unwrap();
+
+        let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&room.path().join("clipboard.db")), FILE_MODE);
+        assert_eq!(mode(&store.image_path("abc")), FILE_MODE);
+        assert_eq!(mode(&room.path().join("clipboard-images")), DIR_MODE);
     }
 
     #[test]

@@ -70,7 +70,7 @@ ColumnLayout {
 
             Label {
                 Layout.fillWidth: true
-                text: "Moves the pointer one step and puts it back, for applications that watch for input rather than power inhibitions."
+                text: "Moves the pointer somewhere else and can press a key, for the applications that watch for input rather than for a power inhibition."
                 font.pixelSize: 11
                 color: section.theme.secondaryText
                 wrapMode: Text.WordWrap
@@ -78,8 +78,8 @@ ColumnLayout {
 
             ChoiceRow {
                 theme: section.theme
-                title: "Every"
-                current: section.hub.jiggle_minutes
+                title: "No sooner than"
+                current: section.hub.jiggle_shortest
                 choices: [
                     { label: "1m", value: 1 },
                     { label: "2m", value: 2 },
@@ -87,7 +87,47 @@ ColumnLayout {
                     { label: "10m", value: 10 },
                     { label: "15m", value: 15 }
                 ]
-                onPicked: (value) => section.hub.choose_jiggle_minutes(value)
+                onPicked: (value) => section.hub.choose_jiggle_shortest(value)
+            }
+
+            ChoiceRow {
+                theme: section.theme
+                title: "And no later than"
+                detail: "The wait is drawn afresh between the two, so it does not look like a timer."
+                current: section.hub.jiggle_longest
+                choices: [
+                    { label: "2m", value: 2 },
+                    { label: "5m", value: 5 },
+                    { label: "10m", value: 10 },
+                    { label: "15m", value: 15 },
+                    { label: "30m", value: 30 }
+                ]
+                onPicked: (value) => section.hub.choose_jiggle_longest(value)
+            }
+
+            ChoiceRow {
+                theme: section.theme
+                title: "What it does"
+                current: section.hub.jiggle_activity
+                choices: [
+                    { label: "Pointer", value: 0 },
+                    { label: "Key", value: 1 },
+                    { label: "Both", value: 2 }
+                ]
+                onPicked: (value) => section.hub.choose_jiggle_activity(value)
+            }
+
+            ChoiceRow {
+                theme: section.theme
+                title: "Which key"
+                detail: "For the watchers that count keys rather than pointer movement."
+                visible: section.hub.jiggle_activity !== 0
+                current: section.hub.jiggle_keystroke
+                choices: [
+                    { label: "Shift", value: 0 },
+                    { label: "Up and down", value: 1 }
+                ]
+                onPicked: (value) => section.hub.choose_jiggle_keystroke(value)
             }
 
             Button {

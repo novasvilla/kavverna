@@ -20,10 +20,16 @@ Worth knowing before you decide to trust it:
 It does not run as root, does not install a daemon and does not ask for any elevated
 permission. There is no network code.
 
-## What it deliberately does not do
+## Synthetic input
 
-- Synthetic input. `ydotool` would need membership of the `input` group, which makes every
-  input device readable by any process running as you. Nothing today requires it, and anything
-  that does will say so before it is switched on.
+The pointer nudge moves the pointer through `ydotool`, and pressing a key uses the same route.
+That needs `ydotool` installed and its daemon running, which in practice means membership of
+the `input` group, and that makes every input device readable by any process running as you.
+
+Nothing else uses it. The feature is off by default and does nothing at all without `ydotool`,
+so declining to install it declines the whole cost. Paste as plain text and pasting from the
+picker will need the same thing when they land, and will say so before they are switched on.
+
+## What it deliberately does not do
 - Fan control. It writes PWM as root and a fan left stopped can damage hardware. It stays out
   until it can have its own privileged daemon with a heartbeat and a thermal watchdog.

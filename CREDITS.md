@@ -14,9 +14,16 @@ Kavverna aims to cover, and two of its architectural decisions were adopted dire
 - **Splitting pure description from live wiring.** Feature metadata lives somewhere that
   cannot reach a feature's implementation, so naming a feature can never start it.
 
-Kavverna is an independent implementation. No Vorssaint code was copied or translated. It
+Kavverna is an independent implementation. No Vorssaint code was copied or translated: it
 targets a different platform, a different language and a different desktop, and the two
 projects share no build system, dependency or runtime.
+
+Two things were taken as data rather than written afresh, and it would be dishonest to imply
+otherwise. The list of tracking parameters the link cleaner removes, and the per-site rules
+that go with it, are the same names Vorssaint removes. They are facts about advertising
+networks rather than an implementation, every one of them is public knowledge, and reinventing
+the list would only mean getting it wrong for a while. The engine that applies them is our
+own.
 
 Kavverna is licensed GPL-3.0-or-later, matching Vorssaint, out of respect for the project
 that inspired it.

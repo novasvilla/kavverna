@@ -332,6 +332,12 @@ fn payload_for(store: &Store, entry: &Entry) -> Option<Payload> {
 }
 
 fn save(store: &mut Store, payload: Payload, settings: Settings) -> bool {
+    // Link cleaning needs the content read to rewrite it, which is not permission to keep it.
+    // The gate belongs on the write as well as on the read, or switching the history off while
+    // anything else is on quietly fills the database.
+    if !settings.keep_history {
+        return false;
+    }
     let Some(captured) = worth_keeping(payload, settings) else {
         return false;
     };
@@ -414,6 +420,18 @@ mod tests {
 
         settings.skip_sensitive = false;
         assert!(worth_keeping(secret(), settings).is_some());
+    }
+
+    /// Link cleaning has to read the content to rewrite it. Reading is not permission to keep,
+    /// and the two settings are independent rows on the same page.
+    #[test]
+    fn with_the_history_off_nothing_is_kept_however_it_was_read() {
+        let room = tempfile::tempdir().expect("a temporary directory");
+        let mut store = Store::open(room.path()).unwrap();
+        let settings = Settings { keep_history: false, clean_links: true, ..Settings::default() };
+
+        assert!(!save(&mut store, Payload::Text("a copy nobody asked to keep".into()), settings));
+        assert_eq!(store.counts().unwrap(), (0, 0));
     }
 
     #[test]

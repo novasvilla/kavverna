@@ -14,13 +14,6 @@ pub fn sanitized_delay(delay: Duration) -> Duration {
     delay.clamp(SHORTEST_DELAY, LONGEST_DELAY)
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Trigger {
-    Delay,
-    Suspend,
-    ScreenLock,
-}
-
 #[derive(Debug, Default)]
 pub struct AutoClear {
     after: Option<Duration>,

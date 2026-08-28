@@ -137,22 +137,24 @@ mod tests {
     #[test]
     fn adopting_twice_does_not_double_the_history() {
         let room = tempfile::tempdir().expect("a temporary directory");
-        let mut store = Store::open(room.path()).unwrap();
-        let saved = Captured {
-            kind: Kind::Text,
-            text: "already here".into(),
-            file_paths: Vec::new(),
-            image: None,
-        };
-        store.remember(saved).unwrap();
+        let theirs = room.path().join("share/klipper");
+        std::fs::create_dir_all(&theirs).unwrap();
+        let db = Connection::open(theirs.join("history3.sqlite")).unwrap();
+        db.execute_batch(
+            "CREATE TABLE main (uuid char(40) PRIMARY KEY, added_time REAL NOT NULL,
+                 last_used_time REAL, mimetypes TEXT NOT NULL, text NTEXT, starred BOOLEAN);
+             INSERT INTO main VALUES ('a', 1000.5, NULL, 'text/plain', 'already here', 1);",
+        )
+        .unwrap();
+        drop(db);
 
-        let again = Captured {
-            kind: Kind::Text,
-            text: "already here".into(),
-            file_paths: Vec::new(),
-            image: None,
-        };
-        store.remember(again).unwrap();
-        assert_eq!(store.counts().unwrap(), (0, 1));
+        // SAFETY: the whole point is to point the importer at a history we just wrote, and
+        // these tests run one at a time.
+        unsafe { std::env::set_var("XDG_DATA_HOME", room.path().join("share")) };
+
+        let mut store = Store::open(&room.path().join("ours")).unwrap();
+        assert_eq!(import_into(&mut store).unwrap(), 1);
+        assert_eq!(import_into(&mut store).unwrap(), 1, "the same entry is adopted once");
+        assert_eq!(store.counts().unwrap(), (1, 0), "and it keeps the star it had");
     }
 }

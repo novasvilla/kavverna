@@ -19,3 +19,6 @@ url.workspace = true
 wayland-client.workspace = true
 wayland-protocols = { workspace = true, features = ["client", "staging"] }
 
+
+[dev-dependencies]
+tempfile.workspace = true

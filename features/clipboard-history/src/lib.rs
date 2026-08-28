@@ -8,7 +8,7 @@ pub mod selection;
 pub mod sensitivity;
 pub mod store;
 
-pub use auto_clear::{AutoClear, Trigger};
+pub use auto_clear::AutoClear;
 pub use entry::{Entry, Kind, StoredImage};
 pub use history::{Command, Commands, History, Settings, Snapshot, StartError};
 pub use selection::{

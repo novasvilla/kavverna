@@ -230,6 +230,10 @@ ColumnLayout {
                                 Label {
                                     Layout.fillWidth: true
                                     text: section.clipboard.row_previews[row.index]
+                                    // Copied text is text. Left on AutoText, a copied string
+                                    // that looks like markup would be rendered, and anything it
+                                    // pointed at would be fetched.
+                                    textFormat: Text.PlainText
                                     font.pixelSize: 10
                                     color: section.theme.primaryText
                                     wrapMode: Text.Wrap
