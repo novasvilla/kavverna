@@ -1,0 +1,199 @@
+use std::collections::BTreeMap;
+
+pub type Properties = BTreeMap<String, String>;
+
+/// What a stream is remembered by between runs. Node ids are recycled, so they cannot
+/// carry a saved volume across a restart.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AppKey(String);
+
+impl AppKey {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for AppKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+const IDENTIFYING: [&str; 3] =
+    ["application.id", "pipewire.access.portal.app_id", "application.process.binary"];
+
+const PROCESS_ID: [&str; 2] = ["application.process.id", "pipewire.sec.pid"];
+
+pub fn app_key(node: &Properties, client: Option<&Properties>) -> AppKey {
+    app_key_resolving(node, client, binary_of_process)
+}
+
+/// Falls back through the properties an application may or may not set, then to the owning
+/// client, and finally to the running process, because the registry hands out a process id
+/// for clients that never declare their binary.
+pub fn app_key_resolving(
+    node: &Properties,
+    client: Option<&Properties>,
+    binary_of: impl Fn(u32) -> Option<String>,
+) -> AppKey {
+    let bags = [Some(node), client];
+
+    for key in IDENTIFYING {
+        for bag in bags.iter().flatten() {
+            if let Some(value) = non_empty(bag, key) {
+                return AppKey(normalise(value));
+            }
+        }
+    }
+
+    for key in PROCESS_ID {
+        for bag in bags.iter().flatten() {
+            if let Some(pid) = non_empty(bag, key).and_then(|value| value.parse::<u32>().ok())
+                && let Some(binary) = binary_of(pid)
+            {
+                return AppKey(normalise(&binary));
+            }
+        }
+    }
+
+    for bag in bags.iter().flatten() {
+        if let Some(value) = non_empty(bag, "application.name") {
+            return AppKey(normalise(value));
+        }
+    }
+
+    AppKey("unknown".into())
+}
+
+/// Clients reaching PipeWire through the PulseAudio bridge report the bridge's process, so
+/// naming a stream after one of these would lump every such application together.
+const BRIDGES: [&str; 4] = ["pipewire", "pipewire-pulse", "wireplumber", "pulseaudio"];
+
+fn binary_of_process(pid: u32) -> Option<String> {
+    let binary = std::fs::read_link(format!("/proc/{pid}/exe"))
+        .ok()?
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())?;
+
+    (!BRIDGES.contains(&binary.as_str())).then_some(binary)
+}
+
+/// The name shown in the mixer, which unlike the key is allowed to change between runs.
+pub fn display_name(node: &Properties, client: Option<&Properties>) -> String {
+    let bags = [Some(node), client];
+
+    for key in ["application.name", "node.description", "node.name"] {
+        for bag in bags.iter().flatten() {
+            if let Some(value) = non_empty(bag, key) {
+                return value.to_owned();
+            }
+        }
+    }
+
+    "Unknown application".into()
+}
+
+fn non_empty<'a>(bag: &'a Properties, key: &str) -> Option<&'a str> {
+    bag.get(key).map(String::as_str).filter(|value| !value.trim().is_empty())
+}
+
+fn normalise(value: &str) -> String {
+    value.trim().to_lowercase()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn props(pairs: &[(&str, &str)]) -> Properties {
+        pairs.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect()
+    }
+
+    #[test]
+    fn the_binary_wins_over_a_display_name() {
+        let node = props(&[("application.name", "Chromium"), ("application.process.binary", "electron")]);
+
+        assert_eq!(app_key_resolving(&node, None, |_| None).as_str(), "electron");
+    }
+
+    /// A second stream from the same application often carries nothing but its name, while
+    /// the client behind it still knows the binary.
+    #[test]
+    fn a_bare_stream_is_identified_through_its_client() {
+        let node = props(&[("application.name", "SDL Application")]);
+        let client = props(&[
+            ("application.name", "SDL Application"),
+            ("application.process.binary", "dota2"),
+        ]);
+
+        assert_eq!(app_key_resolving(&node, Some(&client), |_| None).as_str(), "dota2");
+    }
+
+    #[test]
+    fn both_streams_of_one_application_share_a_key() {
+        let with_binary = props(&[
+            ("application.name", "SDL Application"),
+            ("application.process.binary", "dota2"),
+        ]);
+        let bare = props(&[("application.name", "SDL Application")]);
+        let client = props(&[("application.process.binary", "dota2")]);
+
+        assert_eq!(
+            app_key_resolving(&with_binary, None, |_| None),
+            app_key_resolving(&bare, Some(&client), |_| None)
+        );
+    }
+
+    /// The registry hands out `pipewire.sec.pid` for clients that never set a binary.
+    #[test]
+    fn a_client_with_only_a_process_id_is_keyed_by_its_binary() {
+        let node = props(&[("application.name", "SDL Application")]);
+        let client = props(&[
+            ("application.name", "SDL Application"),
+            ("pipewire.sec.pid", "541940"),
+        ]);
+
+        let key = app_key_resolving(&node, Some(&client), |pid| {
+            (pid == 541940).then(|| "dota2".to_owned())
+        });
+
+        assert_eq!(key.as_str(), "dota2");
+    }
+
+    #[test]
+    fn a_process_that_has_gone_falls_through_to_the_name() {
+        let node = props(&[("application.name", "SDL Application"), ("pipewire.sec.pid", "1")]);
+
+        let key = app_key_resolving(&node, None, |_| None);
+
+        assert_eq!(key.as_str(), "sdl application");
+    }
+
+    #[test]
+    fn a_sandboxed_application_is_keyed_by_its_portal_id() {
+        let node = props(&[
+            ("application.name", "Spotify"),
+            ("pipewire.access.portal.app_id", "com.spotify.Client"),
+            ("application.process.binary", "bwrap"),
+        ]);
+
+        assert_eq!(app_key_resolving(&node, None, |_| None).as_str(), "com.spotify.client");
+    }
+
+    #[test]
+    fn a_stream_with_nothing_useful_still_gets_a_key() {
+        assert_eq!(app_key_resolving(&props(&[]), None, |_| None).as_str(), "unknown");
+        assert_eq!(
+            app_key_resolving(&props(&[("application.name", "  ")]), None, |_| None).as_str(),
+            "unknown"
+        );
+    }
+
+    #[test]
+    fn the_shown_name_keeps_its_capitals() {
+        let node = props(&[("application.name", "Chromium"), ("application.process.binary", "electron")]);
+
+        assert_eq!(display_name(&node, None), "Chromium");
+        assert_eq!(display_name(&props(&[]), None), "Unknown application");
+    }
+}
