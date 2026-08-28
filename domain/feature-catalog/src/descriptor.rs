@@ -1,12 +1,24 @@
 use crate::Feature;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum_macros::EnumIter)]
 pub enum Group {
     Sound,
     Monitoring,
     Clipboard,
     Energy,
     Tools,
+}
+
+impl Group {
+    pub const fn title(self) -> &'static str {
+        match self {
+            Self::Sound => "Sound",
+            Self::Monitoring => "Monitoring",
+            Self::Clipboard => "Clipboard",
+            Self::Energy => "Energy",
+            Self::Tools => "Tools",
+        }
+    }
 }
 
 /// A curated claim about what a feature costs at rest, not a live measurement.
@@ -18,6 +30,15 @@ pub enum EnergyProfile {
     WatchesInput,
 }
 
+/// Whether the feature exists yet. The catalogue is what Kavverna is for rather than what it
+/// has finished, so something on its way is listed and says so instead of being left out and
+/// forgotten about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Readiness {
+    Built,
+    Planned,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Descriptor {
     pub title: &'static str,
@@ -25,7 +46,7 @@ pub struct Descriptor {
     pub group: Group,
     pub icon: &'static str,
     pub energy: EnergyProfile,
-    pub beta: bool,
+    pub readiness: Readiness,
     pub enable_keys: &'static [&'static str],
 }
 
@@ -35,11 +56,11 @@ impl Feature {
         match self {
             Self::VolumeMixer => Descriptor {
                 title: "Volume mixer",
-                summary: "Per-app volume with exact percentages, boost and per-app output.",
+                summary: "One row per application, with exact percentages, boost and mute.",
                 group: Group::Sound,
                 icon: "audio-volume-high",
                 energy: EnergyProfile::Idle,
-                beta: false,
+                readiness: Readiness::Built,
                 enable_keys: &["volume-mixer.enabled"],
             },
             Self::OutputSwitcher => Descriptor {
@@ -48,7 +69,7 @@ impl Feature {
                 group: Group::Sound,
                 icon: "audio-headphones",
                 energy: EnergyProfile::Idle,
-                beta: false,
+                readiness: Readiness::Built,
                 enable_keys: &["output-switcher.enabled"],
             },
             Self::MicrophoneTools => Descriptor {
@@ -57,7 +78,7 @@ impl Feature {
                 group: Group::Sound,
                 icon: "audio-input-microphone",
                 energy: EnergyProfile::Idle,
-                beta: false,
+                readiness: Readiness::Built,
                 enable_keys: &["microphone-tools.enabled"],
             },
             Self::SystemMonitor => Descriptor {
@@ -66,7 +87,7 @@ impl Feature {
                 group: Group::Monitoring,
                 icon: "utilities-system-monitor",
                 energy: EnergyProfile::Periodic,
-                beta: false,
+                readiness: Readiness::Built,
                 enable_keys: &["system-monitor.enabled"],
             },
             Self::NetworkMonitor => Descriptor {
@@ -75,7 +96,7 @@ impl Feature {
                 group: Group::Monitoring,
                 icon: "network-wired",
                 energy: EnergyProfile::Periodic,
-                beta: false,
+                readiness: Readiness::Planned,
                 enable_keys: &["network-monitor.enabled"],
             },
             Self::MonitorAlerts => Descriptor {
@@ -84,7 +105,7 @@ impl Feature {
                 group: Group::Monitoring,
                 icon: "dialog-warning",
                 energy: EnergyProfile::Periodic,
-                beta: false,
+                readiness: Readiness::Planned,
                 enable_keys: &["monitor-alerts.enabled"],
             },
             Self::ClipboardHistory => Descriptor {
@@ -93,7 +114,7 @@ impl Feature {
                 group: Group::Clipboard,
                 icon: "edit-paste",
                 energy: EnergyProfile::WatchesClipboard,
-                beta: false,
+                readiness: Readiness::Built,
                 enable_keys: &["clipboard-history.enabled"],
             },
             Self::ClipboardAutoClear => Descriptor {
@@ -102,7 +123,7 @@ impl Feature {
                 group: Group::Clipboard,
                 icon: "edit-clear-all",
                 energy: EnergyProfile::WatchesClipboard,
-                beta: false,
+                readiness: Readiness::Built,
                 enable_keys: &["clipboard-auto-clear.enabled"],
             },
             Self::CleanUrl => Descriptor {
@@ -111,7 +132,7 @@ impl Feature {
                 group: Group::Clipboard,
                 icon: "link",
                 energy: EnergyProfile::WatchesClipboard,
-                beta: false,
+                readiness: Readiness::Built,
                 enable_keys: &["clean-url.enabled"],
             },
             Self::PlainTextPaste => Descriptor {
@@ -120,7 +141,7 @@ impl Feature {
                 group: Group::Clipboard,
                 icon: "edit-paste-style",
                 energy: EnergyProfile::WatchesInput,
-                beta: false,
+                readiness: Readiness::Planned,
                 enable_keys: &["plain-text-paste.enabled"],
             },
             Self::KeepAwake => Descriptor {
@@ -129,7 +150,7 @@ impl Feature {
                 group: Group::Energy,
                 icon: "preferences-system-power-management",
                 energy: EnergyProfile::Idle,
-                beta: false,
+                readiness: Readiness::Built,
                 enable_keys: &["keep-awake.enabled"],
             },
             Self::MouseJiggle => Descriptor {
@@ -138,7 +159,7 @@ impl Feature {
                 group: Group::Tools,
                 icon: "input-mouse",
                 energy: EnergyProfile::Periodic,
-                beta: false,
+                readiness: Readiness::Built,
                 enable_keys: &["mouse-jiggle.enabled"],
             },
             Self::FanControl => Descriptor {
@@ -147,7 +168,7 @@ impl Feature {
                 group: Group::Energy,
                 icon: "sensors-fan",
                 energy: EnergyProfile::Periodic,
-                beta: true,
+                readiness: Readiness::Planned,
                 enable_keys: &["fan-control.enabled"],
             },
         }

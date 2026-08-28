@@ -4,7 +4,7 @@ use strum_macros::EnumIter;
 
 mod descriptor;
 
-pub use descriptor::{Descriptor, EnergyProfile, Group};
+pub use descriptor::{Descriptor, EnergyProfile, Group, Readiness};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, EnumIter)]
 pub enum Feature {
@@ -43,8 +43,21 @@ impl Feature {
         }
     }
 
-    /// Sits above the feature's own enable keys, so uninstalling preserves its configuration.
+    /// Sits above the feature's own enable keys, so removing a feature preserves whatever it
+    /// was configured to do and putting it back restores exactly that.
     pub fn availability_key(self) -> String {
         format!("{}.installed", self.id())
+    }
+
+    /// Something not built yet is listed so the catalogue stays honest about where Kavverna is
+    /// going, but it is never installed and never asked to run.
+    pub const fn is_built(self) -> bool {
+        matches!(self.describe().readiness, Readiness::Built)
+    }
+
+    /// Everything that exists arrives installed. Thirteen switches to find before the first use
+    /// is not a welcome, and each feature's own setting still decides what it actually does.
+    pub const fn installed_by_default(self) -> bool {
+        self.is_built()
     }
 }

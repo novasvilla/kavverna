@@ -34,7 +34,8 @@ RowLayout {
         }
     }
 
-    Switch {
+    Toggle {
+        theme: row.theme
         checked: row.on
         onToggled: row.toggled(checked)
     }

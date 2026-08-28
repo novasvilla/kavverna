@@ -61,7 +61,8 @@ ColumnLayout {
                     }
                 }
 
-                Switch {
+                Toggle {
+                    theme: section.theme
                     enabled: section.hub.jiggle_available
                     checked: section.hub.mouse_jiggle
                     onToggled: section.hub.choose_mouse_jiggle(checked)

@@ -16,6 +16,45 @@ Window {
     readonly property int toolsPage: 4
     property int page: hub.page
 
+    /// True while the utility is in the features list. Reading `features.installed` here is what
+    /// makes every binding below re-evaluate the moment one is switched off.
+    function shows(id) {
+        const at = features.ids.indexOf(id)
+        return at >= 0 && features.installed[at]
+    }
+
+    function showsAny(ids) {
+        return ids.some(root.shows)
+    }
+
+    /// What each page is there for. Stated once so the tab strip and the page itself cannot
+    /// disagree about whether it should exist.
+    readonly property var pageNeeds: [
+        ["keep-awake"],
+        ["volume-mixer", "output-switcher", "microphone-tools"],
+        ["system-monitor"],
+        ["clipboard-history", "clipboard-auto-clear", "clean-url"],
+        ["mouse-jiggle"]
+    ]
+
+    function pageShown(which) {
+        return root.showsAny(root.pageNeeds[which])
+    }
+
+    /// Opening onto a page whose utilities were all removed would show an empty panel, so the
+    /// first one still here is chosen instead.
+    function landOnSomethingVisible() {
+        if (root.pageShown(hub.page)) {
+            return
+        }
+        for (let which = 0; which < root.pageNeeds.length; which += 1) {
+            if (root.pageShown(which)) {
+                hub.page = which
+                return
+            }
+        }
+    }
+
     width: 360
     // A panel the length of the screen is one nobody reads, so every page keeps to the height
     // the rest of them use.
@@ -74,6 +113,12 @@ Window {
     ClipboardView {
         id: clipboard
         Component.onCompleted: attach()
+    }
+
+    FeaturesView {
+        id: features
+        Component.onCompleted: attach()
+        onInstalledChanged: root.landOnSomethingVisible()
     }
 
     Rectangle {
@@ -165,22 +210,28 @@ Window {
                         model: [
                             { glyph: "\u266a", name: "Sound", page: root.soundPage,
                               ready: mixer.available,
-                              unready: "Sound is waiting for PipeWire" },
+                              unready: "Sound is waiting for PipeWire",
+                              needs: root.pageNeeds[root.soundPage] },
                             { glyph: "\u25f4", name: "Monitoring", page: root.monitoringPage,
-                              ready: true, unready: "" },
+                              ready: true, unready: "",
+                              needs: root.pageNeeds[root.monitoringPage] },
                             { glyph: "\u2704", name: "Clipboard", page: root.clipboardPage,
-                              ready: true, unready: "" },
+                              ready: true, unready: "",
+                              needs: root.pageNeeds[root.clipboardPage] },
                             { glyph: "\ud83d\udee0", name: "Tools", page: root.toolsPage,
-                              ready: true, unready: "" },
+                              ready: true, unready: "",
+                              needs: root.pageNeeds[root.toolsPage] },
                             { glyph: "\u26a1", name: "Energy", page: root.energyPage,
-                              ready: true, unready: "" }
+                              ready: true, unready: "",
+                              needs: root.pageNeeds[root.energyPage] }
                         ]
 
                         delegate: Rectangle {
                             required property var modelData
                             readonly property bool current: root.page === modelData.page
 
-                            Layout.fillWidth: true
+                            visible: root.showsAny(modelData.needs)
+                            Layout.fillWidth: visible
                             Layout.fillHeight: true
                             radius: 8
                             color: current ? theme.selected : "transparent"
@@ -231,24 +282,28 @@ Window {
                     theme: theme
                     hub: hub
                     visible: !hub.showing_settings && root.page === root.energyPage
+                             && root.pageShown(root.energyPage)
                 }
 
                 SoundSection {
                     theme: theme
                     mixer: mixer
                     visible: !hub.showing_settings && root.page === root.soundPage
+                             && root.pageShown(root.soundPage)
                 }
 
                 MonitoringSection {
                     theme: theme
                     vitals: vitals
                     visible: !hub.showing_settings && root.page === root.monitoringPage
+                             && root.pageShown(root.monitoringPage)
                 }
 
                 ClipboardSection {
                     theme: theme
                     clipboard: clipboard
                     visible: !hub.showing_settings && root.page === root.clipboardPage
+                             && root.pageShown(root.clipboardPage)
                     // Choosing an entry puts it on the clipboard, so the panel gets out of the way
                     // for the paste that follows.
                     onPicked: hub.dismiss()
@@ -258,12 +313,14 @@ Window {
                     theme: theme
                     hub: hub
                     visible: !hub.showing_settings && root.page === root.toolsPage
+                             && root.pageShown(root.toolsPage)
                 }
 
                 SettingsPage {
                     theme: theme
                     hub: hub
                     clipboard: clipboard
+                    features: features
                     visible: hub.showing_settings
                 }
                 }

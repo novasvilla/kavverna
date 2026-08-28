@@ -58,6 +58,22 @@ pub const CLEAN_LINKS_DEFAULT: bool = false;
 /// somebody who switched their desktop to light meant it.
 pub const APPEARANCE_DEFAULT: i64 = 0;
 
+/// Sits above a feature's own switch. Removing one hides it everywhere and stops it starting
+/// next time, and never touches its enable keys, so putting it back restores what it was set to
+/// do rather than a fresh default.
+pub fn is_installed(feature: Feature) -> bool {
+    feature.is_built() && bool_at(&feature.availability_key(), feature.installed_by_default())
+}
+
+/// A shared service belongs to more than one feature, so it runs while any of them is here.
+pub fn any_installed(features: &[Feature]) -> bool {
+    features.iter().copied().any(is_installed)
+}
+
+pub fn set_installed(feature: Feature, installed: bool) {
+    put_bool(&feature.availability_key(), installed);
+}
+
 static STORE: Mutex<Option<Preferences>> = Mutex::new(None);
 
 fn store() -> MutexGuard<'static, Option<Preferences>> {

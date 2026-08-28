@@ -9,9 +9,21 @@ ColumnLayout {
     required property var theme
     required property var hub
     required property var clipboard
+    required property var features
+
+    /// A card for a utility that was removed would offer settings for something not running.
+    function shows(id) {
+        const at = page.features.ids.indexOf(id)
+        return at >= 0 && page.features.installed[at]
+    }
 
     Layout.fillWidth: true
     spacing: 12
+
+    FeaturesCard {
+        theme: page.theme
+        features: page.features
+    }
 
     SectionLabel {
         theme: page.theme
@@ -62,11 +74,13 @@ ColumnLayout {
     SectionLabel {
         theme: page.theme
         text: "ENERGY"
+        visible: page.shows("keep-awake")
     }
 
     Card {
         theme: page.theme
         implicitHeight: energy.implicitHeight + page.theme.pad * 2
+        visible: page.shows("keep-awake")
 
         ColumnLayout {
             id: energy
@@ -111,11 +125,13 @@ ColumnLayout {
     SectionLabel {
         theme: page.theme
         text: "CLIPBOARD"
+        visible: page.shows("clipboard-history")
     }
 
     Card {
         theme: page.theme
         implicitHeight: saving.implicitHeight + page.theme.pad * 2
+        visible: page.shows("clipboard-history")
 
         ColumnLayout {
             id: saving

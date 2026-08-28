@@ -23,7 +23,28 @@ pub fn send(command: MixerCommand) {
     }
 }
 
-/// Publishes every snapshot the session produces until it stops.
+/// Moves to the next output in the cycle and reports what it landed on, so a shortcut, the tray
+/// and the bus all switch outputs the same way.
+pub fn cycle_output() -> Option<String> {
+    let snapshot = get();
+    let cycle: Vec<String> = snapshot.outputs.iter().map(|device| device.name.clone()).collect();
+    let next = snapshot.next_in_cycle(&cycle)?.clone();
+    send(MixerCommand::MakeDefaultOutput(next.clone()));
+    Some(next)
+}
+
+pub fn mute_every_input(muted: bool) {
+    for device in get().inputs {
+        send(MixerCommand::SetMute { node_id: device.node_id, muted });
+    }
+}
+
+/// True only when every input is muted, since a half muted set is not muted.
+pub fn every_input_muted() -> bool {
+    let inputs = get().inputs;
+    !inputs.is_empty() && inputs.iter().all(|device| device.muted)
+}
+
 pub fn run(on_change: impl Fn()) {
     let (commands, changes) = match sound_mixer::start() {
         Ok(parts) => parts,

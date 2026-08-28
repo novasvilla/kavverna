@@ -50,15 +50,15 @@ ColumnLayout {
 
                     Label {
                         Layout.fillWidth: true
-                        text: section.hub.awake ? section.hub.awake_summary
-                                                : "May suspend when idle"
+                        text: section.hub.awake_summary
                         font.pixelSize: section.theme.textBody
                         color: section.theme.secondaryText
                         elide: Text.ElideRight
                     }
                 }
 
-                Switch {
+                Toggle {
+                    theme: section.theme
                     checked: section.hub.awake
                     onToggled: section.hub.toggle_awake()
                 }
@@ -119,10 +119,10 @@ ColumnLayout {
                 }
             }
 
-            CheckBox {
+            Tick {
+                theme: section.theme
                 text: "Let displays sleep"
                 checked: section.hub.allow_display_sleep
-                font.pixelSize: section.theme.textBody
                 onToggled: section.hub.choose_display_sleep(checked)
             }
         }

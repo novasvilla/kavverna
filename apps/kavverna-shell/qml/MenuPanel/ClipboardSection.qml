@@ -72,20 +72,11 @@ ColumnLayout {
             anchors.margins: section.theme.pad
             spacing: 8
 
-            CheckBox {
-                id: keeping
+            Tick {
+                theme: section.theme
                 text: "Save clipboard history"
                 checked: section.clipboard.enabled
-                font.pixelSize: 12
                 onToggled: section.clipboard.enable(checked)
-
-                contentItem: Label {
-                    text: keeping.text
-                    font: keeping.font
-                    color: section.theme.primaryText
-                    leftPadding: keeping.indicator.width + 6
-                    verticalAlignment: Text.AlignVCenter
-                }
             }
 
             Label {

@@ -11,6 +11,7 @@ mod awake_state;
 mod clipboard_state;
 mod clipboard_view;
 mod command;
+mod features_view;
 mod jiggle_state;
 mod launch_at_login;
 mod mixer_state;
@@ -24,6 +25,7 @@ mod vitals_state;
 mod vitals_view;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
+use feature_catalog::Feature;
 
 fn main() {
     tracing_subscriber::fmt()
@@ -64,16 +66,33 @@ fn main() {
     let (sender, requests) = std::sync::mpsc::channel();
     command::publish(sender);
 
-    shortcuts::serve(bus.handle().clone());
-    auto_clear::serve(bus.handle().clone());
+    // A utility removed in the features list never starts, which is what makes that switch
+    // mean something rather than only hiding a page.
+    let clipboard = [Feature::ClipboardHistory, Feature::ClipboardAutoClear, Feature::CleanUrl];
+    let sound = [Feature::VolumeMixer, Feature::OutputSwitcher, Feature::MicrophoneTools];
+
+    if settings::is_installed(Feature::ClipboardHistory) {
+        shortcuts::serve(bus.handle().clone());
+    }
+    if settings::is_installed(Feature::ClipboardAutoClear) {
+        auto_clear::serve(bus.handle().clone());
+    }
 
     let tray = tray::show();
-    std::thread::spawn(move || awake_loop::run(requests, tray));
-    std::thread::spawn(|| mixer_state::run(mixer_view::publish));
-    std::thread::spawn(|| clipboard_state::run(clipboard_view::publish));
-    std::thread::spawn(|| {
-        vitals_state::run(std::time::Duration::from_secs(2), vitals_view::publish)
-    });
+    if settings::any_installed(&[Feature::KeepAwake, Feature::MouseJiggle]) {
+        std::thread::spawn(move || awake_loop::run(requests, tray));
+    }
+    if settings::any_installed(&sound) {
+        std::thread::spawn(|| mixer_state::run(mixer_view::publish));
+    }
+    if settings::any_installed(&clipboard) {
+        std::thread::spawn(|| clipboard_state::run(clipboard_view::publish));
+    }
+    if settings::is_installed(Feature::SystemMonitor) {
+        std::thread::spawn(|| {
+            vitals_state::run(std::time::Duration::from_secs(2), vitals_view::publish)
+        });
+    }
 
     let mut app = QGuiApplication::new();
     let mut engine = QQmlApplicationEngine::new();

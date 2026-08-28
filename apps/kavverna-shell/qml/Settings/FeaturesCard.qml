@@ -1,0 +1,124 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import "../Shared"
+
+/// Every utility in one place, grouped as the panel groups them. Removing one hides it from the
+/// panel and from these settings without touching what it was configured to do, so putting it
+/// back restores exactly that.
+ColumnLayout {
+    id: card
+
+    required property var theme
+    required property var features
+
+    Layout.fillWidth: true
+    spacing: card.theme.pad
+
+    RowLayout {
+        Layout.fillWidth: true
+
+        SectionLabel {
+            theme: card.theme
+            text: "UTILITIES"
+            Layout.fillWidth: true
+        }
+
+        Label {
+            text: card.features.installed_count + " of " + card.features.built_count + " on"
+            font.pixelSize: card.theme.textBody
+            color: card.theme.secondaryText
+        }
+    }
+
+    Card {
+        theme: card.theme
+        implicitHeight: list.implicitHeight + card.theme.pad * 2
+
+        ColumnLayout {
+            id: list
+            anchors.fill: parent
+            anchors.margins: card.theme.pad
+            spacing: card.theme.gap
+
+            Repeater {
+                model: card.features.ids.length
+
+                delegate: ColumnLayout {
+                    id: entry
+
+                    required property int index
+
+                    readonly property string id: card.features.ids[index]
+                    readonly property bool built: card.features.built[index]
+                    // The group name is only drawn when it changes, which turns a flat list into
+                    // the same five groups the panel has without a second model to keep in step.
+                    readonly property bool opensGroup: index === 0
+                        || card.features.groups[index] !== card.features.groups[index - 1]
+
+                    Layout.fillWidth: true
+                    spacing: card.theme.gapSnug
+
+                    Label {
+                        visible: entry.opensGroup
+                        Layout.fillWidth: true
+                        Layout.topMargin: entry.index === 0 ? 0 : card.theme.gapSnug
+                        text: card.features.groups[entry.index].toUpperCase()
+                        font.pixelSize: card.theme.textBody
+                        font.bold: true
+                        color: card.theme.mutedText
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: card.theme.gap
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: card.features.titles[entry.index]
+                                font.pixelSize: card.theme.textStrong
+                                font.bold: true
+                                color: entry.built ? card.theme.primaryText : card.theme.mutedText
+                                elide: Text.ElideRight
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: card.features.summaries[entry.index]
+                                font.pixelSize: card.theme.textBody
+                                color: card.theme.secondaryText
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        Label {
+                            visible: !entry.built
+                            text: "On the way"
+                            font.pixelSize: card.theme.textBody
+                            color: card.theme.mutedText
+                        }
+
+                        Toggle {
+                            theme: card.theme
+                            visible: entry.built
+                            checked: card.features.installed[entry.index]
+                            onToggled: card.features.choose_installed(entry.id, checked)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Label {
+        Layout.fillWidth: true
+        text: "A utility switched off here stops watching anything the next time Kavverna starts."
+        font.pixelSize: card.theme.textBody
+        color: card.theme.mutedText
+        wrapMode: Text.WordWrap
+    }
+}

@@ -1,6 +1,7 @@
 use crate::command::{self, Command};
 use crate::settings;
-use crate::{app_icon, panel};
+use crate::{app_icon, mixer_state, panel};
+use feature_catalog::Feature;
 use keep_awake::{Hold, Scope, format_compact, format_duration};
 use ksni::blocking::{Handle, TrayMethods};
 use ksni::menu::{StandardItem, SubMenu};
@@ -41,6 +42,110 @@ impl StatusIcon {
             (true, Some(left)) => format!("Awake for {}", format_duration(left)),
             (true, None) => "Awake until switched off".into(),
         }
+    }
+}
+
+impl StatusIcon {
+    fn keep_awake_items(&self) -> Vec<MenuItem<Self>> {
+        let timed = DURATIONS
+            .iter()
+            .map(|&(label, minutes)| {
+                StandardItem {
+                    label: label.into(),
+                    activate: Box::new(move |_: &mut Self| {
+                        command::send(Command::Engage(
+                            Hold::For(Duration::from_secs(minutes * 60)),
+                            configured_scope(),
+                        ));
+                    }),
+                    ..Default::default()
+                }
+                .into()
+            })
+            .collect();
+
+        let extensions = EXTENSIONS
+            .iter()
+            .map(|&(label, minutes)| {
+                StandardItem {
+                    label: format!("+ {label}"),
+                    activate: Box::new(move |_: &mut Self| {
+                        command::send(Command::Extend(Duration::from_secs(minutes * 60)));
+                    }),
+                    ..Default::default()
+                }
+                .into()
+            })
+            .collect();
+
+        vec![
+            StandardItem { label: self.summary(), enabled: false, ..Default::default() }.into(),
+            SubMenu { label: "Keep awake for".into(), submenu: timed, ..Default::default() }.into(),
+            SubMenu {
+                label: "Add more time".into(),
+                enabled: self.remaining.is_some(),
+                submenu: extensions,
+                ..Default::default()
+            }
+            .into(),
+            StandardItem {
+                label: if self.awake { "Allow sleep now" } else { "Keep awake" }.into(),
+                activate: Box::new(|icon: &mut Self| {
+                    let command = if icon.awake {
+                        Command::Release
+                    } else {
+                        Command::Engage(Hold::Indefinite, configured_scope())
+                    };
+                    command::send(command);
+                }),
+                ..Default::default()
+            }
+            .into(),
+        ]
+    }
+
+    /// The two sound actions worth reaching without opening anything. Both need a live mixer,
+    /// so neither is offered when there is nothing to act on.
+    fn sound_items(&self) -> Vec<MenuItem<Self>> {
+        let mut items: Vec<MenuItem<Self>> = Vec::new();
+        if !mixer_state::is_running() {
+            return items;
+        }
+
+        if settings::is_installed(Feature::MicrophoneTools) {
+            let muted = mixer_state::every_input_muted();
+            items.push(
+                StandardItem {
+                    label: if muted { "Unmute microphones" } else { "Mute every microphone" }
+                        .into(),
+                    icon_name: if muted {
+                        "audio-input-microphone"
+                    } else {
+                        "microphone-sensitivity-muted"
+                    }
+                    .into(),
+                    activate: Box::new(move |_: &mut Self| mixer_state::mute_every_input(!muted)),
+                    ..Default::default()
+                }
+                .into(),
+            );
+        }
+
+        if settings::is_installed(Feature::OutputSwitcher) {
+            items.push(
+                StandardItem {
+                    label: "Next sound output".into(),
+                    icon_name: "audio-headphones".into(),
+                    activate: Box::new(|_: &mut Self| {
+                        mixer_state::cycle_output();
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+            );
+        }
+
+        items
     }
 }
 
@@ -88,66 +193,41 @@ impl Tray for StatusIcon {
     }
 
     fn menu(&self) -> Vec<MenuItem<Self>> {
-        let timed = DURATIONS
-            .iter()
-            .map(|&(label, minutes)| {
-                StandardItem {
-                    label: label.into(),
-                    activate: Box::new(move |_: &mut Self| {
-                        command::send(Command::Engage(
-                            Hold::For(Duration::from_secs(minutes * 60)),
-                            configured_scope(),
-                        ));
-                    }),
-                    ..Default::default()
-                }
-                .into()
-            })
-            .collect();
-
-        vec![
+        let mut items: Vec<MenuItem<Self>> = vec![
             StandardItem {
                 label: "Open Kavverna".into(),
                 activate: Box::new(|_| panel::toggle()),
                 ..Default::default()
             }
             .into(),
-            MenuItem::Separator,
-            StandardItem { label: self.summary(), enabled: false, ..Default::default() }.into(),
-            SubMenu { label: "Keep awake for".into(), submenu: timed, ..Default::default() }.into(),
-            SubMenu {
-                label: "Add more time".into(),
-                enabled: self.remaining.is_some(),
-                submenu: EXTENSIONS
-                    .iter()
-                    .map(|&(label, minutes)| {
-                        StandardItem {
-                            label: format!("+ {label}"),
-                            activate: Box::new(move |_: &mut Self| {
-                                command::send(Command::Extend(Duration::from_secs(minutes * 60)));
-                            }),
-                            ..Default::default()
-                        }
-                        .into()
-                    })
-                    .collect(),
-                ..Default::default()
-            }
-            .into(),
-            StandardItem {
-                label: if self.awake { "Allow sleep now" } else { "Keep awake" }.into(),
-                activate: Box::new(|icon: &mut Self| {
-                    let command = if icon.awake {
-                        Command::Release
-                    } else {
-                        Command::Engage(Hold::Indefinite, configured_scope())
-                    };
-                    command::send(command);
-                }),
-                ..Default::default()
-            }
-            .into(),
-            MenuItem::Separator,
+        ];
+
+        if settings::is_installed(Feature::KeepAwake) {
+            items.push(MenuItem::Separator);
+            items.extend(self.keep_awake_items());
+        }
+
+        let sound = self.sound_items();
+        if !sound.is_empty() {
+            items.push(MenuItem::Separator);
+            items.extend(sound);
+        }
+
+        if settings::is_installed(Feature::ClipboardHistory) {
+            items.push(MenuItem::Separator);
+            items.push(
+                StandardItem {
+                    label: "Clipboard history".into(),
+                    icon_name: "edit-paste".into(),
+                    activate: Box::new(|_| panel::open_page("clipboard")),
+                    ..Default::default()
+                }
+                .into(),
+            );
+        }
+
+        items.push(MenuItem::Separator);
+        items.push(
             StandardItem {
                 label: "Settings".into(),
                 icon_name: "configure".into(),
@@ -155,6 +235,8 @@ impl Tray for StatusIcon {
                 ..Default::default()
             }
             .into(),
+        );
+        items.push(
             StandardItem {
                 label: "Quit".into(),
                 icon_name: "application-exit".into(),
@@ -162,7 +244,9 @@ impl Tray for StatusIcon {
                 ..Default::default()
             }
             .into(),
-        ]
+        );
+
+        items
     }
 }
 

@@ -11,7 +11,7 @@ Button {
     property bool active: false
 
     implicitHeight: 26
-    font.pixelSize: theme.textSmall
+    font.pixelSize: theme.textBody
     leftPadding: pill.theme.gapTight / 2
     rightPadding: pill.theme.gapTight / 2
 
