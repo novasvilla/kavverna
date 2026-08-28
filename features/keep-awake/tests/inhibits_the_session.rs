@@ -1,6 +1,14 @@
 use keep_awake::{Hold, KeepAwake, Scope};
 use std::process::Command;
+use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
+
+/// logind's inhibitor list is process-wide state, so these tests cannot overlap.
+static LOGIND: Mutex<()> = Mutex::new(());
+
+fn exclusive() -> MutexGuard<'static, ()> {
+    LOGIND.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 fn logind_reports_kavverna() -> bool {
     Command::new("systemd-inhibit")
@@ -13,6 +21,8 @@ fn logind_reports_kavverna() -> bool {
 /// Skips rather than fails without a session bus, so the suite stays runnable headless.
 #[tokio::test]
 async fn the_inhibitor_appears_and_disappears_with_the_hold() {
+    let _exclusive = exclusive();
+
     let Ok(mut keep_awake) = KeepAwake::connect().await else {
         eprintln!("skipped: no session bus");
         return;
@@ -36,6 +46,8 @@ async fn the_inhibitor_appears_and_disappears_with_the_hold() {
 
 #[tokio::test]
 async fn a_lapsed_hold_releases_itself() {
+    let _exclusive = exclusive();
+
     let Ok(mut keep_awake) = KeepAwake::connect().await else {
         eprintln!("skipped: no session bus");
         return;
