@@ -1,14 +1,23 @@
+mod app_icon;
 mod awake_loop;
 mod awake_state;
 mod command;
-mod cup_icon;
+mod launch_at_login;
+mod settings;
 mod panel;
 mod tray;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
 
 fn main() {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("kavverna_shell=info,keep_awake=info")),
+        )
+        .init();
+
+    tracing::info!(version = env!("CARGO_PKG_VERSION"), "kavverna starting");
 
     let (sender, requests) = std::sync::mpsc::channel();
     command::publish(sender);

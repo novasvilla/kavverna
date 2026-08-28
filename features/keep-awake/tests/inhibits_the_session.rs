@@ -1,25 +1,45 @@
-use keep_awake::{Hold, KeepAwake, Scope};
+use keep_awake::{Hold, KeepAwake, Scope, Trigger};
 use std::process::Command;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
-/// logind's inhibitor list is process-wide state, so these tests cannot overlap.
-static LOGIND: Mutex<()> = Mutex::new(());
+/// The power daemon's inhibition list is session-wide state, so these tests cannot overlap.
+static POWER_DAEMON: Mutex<()> = Mutex::new(());
 
 fn exclusive() -> MutexGuard<'static, ()> {
-    LOGIND.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    POWER_DAEMON.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-fn logind_reports_kavverna() -> bool {
-    Command::new("systemd-inhibit")
-        .arg("--list")
+/// Asks the daemon that actually performs the suspend, rather than trusting our own state.
+fn power_daemon_lists_kavverna() -> bool {
+    Command::new("busctl")
+        .args([
+            "--user",
+            "call",
+            "org.kde.Solid.PowerManagement",
+            "/org/kde/Solid/PowerManagement/PolicyAgent",
+            "org.kde.Solid.PowerManagement.PolicyAgent",
+            "ListInhibitions",
+        ])
         .output()
         .map(|out| String::from_utf8_lossy(&out.stdout).contains("Kavverna"))
         .unwrap_or(false)
 }
 
-#[tokio::test]
-async fn the_inhibitor_appears_and_disappears_with_the_hold() {
+/// The daemon publishes its list a moment after accepting a change, so a single read right
+/// after the call is a race rather than an answer.
+fn settles_on(expected: bool, probe: fn() -> bool) -> bool {
+    for _ in 0..120 {
+        if probe() == expected {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    false
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_power_daemon_honours_the_hold() {
     let _exclusive = exclusive();
 
     let Ok(mut keep_awake) = KeepAwake::connect().await else {
@@ -27,23 +47,30 @@ async fn the_inhibitor_appears_and_disappears_with_the_hold() {
         return;
     };
 
-    assert!(!logind_reports_kavverna(), "a previous run left an inhibitor behind");
+    assert!(!power_daemon_lists_kavverna(), "a previous run left an inhibition behind");
 
     keep_awake
-        .engage(Hold::For(Duration::from_secs(60)), Scope::SystemOnly)
+        .engage(Hold::For(Duration::from_secs(60)), Scope::SystemOnly, Trigger::Manual)
         .await
         .expect("engage");
 
     assert!(keep_awake.is_active());
-    assert!(logind_reports_kavverna(), "logind never saw the inhibitor");
+    assert!(
+        keep_awake.power_daemon_holds(),
+        "the power daemon refused the inhibition, so the machine would still suspend"
+    );
+    assert!(
+        settles_on(true, power_daemon_lists_kavverna),
+        "the power daemon never listed the hold"
+    );
 
     keep_awake.release().await;
 
     assert!(!keep_awake.is_active());
-    assert!(!logind_reports_kavverna(), "the inhibitor outlived its hold");
+    assert!(settles_on(false, power_daemon_lists_kavverna), "the inhibition outlived its hold");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn a_lapsed_hold_releases_itself() {
     let _exclusive = exclusive();
 
@@ -53,7 +80,7 @@ async fn a_lapsed_hold_releases_itself() {
     };
 
     keep_awake
-        .engage(Hold::For(Duration::from_millis(50)), Scope::SystemOnly)
+        .engage(Hold::For(Duration::from_millis(50)), Scope::SystemOnly, Trigger::Manual)
         .await
         .expect("engage");
 
@@ -61,4 +88,48 @@ async fn a_lapsed_hold_releases_itself() {
 
     assert!(keep_awake.expire_if_due().await, "the hold should have lapsed");
     assert!(!keep_awake.is_active());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn extending_pushes_the_deadline_out() {
+    let _exclusive = exclusive();
+
+    let Ok(mut keep_awake) = KeepAwake::connect().await else {
+        eprintln!("skipped: no session bus");
+        return;
+    };
+
+    keep_awake
+        .engage(Hold::For(Duration::from_secs(60)), Scope::SystemOnly, Trigger::Manual)
+        .await
+        .expect("engage");
+
+    let before = keep_awake.remaining().expect("timed hold");
+    assert!(keep_awake.extend(Duration::from_secs(900)));
+    let after = keep_awake.remaining().expect("still timed");
+
+    assert!(after > before + Duration::from_secs(880), "extend did not add the time");
+
+    keep_awake.release().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_indefinite_hold_has_nothing_to_extend() {
+    let _exclusive = exclusive();
+
+    let Ok(mut keep_awake) = KeepAwake::connect().await else {
+        eprintln!("skipped: no session bus");
+        return;
+    };
+
+    keep_awake
+        .engage(Hold::Indefinite, Scope::SystemOnly, Trigger::Manual)
+        .await
+        .expect("engage");
+
+    assert!(!keep_awake.is_timed());
+    assert!(!keep_awake.extend(Duration::from_secs(900)));
+    assert!(keep_awake.remaining().is_none());
+
+    keep_awake.release().await;
 }

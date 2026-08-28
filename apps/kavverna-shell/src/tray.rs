@@ -1,6 +1,6 @@
-use crate::awake_state;
 use crate::command::{self, Command};
-use crate::{cup_icon, panel};
+use crate::settings;
+use crate::{app_icon, panel};
 use keep_awake::{Hold, Scope, format_duration};
 use ksni::blocking::{Handle, TrayMethods};
 use ksni::menu::{StandardItem, SubMenu};
@@ -31,7 +31,8 @@ impl StatusIcon {
     }
 
     fn scope() -> Scope {
-        if awake_state::get().allow_display_sleep {
+        if settings::bool_at(settings::ALLOW_DISPLAY_SLEEP, settings::ALLOW_DISPLAY_SLEEP_DEFAULT)
+        {
             Scope::SystemOnly
         } else {
             Scope::SystemAndDisplay
@@ -49,7 +50,7 @@ impl Tray for StatusIcon {
     }
 
     fn icon_pixmap(&self) -> Vec<ksni::Icon> {
-        cup_icon::cup(self.awake)
+        app_icon::mark(self.awake)
     }
 
     fn tool_tip(&self) -> ToolTip {
@@ -61,7 +62,7 @@ impl Tray for StatusIcon {
     }
 
     fn activate(&mut self, _x: i32, _y: i32) {
-        panel::open();
+        panel::toggle();
     }
 
     fn menu(&self) -> Vec<MenuItem<Self>> {
@@ -85,7 +86,7 @@ impl Tray for StatusIcon {
         vec![
             StandardItem {
                 label: "Open Kavverna".into(),
-                activate: Box::new(|_| panel::open()),
+                activate: Box::new(|_| panel::toggle()),
                 ..Default::default()
             }
             .into(),
@@ -106,6 +107,13 @@ impl Tray for StatusIcon {
             }
             .into(),
             MenuItem::Separator,
+            StandardItem {
+                label: "Settings".into(),
+                icon_name: "configure".into(),
+                activate: Box::new(|_| panel::open_settings()),
+                ..Default::default()
+            }
+            .into(),
             StandardItem {
                 label: "Quit".into(),
                 icon_name: "application-exit".into(),

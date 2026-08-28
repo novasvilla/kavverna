@@ -12,7 +12,10 @@ cxx-qt.workspace = true
 cxx-qt-lib = { workspace = true, features = ["qt_full"] }
 ksni.workspace = true
 feature-catalog.workspace = true
+directories.workspace = true
 keep-awake.workspace = true
+notify-rust.workspace = true
+preferences.workspace = true
 strum.workspace = true
 tokio = { workspace = true, features = ["rt", "time"] }
 tracing.workspace = true

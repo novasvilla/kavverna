@@ -22,8 +22,6 @@ Window {
     visible: hub.panel_open
     color: "transparent"
 
-    onActiveChanged: if (!active && hub.panel_open) hub.close_panel()
-
     // Anchored rather than positioned: a Wayland client cannot place its own window, so the
     // panel hangs off the screen edge nearest the tray instead.
     LayerShell.Window.anchors: LayerShell.Window.AnchorBottom | LayerShell.Window.AnchorRight
@@ -31,10 +29,62 @@ Window {
     LayerShell.Window.margins: Qt.rect(0, 0, 12, 12)
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityOnDemand
     LayerShell.Window.scope: "kavverna-panel"
+    LayerShell.Window.wantsToBeOnActiveScreen: true
+
+    onActiveChanged: if (!active && hub.panel_open) hub.dismiss()
 
     KavvernaPanel {
         id: hub
         Component.onCompleted: attach()
+    }
+
+    component SectionLabel: Label {
+        font.pixelSize: 10
+        font.bold: true
+        font.letterSpacing: 1.2
+        color: root.secondaryText
+    }
+
+    component Card: Rectangle {
+        radius: 10
+        color: root.raised
+        Layout.fillWidth: true
+    }
+
+    component SettingRow: RowLayout {
+        id: settingRow
+        property alias title: titleLabel.text
+        property alias detail: detailLabel.text
+        property bool checked: false
+        signal toggled(bool value)
+
+        Layout.fillWidth: true
+        spacing: 10
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 1
+
+            Label {
+                id: titleLabel
+                font.pixelSize: 13
+                font.bold: true
+                color: root.primaryText
+            }
+
+            Label {
+                id: detailLabel
+                font.pixelSize: 11
+                color: root.secondaryText
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+        }
+
+        Switch {
+            checked: settingRow.checked
+            onToggled: settingRow.toggled(checked)
+        }
     }
 
     Rectangle {
@@ -66,7 +116,7 @@ Window {
                         text: "K"
                         font.pixelSize: 20
                         font.bold: true
-                        color: root.accent
+                        color: hub.awake ? root.awakeTint : root.accent
                     }
                 }
 
@@ -75,7 +125,7 @@ Window {
                     spacing: 4
 
                     Label {
-                        text: "Kavverna"
+                        text: hub.showing_settings ? "Settings" : "Kavverna"
                         font.pixelSize: 16
                         font.bold: true
                         color: root.primaryText
@@ -115,6 +165,7 @@ Window {
                 Layout.fillWidth: true
                 implicitHeight: 42
                 radius: 10
+                visible: !hub.showing_settings
                 color: Qt.rgba(1, 1, 1, 0.05)
 
                 RowLayout {
@@ -156,101 +207,160 @@ Window {
                 }
             }
 
-            Label {
-                text: "ENERGY"
-                font.pixelSize: 10
-                font.bold: true
-                font.letterSpacing: 1.2
-                color: root.secondaryText
-            }
-
-            Rectangle {
+            ColumnLayout {
                 Layout.fillWidth: true
-                implicitHeight: awakeCard.implicitHeight + 24
-                radius: 10
-                color: root.raised
+                visible: !hub.showing_settings
+                spacing: 12
 
-                ColumnLayout {
-                    id: awakeCard
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 10
+                SectionLabel { text: "ENERGY" }
 
-                    RowLayout {
-                        Layout.fillWidth: true
+                Card {
+                    implicitHeight: awakeCard.implicitHeight + 24
+
+                    ColumnLayout {
+                        id: awakeCard
+                        anchors.fill: parent
+                        anchors.margins: 12
                         spacing: 10
 
-                        Label {
-                            text: "⚡"
-                            font.pixelSize: 17
-                            color: root.awakeTint
-                        }
-
-                        ColumnLayout {
+                        RowLayout {
                             Layout.fillWidth: true
-                            spacing: 1
+                            spacing: 10
 
                             Label {
-                                text: "Keep awake"
-                                font.pixelSize: 13
-                                font.bold: true
-                                color: root.primaryText
+                                text: "⚡"
+                                font.pixelSize: 17
+                                color: root.awakeTint
                             }
 
-                            Label {
-                                text: hub.awake ? hub.awake_summary : "May suspend when idle"
-                                font.pixelSize: 11
-                                color: root.secondaryText
-                                elide: Text.ElideRight
+                            ColumnLayout {
                                 Layout.fillWidth: true
+                                spacing: 1
+
+                                Label {
+                                    text: "Keep awake"
+                                    font.pixelSize: 13
+                                    font.bold: true
+                                    color: root.primaryText
+                                }
+
+                                Label {
+                                    text: hub.awake ? hub.awake_summary
+                                                    : "May suspend when idle"
+                                    font.pixelSize: 11
+                                    color: root.secondaryText
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+                            }
+
+                            Switch {
+                                checked: hub.awake
+                                onToggled: hub.toggle_awake()
                             }
                         }
 
-                        Switch {
-                            checked: hub.awake
-                            onToggled: hub.toggle_awake()
-                        }
-                    }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 4
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
+                            Repeater {
+                                model: [
+                                    { label: "15m", minutes: 15 },
+                                    { label: "30m", minutes: 30 },
+                                    { label: "1h", minutes: 60 },
+                                    { label: "2h", minutes: 120 },
+                                    { label: "4h", minutes: 240 }
+                                ]
 
-                        Repeater {
-                            model: [
-                                { label: "15m", minutes: 15 },
-                                { label: "30m", minutes: 30 },
-                                { label: "1h", minutes: 60 },
-                                { label: "2h", minutes: 120 },
-                                { label: "4h", minutes: 240 }
-                            ]
+                                delegate: Button {
+                                    required property var modelData
 
-                            delegate: Button {
-                                required property var modelData
+                                    Layout.fillWidth: true
+                                    implicitHeight: 26
+                                    text: modelData.label
+                                    font.pixelSize: 11
+                                    leftPadding: 2
+                                    rightPadding: 2
+                                    onClicked: hub.keep_awake_minutes(modelData.minutes)
 
-                                Layout.fillWidth: true
-                                implicitHeight: 26
-                                text: modelData.label
-                                font.pixelSize: 11
-                                leftPadding: 2
-                                rightPadding: 2
-                                onClicked: hub.keep_awake_minutes(modelData.minutes)
-
-                                background: Rectangle {
-                                    radius: 6
-                                    color: parent.down ? Qt.rgba(1, 1, 1, 0.16)
-                                                       : Qt.rgba(1, 1, 1, 0.08)
+                                    background: Rectangle {
+                                        radius: 6
+                                        color: parent.down ? Qt.rgba(1, 1, 1, 0.16)
+                                                           : Qt.rgba(1, 1, 1, 0.08)
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    CheckBox {
-                        text: "Let displays sleep"
-                        checked: hub.allow_display_sleep
-                        font.pixelSize: 11
-                        onToggled: hub.set_display_sleep(checked)
+                        CheckBox {
+                            text: "Let displays sleep"
+                            checked: hub.allow_display_sleep
+                            font.pixelSize: 11
+                            onToggled: hub.choose_display_sleep(checked)
+                        }
                     }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: hub.showing_settings
+                spacing: 12
+
+                SectionLabel { text: "STARTUP" }
+
+                Card {
+                    implicitHeight: startupCard.implicitHeight + 24
+
+                    ColumnLayout {
+                        id: startupCard
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 12
+
+                        SettingRow {
+                            title: "Start with the system"
+                            detail: "Adds a desktop entry to the session autostart folder."
+                            checked: hub.launch_at_login
+                            onToggled: (value) => hub.choose_launch_at_login(value)
+                        }
+
+                        SettingRow {
+                            title: "Restore keep awake on start"
+                            detail: "Hold off sleep again as soon as Kavverna launches."
+                            checked: hub.restore_on_start
+                            onToggled: (value) => hub.choose_restore_on_start(value)
+                        }
+                    }
+                }
+
+                SectionLabel { text: "ENERGY" }
+
+                Card {
+                    implicitHeight: energyCard.implicitHeight + 24
+
+                    ColumnLayout {
+                        id: energyCard
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 12
+
+                        SettingRow {
+                            title: "Let displays sleep"
+                            detail: "Blocks automatic suspend only, so screens still turn off and a deliberate suspend still works."
+                            checked: hub.allow_display_sleep
+                            onToggled: (value) => hub.choose_display_sleep(value)
+                        }
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: hub.settings_path
+                    font.pixelSize: 9
+                    color: Qt.rgba(1, 1, 1, 0.3)
+                    elide: Text.ElideMiddle
                 }
             }
 
@@ -264,10 +374,12 @@ Window {
                 Layout.fillWidth: true
 
                 Label {
-                    text: "⚙  Settings"
+                    text: hub.showing_settings ? "‹  Back" : "⚙  Settings"
                     font.pixelSize: 12
                     color: root.secondaryText
                     Layout.fillWidth: true
+
+                    TapHandler { onTapped: hub.show_settings(!hub.showing_settings) }
                 }
 
                 Label {

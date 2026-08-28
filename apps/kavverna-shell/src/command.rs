@@ -4,6 +4,7 @@ use std::sync::mpsc::Sender;
 
 pub enum Command {
     Engage(Hold, Scope),
+    Extend(std::time::Duration),
     Release,
 }
 

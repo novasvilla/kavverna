@@ -4,6 +4,7 @@ members = [
     "apps/kavverna-shell",
     "domain/feature-catalog",
     "domain/feature-runtime",
+    "domain/preferences",
     "features/keep-awake",
 ]
 
@@ -49,17 +50,20 @@ blake3 = "1.8.7"
 image = "0.25.10"
 url = "2.5.8"
 directories = "6.0.0"
+tempfile = "3.27.0"
 
 # Tray. `blocking` layers a sync API over the default tokio backend, backed by ksni's own
 # private current-thread runtime. The tray therefore shares neither Qt's event loop nor our
 # main tokio runtime, which is the isolation we want for a service that must never stall.
 ksni = { version = "0.3.6", features = ["blocking"] }
 
+notify-rust = { version = "4.18.0", default-features = false, features = ["d"] }
+
 # Diagnostics
 anyhow = "1.0.104"
 thiserror = "2.0.20"
 tracing = "0.1.44"
-tracing-subscriber = "0.3.23"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 # Feature catalogue
 strum = "0.28.0"
@@ -67,3 +71,4 @@ strum_macros = "0.28.0"
 feature-catalog = { path = "domain/feature-catalog" }
 feature-runtime = { path = "domain/feature-runtime" }
 keep-awake = { path = "features/keep-awake" }
+preferences = { path = "domain/preferences" }

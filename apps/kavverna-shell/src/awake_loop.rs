@@ -1,7 +1,7 @@
 use crate::command::Command;
 use crate::tray::StatusIcon;
-use crate::{awake_state, panel};
-use keep_awake::KeepAwake;
+use crate::{awake_state, panel, settings};
+use keep_awake::{Hold, KeepAwake, MouseJiggle, Scope, Trigger};
 use ksni::blocking::Handle;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
@@ -27,21 +27,49 @@ pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
         }
     };
 
+    let mut jiggle = MouseJiggle::every(jiggle_interval());
+
+    if settings::bool_at(settings::RESTORE_ON_START, settings::RESTORE_ON_START_DEFAULT) {
+        let hold = default_hold();
+        if let Err(err) = runtime.block_on(keep_awake.engage(hold, scope(), Trigger::Manual)) {
+            tracing::error!(%err, "could not restore keep awake on start");
+        } else {
+            tracing::info!(?hold, "keep awake restored on start");
+        }
+    }
+
     loop {
         match commands.recv_timeout(TICK) {
-            Ok(Command::Engage(hold, scope)) => {
-                if let Err(err) = runtime.block_on(keep_awake.engage(hold, scope)) {
+            Ok(Command::Engage(hold, requested)) => {
+                if let Err(err) = runtime.block_on(keep_awake.engage(hold, requested, Trigger::Manual))
+                {
                     tracing::error!(%err, "could not engage keep awake");
+                }
+            }
+            Ok(Command::Extend(extra)) => {
+                if !keep_awake.extend(extra) {
+                    tracing::info!("nothing to extend: no timed hold running");
                 }
             }
             Ok(Command::Release) => runtime.block_on(keep_awake.release()),
             Err(RecvTimeoutError::Timeout) => {
-                runtime.block_on(keep_awake.expire_if_due());
+                if runtime.block_on(keep_awake.expire_if_due()) {
+                    announce_expiry();
+                }
             }
             Err(RecvTimeoutError::Disconnected) => {
                 runtime.block_on(keep_awake.release());
                 return;
             }
+        }
+
+        if keep_awake.is_active()
+            && settings::bool_at(settings::MOUSE_JIGGLE, settings::MOUSE_JIGGLE_DEFAULT)
+        {
+            jiggle.set_interval(jiggle_interval());
+            jiggle.tick();
+        } else {
+            jiggle.rest();
         }
 
         let active = keep_awake.is_active();
@@ -56,5 +84,39 @@ pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
                 icon.remaining = remaining;
             });
         }
+    }
+}
+
+fn scope() -> Scope {
+    if settings::bool_at(settings::ALLOW_DISPLAY_SLEEP, settings::ALLOW_DISPLAY_SLEEP_DEFAULT) {
+        Scope::SystemOnly
+    } else {
+        Scope::SystemAndDisplay
+    }
+}
+
+fn default_hold() -> Hold {
+    match settings::integer_at(settings::DEFAULT_MINUTES, settings::DEFAULT_MINUTES_DEFAULT) {
+        0 => Hold::Indefinite,
+        minutes => Hold::For(Duration::from_secs(minutes.unsigned_abs() * 60)),
+    }
+}
+
+fn jiggle_interval() -> Duration {
+    let minutes =
+        settings::integer_at(settings::JIGGLE_MINUTES, settings::JIGGLE_MINUTES_DEFAULT).max(1);
+    Duration::from_secs(minutes.unsigned_abs() * 60)
+}
+
+fn announce_expiry() {
+    let outcome = notify_rust::Notification::new()
+        .summary("Keep awake ended")
+        .body("Time is up. The machine will sleep normally again.")
+        .icon("preferences-system-power-management")
+        .appname("Kavverna")
+        .show();
+
+    if let Err(err) = outcome {
+        tracing::warn!(%err, "could not post the expiry notification");
     }
 }
