@@ -27,7 +27,7 @@
   }
   a { color: var(--torch); text-decoration: none; }
   a:hover { color: var(--torch-bright); text-decoration: underline; }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 0 24px; }
 
   header { padding: 88px 0 56px; text-align: center; }
   header img { width: 108px; height: 108px; }
@@ -45,6 +45,23 @@
   }
   .cta a.primary { background: var(--torch); border-color: var(--torch); color: #1b1500; font-weight: 600; }
   .cta a:hover { text-decoration: none; border-color: var(--torch); }
+
+  .shots {
+    margin-top: 46px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 14px;
+  }
+  .shots img {
+    width: 168px;
+    height: auto;
+    border-radius: 12px;
+    border: 1px solid var(--hairline);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  }
+  @media (max-width: 620px) { .shots img { width: 44%; } }
 
   section { padding: 40px 0; border-top: 1px solid var(--hairline); }
   h2 { font-size: 24px; margin: 0 0 6px; letter-spacing: -0.01em; }
@@ -88,12 +105,12 @@
     <a class="primary" href="https://github.com/novasvilla/kavverna">Source on GitHub</a>
     <a href="https://github.com/novasvilla/kavverna/releases">Releases</a>
   </div>
-  <p style="margin-top:44px">
-    <img src="assets/readme/sound.png" width="176" alt="Sound" style="border-radius:12px;margin:4px">
-    <img src="assets/readme/monitoring.png" width="176" alt="Monitoring" style="border-radius:12px;margin:4px">
-    <img src="assets/readme/clipboard.png" width="176" alt="Clipboard" style="border-radius:12px;margin:4px">
-    <img src="assets/readme/settings.png" width="176" alt="Settings" style="border-radius:12px;margin:4px">
-  </p>
+  <div class="shots">
+    <img src="assets/readme/sound.png" alt="Sound: every output with live volumes, and one row per application">
+    <img src="assets/readme/monitoring.png" alt="Monitoring: processor, memory, pressure and both graphics cards">
+    <img src="assets/readme/clipboard.png" alt="Clipboard history with search and quick paste shortcuts">
+    <img src="assets/readme/settings.png" alt="Settings for startup, energy and the clipboard">
+  </div>
 </header>
 
 <section class="wrap" id="why">
