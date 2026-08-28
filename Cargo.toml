@@ -7,6 +7,7 @@ members = [
     "domain/preferences",
     "features/keep-awake",
     "features/sound-mixer",
+    "features/system-monitor",
 ]
 
 [workspace.package]
@@ -74,3 +75,4 @@ feature-runtime = { path = "domain/feature-runtime" }
 keep-awake = { path = "features/keep-awake" }
 preferences = { path = "domain/preferences" }
 sound-mixer = { path = "features/sound-mixer" }
+system-monitor = { path = "features/system-monitor" }
