@@ -27,6 +27,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/sponsors/novasvilla"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-GitHub%20Sponsors-e9b44c?logo=githubsponsors&logoColor=white" alt="Buy me a coffee through GitHub Sponsors"></a>
+</p>
+
+<p align="center">
   <img src="docs/assets/readme/sound.png" width="186" alt="Sound: every output with live volumes, and one row per application">
   <img src="docs/assets/readme/monitoring.png" width="186" alt="Monitoring: processor, memory, pressure and both graphics cards">
   <img src="docs/assets/readme/clipboard.png" width="186" alt="Clipboard history with search and quick paste shortcuts">
