@@ -9,5 +9,6 @@ repository.workspace = true
 [dependencies]
 futures-util.workspace = true
 thiserror.workspace = true
+tokio = { workspace = true, features = ["macros"] }
 tracing.workspace = true
 zbus.workspace = true

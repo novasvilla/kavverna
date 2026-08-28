@@ -1440,6 +1440,7 @@ version = "0.1.5"
 dependencies = [
  "futures-util",
  "thiserror 2.0.20",
+ "tokio",
  "tracing",
  "zbus",
 ]

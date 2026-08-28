@@ -154,6 +154,11 @@ fn what_we_put_back_is_readable_and_is_not_a_new_copy() {
         matches!(events.recv_timeout(Duration::from_millis(800)), Err(RecvTimeoutError::Timeout)),
         "our own write must not come back as a copy"
     );
+
+    // A watcher that died at startup would also report nothing, so the silence above only means
+    // something once an ordinary copy proves it was listening the whole time.
+    copy("an ordinary copy afterwards");
+    assert_eq!(next_copy(&events), Payload::Text("an ordinary copy afterwards".into()));
 }
 
 #[test]
@@ -245,6 +250,10 @@ fn plasma_putting_the_clipboard_back_is_not_a_new_copy() {
         matches!(events.recv_timeout(Duration::from_millis(800)), Err(RecvTimeoutError::Timeout)),
         "an offer Plasma re-asserted is not a copy anyone made"
     );
+
+    // The same control: without it a watcher that never connected passes this test.
+    copy("an ordinary copy afterwards");
+    assert_eq!(next_copy(&events), Payload::Text("an ordinary copy afterwards".into()));
 }
 
 /// The claim that switching the history off stops the content reaching this process at all is
