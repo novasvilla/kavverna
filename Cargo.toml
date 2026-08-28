@@ -1,0 +1,63 @@
+[workspace]
+resolver = "2"
+members = ["apps/kavverna-shell", "domain/feature-catalog", "domain/feature-runtime"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/novasvilla/kavverna"
+
+# Single source of truth for versions. Checked against crates.io on 2026-08-28.
+[workspace.dependencies]
+# Qt / QML interop
+cxx = "1.0.199"
+cxx-qt = "0.10.0"
+cxx-qt-lib = "0.10.0"
+cxx-qt-build = "0.10.0"
+
+# Async and D-Bus
+tokio = "1.53.1"
+zbus = "5.19.0"
+
+# Audio
+pipewire = "0.10.1"
+libspa = "0.10.1"
+
+# System metrics
+nvml-wrapper = "0.12.1"
+sysinfo = "0.39.6"
+udev = "0.9.3"
+nix = "0.31.3"
+
+# Wayland
+wayland-client = "0.31.15"
+wayland-protocols = "0.32.13"
+wl-clipboard-rs = "0.9.3"
+
+# Storage and data
+rusqlite = "0.40.2"
+serde = "1.0.229"
+serde_json = "1.0.151"
+blake3 = "1.8.7"
+image = "0.25.10"
+url = "2.5.8"
+directories = "6.0.0"
+
+# Tray. `blocking` layers a sync API over the default tokio backend, backed by ksni's own
+# private current-thread runtime. The tray therefore shares neither Qt's event loop nor our
+# main tokio runtime, which is the isolation we want for a service that must never stall.
+ksni = { version = "0.3.6", features = ["blocking"] }
+
+# Diagnostics
+anyhow = "1.0.104"
+thiserror = "2.0.20"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+
+# Feature catalogue
+strum = "0.28.0"
+strum_macros = "0.28.0"
+feature-catalog = { path = "domain/feature-catalog" }
+feature-runtime = { path = "domain/feature-runtime" }
