@@ -471,7 +471,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "clipboard-history"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "blake3",
  "image",
@@ -978,7 +978,7 @@ dependencies = [
 
 [[package]]
 name = "feature-catalog"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "strum",
  "strum_macros",
@@ -986,7 +986,7 @@ dependencies = [
 
 [[package]]
 name = "feature-runtime"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "feature-catalog",
  "strum",
@@ -1420,7 +1420,7 @@ dependencies = [
 
 [[package]]
 name = "kavverna-shell"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clipboard-history",
  "cxx",
@@ -1446,7 +1446,7 @@ dependencies = [
 
 [[package]]
 name = "kde-bridge"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "futures-util",
  "thiserror 2.0.20",
@@ -1456,7 +1456,7 @@ dependencies = [
 
 [[package]]
 name = "keep-awake"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "fastrand",
  "thiserror 2.0.20",
@@ -1579,7 +1579,7 @@ dependencies = [
 
 [[package]]
 name = "link-cleaner"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "url",
 ]
@@ -2070,7 +2070,7 @@ dependencies = [
 
 [[package]]
 name = "preferences"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "directories",
  "serde_json",
@@ -2558,7 +2558,7 @@ dependencies = [
 
 [[package]]
 name = "sound-mixer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "libspa",
  "pipewire",
@@ -2662,7 +2662,7 @@ dependencies = [
 
 [[package]]
 name = "system-monitor"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "nvml-wrapper",
  "thiserror 2.0.20",
