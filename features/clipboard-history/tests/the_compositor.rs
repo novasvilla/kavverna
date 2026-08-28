@@ -6,7 +6,7 @@
 
 use std::process::{Command, Stdio};
 use std::sync::{Mutex, MutexGuard, OnceLock};
-use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
 use std::time::Duration;
 
 use clipboard_history::selection::{
@@ -62,6 +62,18 @@ fn paste() -> Option<String> {
     out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
+fn watching() -> (SelectionWatcher, Receiver<SelectionEvent>) {
+    let (out, events) = channel();
+    let watcher = SelectionWatcher::start(
+        CapturePolicy::default().into(),
+        Box::new(move |event| {
+            let _ = out.send(event);
+        }),
+    )
+    .expect("the compositor should offer ext-data-control");
+    (watcher, events)
+}
+
 fn next_copy(events: &Receiver<SelectionEvent>) -> Payload {
     loop {
         match events.recv_timeout(PATIENCE) {
@@ -81,8 +93,7 @@ fn a_copy_from_another_application_arrives() {
     let _guard = one_at_a_time();
     let _restore = RestoredClipboard::save();
 
-    let (_watcher, events) = SelectionWatcher::start(CapturePolicy::default().into())
-        .expect("the compositor should offer ext-data-control");
+    let (_watcher, events) = watching();
 
     copy("kavverna sees this");
 
@@ -95,8 +106,7 @@ fn what_was_already_there_is_not_captured() {
     let _restore = RestoredClipboard::save();
 
     copy("copied before the watcher existed");
-    let (_watcher, events) = SelectionWatcher::start(CapturePolicy::default().into())
-        .expect("the compositor should offer ext-data-control");
+    let (_watcher, events) = watching();
 
     assert!(
         matches!(events.recv_timeout(Duration::from_millis(800)), Err(RecvTimeoutError::Timeout)),
@@ -112,8 +122,7 @@ fn what_we_put_back_is_readable_and_is_not_a_new_copy() {
     let _guard = one_at_a_time();
     let _restore = RestoredClipboard::save();
 
-    let (watcher, events) = SelectionWatcher::start(CapturePolicy::default().into())
-        .expect("the compositor should offer ext-data-control");
+    let (watcher, events) = watching();
 
     copy("something else entirely");
     next_copy(&events);
@@ -143,8 +152,7 @@ fn a_copy_marked_as_a_secret_is_never_read() {
     let _guard = one_at_a_time();
     let _restore = RestoredClipboard::save();
 
-    let (_watcher, events) = SelectionWatcher::start(CapturePolicy::default().into())
-        .expect("the compositor should offer ext-data-control");
+    let (_watcher, events) = watching();
 
     let hinted = detached("wl-copy")
         .args(["--type", clipboard_history::CONCEALED_HINT, "--", "secret"])
@@ -155,4 +163,51 @@ fn a_copy_marked_as_a_secret_is_never_read() {
         matches!(events.recv_timeout(Duration::from_millis(800)), Err(RecvTimeoutError::Timeout)),
         "a concealed copy is left unread"
     );
+}
+
+#[test]
+fn a_copy_reaches_the_history_and_can_be_put_back() {
+    use clipboard_history::history::{Command, History, Settings, Snapshot};
+
+    let _guard = one_at_a_time();
+    let _restore = RestoredClipboard::save();
+
+    let room = tempfile::tempdir().expect("a temporary directory");
+    let (history, snapshots) =
+        History::start(room.path(), Settings::default()).expect("the history should start");
+
+    copy("saved by the history");
+
+    let holding = |snapshot: &Snapshot| {
+        snapshot.rows.iter().any(|row| row.preview == "saved by the history")
+    };
+    let mut arrived = None;
+    let patience = std::time::Instant::now() + PATIENCE;
+    while std::time::Instant::now() < patience {
+        match snapshots.recv_timeout(Duration::from_millis(200)) {
+            Ok(snapshot) if holding(&snapshot) => {
+                arrived = Some(snapshot);
+                break;
+            }
+            Ok(_) => {}
+            Err(_) => {}
+        }
+    }
+    let arrived = arrived.expect("the copy should have reached the history");
+    assert_eq!(arrived.recent, 1);
+    assert_eq!(arrived.pinned, 0);
+
+    copy("something else entirely");
+    let id = arrived.rows.iter().find(|row| row.preview == "saved by the history").unwrap().id;
+    history.send(Command::PutBack(id));
+
+    let mut back = None;
+    for _ in 0..25 {
+        std::thread::sleep(Duration::from_millis(100));
+        if paste().as_deref() == Some("saved by the history") {
+            back = Some(());
+            break;
+        }
+    }
+    assert!(back.is_some(), "the entry should be on the clipboard again");
 }

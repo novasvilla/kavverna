@@ -124,25 +124,25 @@ pub struct SelectionWatcher {
     thread: Option<JoinHandle<()>>,
 }
 
+/// Where a selection change is reported. A closure rather than a channel so the caller can fold
+/// these into whatever else it is already waiting on, instead of needing a thread to forward them.
+pub type Report = Box<dyn Fn(SelectionEvent) + Send>;
+
 impl SelectionWatcher {
-    pub fn start(
-        policy: Arc<CapturePolicy>,
-    ) -> Result<(Self, Receiver<SelectionEvent>), WatchError> {
-        let (events_out, events_in) = channel();
+    pub fn start(policy: Arc<CapturePolicy>, report: Report) -> Result<Self, WatchError> {
         let (requests_out, requests_in) = channel();
         let (ready_out, ready_in) = sync_channel(1);
         let (wake_read, wake_write) = nix::unistd::pipe2(OFlag::O_CLOEXEC | OFlag::O_NONBLOCK)?;
 
         let thread = std::thread::Builder::new()
             .name("kavverna-clipboard".into())
-            .spawn(move || run(policy, events_out, requests_in, wake_read, ready_out))
+            .spawn(move || run(policy, report, requests_in, wake_read, ready_out))
             .map_err(|_| WatchError::ThreadGone)?;
 
         match ready_in.recv() {
-            Ok(Ok(())) => Ok((
-                Self { requests: requests_out, wake: wake_write, thread: Some(thread) },
-                events_in,
-            )),
+            Ok(Ok(())) => {
+                Ok(Self { requests: requests_out, wake: wake_write, thread: Some(thread) })
+            }
             Ok(Err(err)) => Err(err),
             Err(_) => Err(WatchError::ThreadGone),
         }
@@ -174,7 +174,7 @@ impl Drop for SelectionWatcher {
 
 struct Watcher {
     policy: Arc<CapturePolicy>,
-    events: Sender<SelectionEvent>,
+    report: Report,
     /// Mime types arrive one event at a time before the offer becomes the selection.
     offered: HashMap<u32, Vec<String>>,
     clipboard_source: Option<ExtDataControlSourceV1>,
@@ -188,7 +188,7 @@ struct Watcher {
 
 fn run(
     policy: Arc<CapturePolicy>,
-    events: Sender<SelectionEvent>,
+    report: Report,
     requests: Receiver<Request>,
     wake: OwnedFd,
     ready: SyncSender<Result<(), WatchError>>,
@@ -206,7 +206,7 @@ fn run(
 
     let mut watcher = Watcher {
         policy,
-        events,
+        report,
         offered: HashMap::new(),
         clipboard_source: None,
         primary_source: None,
@@ -344,7 +344,7 @@ impl Watcher {
 
         let Some(offer) = offer else {
             if !replay {
-                let _ = self.events.send(SelectionEvent::Emptied(selection));
+                (self.report)(SelectionEvent::Emptied(selection));
             }
             return;
         };
@@ -368,9 +368,7 @@ impl Watcher {
         }
 
         match self.read(&offer, &types, conn) {
-            Some(payload) => {
-                let _ = self.events.send(SelectionEvent::Copied { selection, payload });
-            }
+            Some(payload) => (self.report)(SelectionEvent::Copied { selection, payload }),
             None => tracing::debug!(?types, "nothing worth keeping in this selection"),
         }
         offer.destroy();

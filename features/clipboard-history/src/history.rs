@@ -1,0 +1,356 @@
+//! The clipboard history as a running feature.
+//!
+//! One thread owns the store and the connection to the compositor. Selection changes and commands
+//! from the interface arrive on the same channel, so there is no lock on the store and no order to
+//! get wrong between a copy landing and a button being pressed.
+
+use std::io::Cursor;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::sync::mpsc::{Receiver, Sender, SyncSender, channel, sync_channel};
+use std::thread::JoinHandle;
+
+use crate::entry::{self, Entry, Kind, MAX_FILES, MAX_IMAGE_BYTES, StoredImage};
+use crate::selection::{
+    CapturePolicy, Payload, Selection, SelectionEvent, SelectionWatcher, WatchError,
+};
+use crate::sensitivity::looks_sensitive;
+use crate::store::{Captured, Store, StoreError, Summary};
+
+#[derive(Clone, Copy, Debug)]
+pub struct Settings {
+    pub limit: u32,
+    pub skip_sensitive: bool,
+    pub images_and_files: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self { limit: entry::DEFAULT_LIMIT, skip_sensitive: true, images_and_files: true }
+    }
+}
+
+#[derive(Debug)]
+pub enum Command {
+    Search(String),
+    PutBack(i64),
+    Pin { id: i64, pinned: bool },
+    Move { id: i64, towards_top: bool },
+    Rewrite { id: i64, text: String },
+    Forget(i64),
+    ClearUnpinned,
+    Apply(Settings),
+    Stop,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Snapshot {
+    pub rows: Vec<Summary>,
+    pub query: String,
+    pub pinned: usize,
+    pub recent: usize,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum StartError {
+    #[error(transparent)]
+    Store(#[from] StoreError),
+    #[error(transparent)]
+    Watch(#[from] WatchError),
+    #[error("the clipboard thread would not start")]
+    ThreadGone,
+}
+
+/// Stops the thread and drops the connection when it goes out of scope. Nothing is observed once
+/// this is gone, which is what switching the feature off has to mean.
+pub struct History {
+    commands: Sender<Event>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl History {
+    pub fn start(
+        root: &Path,
+        settings: Settings,
+    ) -> Result<(Self, Receiver<Snapshot>), StartError> {
+        let (events_out, events_in) = channel();
+        let (snapshots_out, snapshots_in) = channel();
+        let (ready_out, ready_in) = sync_channel(1);
+
+        let root = root.to_path_buf();
+        let commands = events_out.clone();
+        let thread = std::thread::Builder::new()
+            .name("kavverna-history".into())
+            .spawn(move || run(root, settings, events_out, events_in, snapshots_out, ready_out))
+            .map_err(|_| StartError::ThreadGone)?;
+
+        match ready_in.recv() {
+            Ok(Ok(())) => Ok((Self { commands, thread: Some(thread) }, snapshots_in)),
+            Ok(Err(err)) => Err(err),
+            Err(_) => Err(StartError::ThreadGone),
+        }
+    }
+
+    pub fn send(&self, command: Command) {
+        let _ = self.commands.send(Event::Asked(command));
+    }
+}
+
+impl Drop for History {
+    fn drop(&mut self) {
+        self.send(Command::Stop);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+enum Event {
+    Copied(SelectionEvent),
+    Asked(Command),
+}
+
+fn run(
+    root: PathBuf,
+    settings: Settings,
+    events_out: Sender<Event>,
+    events_in: Receiver<Event>,
+    snapshots: Sender<Snapshot>,
+    ready: SyncSender<Result<(), StartError>>,
+) {
+    let mut store = match Store::open(&root) {
+        Ok(store) => store,
+        Err(err) => {
+            let _ = ready.send(Err(err.into()));
+            return;
+        }
+    };
+
+    let policy = Arc::new(CapturePolicy::default());
+    policy.images_and_files.store(settings.images_and_files, Ordering::Relaxed);
+
+    let report = events_out.clone();
+    let watcher = match SelectionWatcher::start(
+        Arc::clone(&policy),
+        Box::new(move |event| {
+            let _ = report.send(Event::Copied(event));
+        }),
+    ) {
+        Ok(watcher) => watcher,
+        Err(err) => {
+            let _ = ready.send(Err(err.into()));
+            return;
+        }
+    };
+    let _ = ready.send(Ok(()));
+
+    let mut settings = settings;
+    let mut query = String::new();
+    publish(&store, &query, &snapshots);
+
+    while let Ok(event) = events_in.recv() {
+        let changed = match event {
+            Event::Copied(SelectionEvent::Copied { selection: Selection::Clipboard, payload }) => {
+                save(&mut store, payload, settings)
+            }
+            // Emptying the clipboard is not a reason to forget what was copied before it, and the
+            // second selection has a list of its own still to come.
+            Event::Copied(_) => false,
+            Event::Asked(Command::Stop) => break,
+            Event::Asked(command) => act(&mut store, &watcher, &mut settings, &mut query, command),
+        };
+
+        if changed {
+            publish(&store, &query, &snapshots);
+        }
+        policy.images_and_files.store(settings.images_and_files, Ordering::Relaxed);
+    }
+}
+
+fn act(
+    store: &mut Store,
+    watcher: &SelectionWatcher,
+    settings: &mut Settings,
+    query: &mut String,
+    command: Command,
+) -> bool {
+    let outcome = match command {
+        Command::Stop => return false,
+        Command::Search(wanted) => {
+            *query = wanted;
+            return true;
+        }
+        Command::PutBack(id) => return put_back(store, watcher, id),
+        Command::Pin { id, pinned } => store.set_pinned(id, pinned),
+        Command::Move { id, towards_top } => store.move_entry(id, towards_top).map(|_| ()),
+        Command::Rewrite { id, text } => store.rewrite(id, &text).map(|_| ()),
+        Command::Forget(id) => store.forget(id),
+        Command::ClearUnpinned => store.clear_unpinned(),
+        Command::Apply(wanted) => {
+            *settings = wanted;
+            store.trim_to(entry::sanitized_limit(wanted.limit))
+        }
+    };
+
+    if let Err(err) = outcome {
+        tracing::error!(%err, "the clipboard history could not be changed");
+        return false;
+    }
+    true
+}
+
+/// A stale entry leaves the clipboard exactly as it was. Writing an empty selection because an
+/// image was swept or a file was deleted would lose whatever the user had in hand.
+fn put_back(store: &mut Store, watcher: &SelectionWatcher, id: i64) -> bool {
+    let Ok(Some(entry)) = store.entry(id) else {
+        return false;
+    };
+    let Some(payload) = payload_for(store, &entry) else {
+        tracing::info!(id, "that entry no longer has anything to paste");
+        return false;
+    };
+
+    watcher.offer(Selection::Clipboard, payload);
+    if let Err(err) = store.touch(id) {
+        tracing::error!(%err, "could not record the paste");
+    }
+    true
+}
+
+fn payload_for(store: &Store, entry: &Entry) -> Option<Payload> {
+    match entry.kind {
+        Kind::Text => Some(Payload::Text(entry.text.clone())),
+        Kind::Image => {
+            let image = entry.image.as_ref()?;
+            std::fs::read(store.image_path(&image.digest)).ok().map(Payload::Image)
+        }
+        Kind::Files => {
+            let alive: Vec<PathBuf> =
+                entry.file_paths.iter().filter(|path| path.exists()).cloned().collect();
+            (!alive.is_empty()).then_some(Payload::Files(alive))
+        }
+    }
+}
+
+fn save(store: &mut Store, payload: Payload, settings: Settings) -> bool {
+    let Some(captured) = worth_keeping(payload, settings) else {
+        return false;
+    };
+    match store.remember(captured).and_then(|_| store.trim_to(entry::sanitized_limit(settings.limit)))
+    {
+        Ok(()) => true,
+        Err(err) => {
+            tracing::error!(%err, "could not save what was copied");
+            false
+        }
+    }
+}
+
+fn worth_keeping(payload: Payload, settings: Settings) -> Option<Captured> {
+    match payload {
+        Payload::Text(raw) => {
+            let text = entry::storable_text(&raw)?;
+            if settings.skip_sensitive && looks_sensitive(&text) {
+                tracing::debug!("a copy that looks like a secret was not saved");
+                return None;
+            }
+            Some(Captured { kind: Kind::Text, text, file_paths: Vec::new(), image: None })
+        }
+        Payload::Image(png) => {
+            if png.len() as u64 > MAX_IMAGE_BYTES {
+                tracing::debug!(bytes = png.len(), "a copied image was too large to keep");
+                return None;
+            }
+            let (width, height) = measure(&png)?;
+            let digest = blake3::hash(&png).to_hex().to_string();
+            Some(Captured {
+                kind: Kind::Image,
+                text: String::new(),
+                file_paths: Vec::new(),
+                image: Some((StoredImage { digest, width, height }, png)),
+            })
+        }
+        Payload::Files(paths) => {
+            if paths.is_empty() || paths.len() > MAX_FILES {
+                return None;
+            }
+            Some(Captured {
+                kind: Kind::Files,
+                text: String::new(),
+                file_paths: paths,
+                image: None,
+            })
+        }
+    }
+}
+
+/// Reads the header rather than decoding the picture, because the size is all that is wanted and
+/// a copied screenshot can be tens of megabytes.
+fn measure(png: &[u8]) -> Option<(u32, u32)> {
+    image::ImageReader::new(Cursor::new(png)).with_guessed_format().ok()?.into_dimensions().ok()
+}
+
+fn publish(store: &Store, query: &str, snapshots: &Sender<Snapshot>) {
+    let rows = match store.search(query) {
+        Ok(rows) => rows,
+        Err(err) => {
+            tracing::error!(%err, "could not read the clipboard history");
+            return;
+        }
+    };
+    let (pinned, recent) = store.counts().unwrap_or_default();
+    let _ = snapshots.send(Snapshot { rows, query: query.to_string(), pinned, recent });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_secret_shaped_copy_is_not_kept_unless_the_setting_is_off() {
+        let secret = || Payload::Text("sk-live-4f9a2b71c8e0d3a6f5b2".into());
+        let mut settings = Settings::default();
+        assert!(worth_keeping(secret(), settings).is_none());
+
+        settings.skip_sensitive = false;
+        assert!(worth_keeping(secret(), settings).is_some());
+    }
+
+    #[test]
+    fn blank_text_is_never_kept() {
+        assert!(worth_keeping(Payload::Text("   \n".into()), Settings::default()).is_none());
+    }
+
+    #[test]
+    fn a_copy_of_too_many_files_is_a_folder_operation() {
+        let many = (0..MAX_FILES + 1).map(|n| PathBuf::from(format!("/tmp/{n}"))).collect();
+        assert!(worth_keeping(Payload::Files(many), Settings::default()).is_none());
+        assert!(worth_keeping(Payload::Files(Vec::new()), Settings::default()).is_none());
+    }
+
+    #[test]
+    fn something_that_is_not_a_picture_is_not_stored_as_one() {
+        assert!(worth_keeping(Payload::Image(b"not a png".to_vec()), Settings::default()).is_none());
+    }
+
+    #[test]
+    fn the_same_picture_gets_the_same_name_twice() {
+        let png = tiny_png();
+        let first = worth_keeping(Payload::Image(png.clone()), Settings::default()).unwrap();
+        let again = worth_keeping(Payload::Image(png), Settings::default()).unwrap();
+
+        let name = |captured: &Captured| captured.image.as_ref().unwrap().0.digest.clone();
+        assert_eq!(name(&first), name(&again));
+        assert_eq!(first.image.unwrap().0.width, 2);
+    }
+
+    fn tiny_png() -> Vec<u8> {
+        let mut bytes = Vec::new();
+        let picture = image::RgbaImage::from_pixel(2, 3, image::Rgba([1, 2, 3, 255]));
+        picture
+            .write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
+            .expect("a picture we just made should encode");
+        bytes
+    }
+}

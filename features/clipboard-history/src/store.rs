@@ -197,6 +197,34 @@ impl Store {
         Ok(id)
     }
 
+    /// Pasting an entry counts as copying it, so it returns to the top of its group with a
+    /// fresh time, exactly as if it had been copied from its source again.
+    pub fn touch(&mut self, id: i64) -> Result<(), StoreError> {
+        let position = self.next_position()?;
+        self.db.execute(
+            "UPDATE entry SET copied_at = ?2, position = ?3 WHERE id = ?1",
+            params![id, millis(SystemTime::now()), position],
+        )?;
+        Ok(())
+    }
+
+    /// Only text can be edited: an image or a file list has no text of its own to change.
+    pub fn rewrite(&mut self, id: i64, text: &str) -> Result<bool, StoreError> {
+        let changed = self.db.execute(
+            "UPDATE entry SET body = ?2 WHERE id = ?1 AND kind = 'text'",
+            params![id, text],
+        )?;
+        if changed == 0 {
+            return Ok(false);
+        }
+        self.db.execute("DELETE FROM entry_search WHERE rowid = ?1", params![id])?;
+        self.db.execute(
+            "INSERT INTO entry_search(rowid, body) VALUES (?1, ?2)",
+            params![id, text],
+        )?;
+        Ok(true)
+    }
+
     pub fn set_pinned(&mut self, id: i64, pinned: bool) -> Result<(), StoreError> {
         let stamp = pinned.then(|| millis(SystemTime::now()));
         let position = self.next_position()?;
@@ -523,6 +551,31 @@ mod tests {
         let id = store.remember(text("findable")).unwrap();
         store.forget(id).unwrap();
         assert!(store.search("findable").unwrap().is_empty());
+    }
+
+    #[test]
+    fn an_edited_entry_is_findable_by_its_new_words() {
+        let (mut store, _room) = store();
+        let id = store.remember(text("before")).unwrap();
+        assert!(store.rewrite(id, "after").unwrap());
+
+        assert!(store.search("before").unwrap().is_empty());
+        assert_eq!(store.search("after").unwrap().len(), 1);
+        assert_eq!(store.entry(id).unwrap().unwrap().text, "after");
+    }
+
+    #[test]
+    fn only_text_can_be_edited() {
+        let (mut store, _room) = store();
+        let id = store
+            .remember(Captured {
+                kind: Kind::Files,
+                text: String::new(),
+                file_paths: vec![PathBuf::from("/tmp/one")],
+                image: None,
+            })
+            .unwrap();
+        assert!(!store.rewrite(id, "not allowed").unwrap());
     }
 
     #[test]
