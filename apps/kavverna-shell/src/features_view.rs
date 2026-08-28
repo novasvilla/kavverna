@@ -112,9 +112,4 @@ impl qobject::FeaturesView {
         settings::set_installed(feature, installed);
         self.as_mut().refresh();
     }
-
-    fn shows(&self, id: &QString) -> bool {
-        let wanted = id.to_string();
-        Feature::iter().find(|feature| feature.id() == wanted).is_some_and(settings::is_installed)
-    }
 }
