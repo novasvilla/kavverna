@@ -32,22 +32,16 @@ jobs:
 
       - run: cargo fmt --all --check
 
+      # Named by exclusion rather than one by one, or the list rots the next time a crate
+      # arrives or leaves.
       - name: Lint
-        run: >
-          cargo clippy --all-targets
-          -p feature-catalog -p feature-runtime -p preferences
-          -p kde-bridge -p keep-awake -p clipboard-history -p link-cleaner
-          -p sound-mixer -p system-monitor
+        run: cargo clippy --all-targets --workspace --exclude kavverna-shell
 
       # The tests under features/*/tests talk to a live compositor and a live session bus, so
       # they belong on a real desktop rather than on a runner. Running them here would either
       # fail or, worse, pass by doing nothing.
       - name: Test
-        run: >
-          cargo test --lib
-          -p feature-catalog -p feature-runtime -p preferences
-          -p kde-bridge -p keep-awake -p clipboard-history -p link-cleaner
-          -p sound-mixer -p system-monitor
+        run: cargo test --lib --workspace --exclude kavverna-shell
 
   # Proves the whole thing still builds where it is meant to run.
   shell:
