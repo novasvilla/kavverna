@@ -12,6 +12,8 @@ pub struct AudioStream {
     pub node_id: u32,
     pub key: AppKey,
     pub name: String,
+    /// The `Icon=` line of the desktop entry that named this stream, when one did.
+    pub icon: Option<String>,
     pub volume: Volume,
     pub muted: bool,
     /// `node.name` of the device this stream plays through, when it has been pinned to one.
@@ -37,6 +39,7 @@ pub struct AudioDevice {
 pub struct AudioApplication {
     pub key: AppKey,
     pub name: String,
+    pub icon: Option<String>,
     pub node_ids: Vec<u32>,
     pub volume: Volume,
     pub muted: bool,
@@ -67,6 +70,7 @@ impl MixerSnapshot {
                 None => rows.push(AudioApplication {
                     key: stream.key.clone(),
                     name: stream.name.clone(),
+                    icon: stream.icon.clone(),
                     node_ids: vec![stream.node_id],
                     volume: stream.volume,
                     muted: stream.muted,
@@ -149,6 +153,7 @@ mod tests {
             node_id,
             key: AppKey::from_refined(key),
             name: name.into(),
+            icon: None,
             volume: Volume::from_percent(percent),
             muted,
             target: None,

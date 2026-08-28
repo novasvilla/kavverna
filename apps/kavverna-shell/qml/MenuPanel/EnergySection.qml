@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import org.kde.kirigami as Kirigami
 import "../Shared"
 
 ColumnLayout {
@@ -31,10 +32,12 @@ ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 10
 
-                Label {
-                    text: "\u26a1"
-                    font.pixelSize: 17
-                    color: section.theme.warm
+                Kirigami.Icon {
+                    source: "preferences-system-power-management"
+                    implicitWidth: 18
+                    implicitHeight: 18
+                    isMask: true
+                    color: section.hub.awake ? section.theme.accent : section.theme.secondaryText
                 }
 
                 ColumnLayout {

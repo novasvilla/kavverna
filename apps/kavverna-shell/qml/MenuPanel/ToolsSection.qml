@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import org.kde.kirigami as Kirigami
 import "../Shared"
 
 ColumnLayout {
@@ -31,9 +32,11 @@ ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 10
 
-                Label {
-                    text: "\ud83d\uddb1"
-                    font.pixelSize: section.theme.textTitle
+                Kirigami.Icon {
+                    source: "input-mouse"
+                    implicitWidth: 18
+                    implicitHeight: 18
+                    isMask: true
                     color: section.hub.mouse_jiggle ? section.theme.accent
                                                     : section.theme.secondaryText
                 }

@@ -12,6 +12,8 @@ const QML: &[&str] = &[
     "qml/Shared/PillButton.qml",
     "qml/Shared/Toggle.qml",
     "qml/Shared/Tick.qml",
+    "qml/Shared/IconButton.qml",
+    "qml/Shared/Level.qml",
     "qml/MenuPanel/EnergySection.qml",
     "qml/MenuPanel/SoundSection.qml",
     "qml/MenuPanel/MonitoringSection.qml",

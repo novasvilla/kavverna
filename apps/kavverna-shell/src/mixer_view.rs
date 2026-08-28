@@ -21,6 +21,7 @@ pub mod qobject {
         #[qml_element]
         #[qproperty(bool, available)]
         #[qproperty(QStringList, stream_names)]
+        #[qproperty(QStringList, stream_icons)]
         #[qproperty(QList_i32, stream_ids)]
         #[qproperty(QList_i32, stream_volumes)]
         #[qproperty(QList_bool, stream_muted)]
@@ -67,6 +68,7 @@ static VIEW: Mutex<Option<cxx_qt::CxxQtThread<qobject::MixerView>>> = Mutex::new
 pub struct MixerViewRust {
     available: bool,
     stream_names: QStringList,
+    stream_icons: QStringList,
     stream_ids: QList<i32>,
     stream_volumes: QList<i32>,
     stream_muted: QList<bool>,
@@ -131,18 +133,25 @@ impl qobject::MixerView {
 
     fn apply(mut self: Pin<&mut Self>, snapshot: MixerSnapshot) {
         let mut names = QStringList::default();
+        let mut icons = QStringList::default();
         let mut ids = QList::<i32>::default();
         let mut volumes = QList::<i32>::default();
         let mut muted = QList::<bool>::default();
 
         for application in &snapshot.applications() {
             names.append(QString::from(&application.name));
+            // An application the desktop does not know gets the generic one rather than a hole
+            // where every other row has a picture.
+            icons.append(QString::from(
+                application.icon.as_deref().unwrap_or("application-x-executable"),
+            ));
             ids.append(application.node_ids[0] as i32);
             volumes.append(application.volume.percent().round() as i32);
             muted.append(application.muted);
         }
 
         self.as_mut().set_stream_names(names);
+        self.as_mut().set_stream_icons(icons);
         self.as_mut().set_stream_ids(ids);
         self.as_mut().set_stream_volumes(volumes);
         self.as_mut().set_stream_muted(muted);

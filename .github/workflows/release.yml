@@ -15,7 +15,7 @@ jobs:
       - name: Install the desktop it targets
         run: |
           pacman -Syu --noconfirm --needed \
-            git rust qt6-base qt6-declarative layer-shell-qt \
+            git rust qt6-base qt6-declarative layer-shell-qt kirigami \
             pipewire libpipewire clang pkgconf sqlite
 
       - uses: actions/checkout@v5

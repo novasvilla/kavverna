@@ -94,14 +94,17 @@ struct Tracked {
 
 /// Steam hands each game its own identity, and the entry Steam writes for that game names its
 /// icon after the same number, so one lookup covers every game rather than a chosen few.
-fn installed_name(node: &Properties, client: Option<&Properties>) -> Option<String> {
+fn installed_entry(
+    node: &Properties,
+    client: Option<&Properties>,
+) -> Option<&'static crate::desktop_entry::Entry> {
     let pid = process_id(node, client);
 
     if let Some(entry) = pid
         .and_then(crate::steam_icon_of_process)
         .and_then(|icon| crate::desktop_entry::named_after_icon(&icon))
     {
-        return Some(entry.name.clone());
+        return Some(entry);
     }
 
     let binary = [Some(node), client]
@@ -110,7 +113,7 @@ fn installed_name(node: &Properties, client: Option<&Properties>) -> Option<Stri
         .find_map(|bag| bag.get("application.process.binary").cloned())
         .or_else(|| pid.and_then(crate::binary_of_process))?;
 
-    crate::desktop_entry::named_after_binary(&binary).map(|entry| entry.name.clone())
+    crate::desktop_entry::named_after_binary(&binary)
 }
 
 /// The framework process is the one holding the arguments that name the application.
@@ -136,11 +139,14 @@ impl Tracked {
 
         let mut key = app_key(&props, client.as_ref());
         let mut name = display_name(&props, client.as_ref());
+        let mut icon = None;
 
         // What the desktop calls a program beats what its toolkit calls itself. An SDL game
-        // announces itself as SDL Application whatever it is.
-        if let Some(installed) = installed_name(&props, client.as_ref()) {
-            name = installed;
+        // announces itself as SDL Application whatever it is, and the entry that names it also
+        // names the icon to draw beside it.
+        if let Some(entry) = installed_entry(&props, client.as_ref()) {
+            name = entry.name.clone();
+            icon = entry.icon.clone();
         }
 
         // Every Electron application calls itself Chromium, so without this the mixer shows
@@ -162,6 +168,7 @@ impl Tracked {
         if let Some(stream) = self.streams.get_mut(&node_id) {
             stream.key = key;
             stream.name = name;
+            stream.icon = icon;
         }
     }
 
@@ -415,6 +422,8 @@ fn adopt_node(
                         node_id: id,
                         key: app_key(&props, client.as_ref()),
                         name: display_name(&props, client.as_ref()),
+                        // Filled in by reidentify_node, which runs once the client is known.
+                        icon: None,
                         volume: Volume::default(),
                         muted: false,
                         target: props.get("target.object").cloned(),

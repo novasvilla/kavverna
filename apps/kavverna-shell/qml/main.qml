@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.layershell as LayerShell
+import org.kde.kirigami as Kirigami
 import dev.kavverna.shell
 import "MenuPanel"
 import "Settings"
@@ -208,20 +209,20 @@ Window {
 
                     Repeater {
                         model: [
-                            { glyph: "\u266a", name: "Sound", page: root.soundPage,
+                            { icon: "audio-volume-high", name: "Sound", page: root.soundPage,
                               ready: mixer.available,
                               unready: "Sound is waiting for PipeWire",
                               needs: root.pageNeeds[root.soundPage] },
-                            { glyph: "\u25f4", name: "Monitoring", page: root.monitoringPage,
+                            { icon: "utilities-system-monitor", name: "Monitoring", page: root.monitoringPage,
                               ready: true, unready: "",
                               needs: root.pageNeeds[root.monitoringPage] },
-                            { glyph: "\u2704", name: "Clipboard", page: root.clipboardPage,
+                            { icon: "edit-paste", name: "Clipboard", page: root.clipboardPage,
                               ready: true, unready: "",
                               needs: root.pageNeeds[root.clipboardPage] },
-                            { glyph: "\ud83d\udee0", name: "Tools", page: root.toolsPage,
+                            { icon: "input-mouse", name: "Tools", page: root.toolsPage,
                               ready: true, unready: "",
                               needs: root.pageNeeds[root.toolsPage] },
-                            { glyph: "\u26a1", name: "Energy", page: root.energyPage,
+                            { icon: "preferences-system-power-management", name: "Energy", page: root.energyPage,
                               ready: true, unready: "",
                               needs: root.pageNeeds[root.energyPage] }
                         ]
@@ -236,10 +237,12 @@ Window {
                             radius: 8
                             color: current ? theme.selected : "transparent"
 
-                            Label {
+                            Kirigami.Icon {
                                 anchors.centerIn: parent
-                                text: parent.modelData.glyph
-                                font.pixelSize: theme.textTitle
+                                source: parent.modelData.icon
+                                implicitWidth: 18
+                                implicitHeight: 18
+                                isMask: true
                                 color: parent.current ? theme.accent
                                      : parent.modelData.ready ? theme.secondaryText
                                                               : theme.mutedText

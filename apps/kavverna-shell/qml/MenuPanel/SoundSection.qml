@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import org.kde.kirigami as Kirigami
 import "../Shared"
 
 ColumnLayout {
@@ -69,11 +70,20 @@ ColumnLayout {
                             font.pixelSize: section.theme.textBody
                             color: section.theme.secondaryText
                         }
+
+                        IconButton {
+                            theme: section.theme
+                            source: section.mixer.output_muted[outputRow.index]
+                                    ? "audio-volume-muted" : "audio-volume-high"
+                            onClicked: section.mixer.mute_output(
+                                section.mixer.output_ids[outputRow.index],
+                                !section.mixer.output_muted[outputRow.index])
+                        }
                     }
 
-                    Slider {
+                    Level {
+                        theme: section.theme
                         Layout.fillWidth: true
-                        implicitHeight: 18
                         from: 0
                         to: 100
                         value: section.mixer.output_volumes[outputRow.index]
@@ -122,6 +132,12 @@ ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 6
 
+                        Kirigami.Icon {
+                            source: section.mixer.stream_icons[streamRow.index]
+                            implicitWidth: 16
+                            implicitHeight: 16
+                        }
+
                         Label {
                             Layout.fillWidth: true
                             text: section.mixer.stream_names[streamRow.index]
@@ -142,9 +158,9 @@ ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 6
 
-                        Slider {
+                        Level {
+                            theme: section.theme
                             Layout.fillWidth: true
-                            implicitHeight: 18
                             from: 0
                             to: 200
                             value: streamRow.percent
@@ -152,16 +168,13 @@ ColumnLayout {
                                 section.mixer.stream_ids[streamRow.index], Math.round(value))
                         }
 
-                        Label {
-                            text: section.mixer.stream_muted[streamRow.index] ? "\ud83d\udd07"
-                                                                              : "\ud83d\udd0a"
-                            font.pixelSize: 12
-
-                            TapHandler {
-                                onTapped: section.mixer.mute_stream(
-                                    section.mixer.stream_ids[streamRow.index],
-                                    !section.mixer.stream_muted[streamRow.index])
-                            }
+                        IconButton {
+                            theme: section.theme
+                            source: section.mixer.stream_muted[streamRow.index]
+                                    ? "audio-volume-muted" : "audio-volume-high"
+                            onClicked: section.mixer.mute_stream(
+                                section.mixer.stream_ids[streamRow.index],
+                                !section.mixer.stream_muted[streamRow.index])
                         }
                     }
                 }
@@ -178,39 +191,65 @@ ColumnLayout {
         theme: section.theme
         implicitHeight: microphone.implicitHeight + section.theme.pad * 2
 
-        RowLayout {
+        ColumnLayout {
             id: microphone
             anchors.fill: parent
             anchors.margins: section.theme.pad
-            spacing: 10
+            spacing: section.theme.gapSnug
 
-            ColumnLayout {
+            RowLayout {
                 Layout.fillWidth: true
-                spacing: 1
+                spacing: section.theme.gap
 
                 Label {
                     Layout.fillWidth: true
-                    text: section.mixer.default_input
-                    font.pixelSize: 12
-                    font.bold: true
-                    color: section.theme.primaryText
-                    elide: Text.ElideRight
-                }
-
-                Label {
                     text: section.mixer.inputs_muted
                           ? "Every microphone is muted"
-                          : section.mixer.input_names.length + " inputs"
+                          : section.mixer.input_names.length + " available"
                     font.pixelSize: section.theme.textBody
                     color: section.theme.secondaryText
                 }
+
+                PillButton {
+                    theme: section.theme
+                    text: section.mixer.inputs_muted ? "Unmute all" : "Mute all"
+                    onClicked: section.mixer.mute_every_input(!section.mixer.inputs_muted)
+                }
             }
 
-            Button {
-                text: section.mixer.inputs_muted ? "Unmute all" : "Mute all"
-                font.pixelSize: section.theme.textBody
-                implicitHeight: 26
-                onClicked: section.mixer.mute_every_input(!section.mixer.inputs_muted)
+            Repeater {
+                model: section.mixer.input_names.length
+
+                delegate: RowLayout {
+                    id: inputRow
+                    required property int index
+                    readonly property bool isDefault:
+                        section.mixer.input_names[index] === section.mixer.default_input
+
+                    Layout.fillWidth: true
+                    spacing: section.theme.gapSnug
+
+                    Label {
+                        text: inputRow.isDefault ? "\u25cf" : "\u25cb"
+                        font.pixelSize: 10
+                        color: inputRow.isDefault ? section.theme.accent
+                                                  : section.theme.secondaryText
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: section.mixer.input_names[inputRow.index]
+                        font.pixelSize: section.theme.textBody
+                        font.bold: inputRow.isDefault
+                        color: section.theme.primaryText
+                        elide: Text.ElideRight
+
+                        TapHandler {
+                            onTapped: section.mixer.make_default_input(
+                                section.mixer.input_ids[inputRow.index])
+                        }
+                    }
+                }
             }
         }
     }
