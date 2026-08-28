@@ -133,6 +133,26 @@ Being straight about this up front, because these limits are not going away:
 - **Per-process power draw cannot be measured.** RAPL needs root, so anything labelled energy
   use would be an estimate, and none is shown rather than showing a guess.
 
+## What is next
+
+In roughly this order. Anything here is a good place to start if you want to help.
+
+- **A panel applet**, so the readings are visible without opening anything. The tray cannot
+  show text, so this is the only place live numbers can live.
+- **Light and dark themes** following the desktop, and switchable by hand.
+- **Application icons in the mixer**, resolved from the desktop entry of the same name.
+- **Paste as plain text**, and pasting straight from the picker into the application you were
+  in. Both need synthetic input, which is why they are not here yet.
+- **A shelf** for files, text and links, anchored to a screen edge.
+- **Text snippets**, expanded through the input method rather than by typing keystrokes, so it
+  needs no privilege at all.
+- **A scratchpad** for the notes that are on their way somewhere else.
+- **Answering in KRunner**, so the history and the snippets are reachable from the launcher
+  everyone already uses.
+- **A second history for the middle-click selection**, which macOS has no concept of.
+- **Fan control**, last, with its own privileged daemon and a thermal watchdog. A fan left
+  stopped can damage hardware, so it waits until it can be done properly.
+
 ## Contributing
 
 More tools are welcome, and adding one is a smaller job than it looks: a descriptor in the
