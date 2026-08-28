@@ -100,6 +100,20 @@ fn last_segment(path: &str) -> Option<String> {
     path.trim_end_matches('/').rsplit('/').find(|part| !part.is_empty()).map(str::to_owned)
 }
 
+/// Steam tells every game it launches which application it is, and the desktop entry Steam
+/// writes for that game names its icon after the same number. That pairs a stream calling
+/// itself SDL Application with the name a person would recognise, for any game rather than for
+/// one that was thought of in advance.
+pub fn steam_icon_of_process(pid: u32) -> Option<String> {
+    let environ = std::fs::read(format!("/proc/{pid}/environ")).ok()?;
+    environ
+        .split(|byte| *byte == 0)
+        .filter_map(|entry| std::str::from_utf8(entry).ok())
+        .find_map(|entry| entry.strip_prefix("SteamAppId="))
+        .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()))
+        .map(|id| format!("steam_icon_{id}"))
+}
+
 pub fn cmdline_of_process(pid: u32) -> Vec<String> {
     std::fs::read(format!("/proc/{pid}/cmdline"))
         .map(|raw| {
@@ -120,7 +134,7 @@ pub fn presentable(name: &str) -> String {
     }
 }
 
-fn binary_of_process(pid: u32) -> Option<String> {
+pub fn binary_of_process(pid: u32) -> Option<String> {
     let binary = std::fs::read_link(format!("/proc/{pid}/exe"))
         .ok()?
         .file_name()

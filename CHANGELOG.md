@@ -3,6 +3,16 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## 0.1.5
+
+### Fixed
+
+- **A game showed up as SDL Application.** The mixer now asks the desktop what a program is
+  called before believing what its toolkit calls itself. A Steam game is matched through the
+  identity Steam hands it and the icon Steam names in the entry it writes, so every game is
+  covered rather than the ones somebody thought of; anything else is matched by the binary its
+  desktop entry runs.
+
 ## 0.1.4
 
 ### Fixed

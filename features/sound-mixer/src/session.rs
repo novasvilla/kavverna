@@ -92,6 +92,27 @@ struct Tracked {
     default_source: Option<String>,
 }
 
+/// Steam hands each game its own identity, and the entry Steam writes for that game names its
+/// icon after the same number, so one lookup covers every game rather than a chosen few.
+fn installed_name(node: &Properties, client: Option<&Properties>) -> Option<String> {
+    let pid = process_id(node, client);
+
+    if let Some(entry) = pid
+        .and_then(crate::steam_icon_of_process)
+        .and_then(|icon| crate::desktop_entry::named_after_icon(&icon))
+    {
+        return Some(entry.name.clone());
+    }
+
+    let binary = [Some(node), client]
+        .into_iter()
+        .flatten()
+        .find_map(|bag| bag.get("application.process.binary").cloned())
+        .or_else(|| pid.and_then(crate::binary_of_process))?;
+
+    crate::desktop_entry::named_after_binary(&binary).map(|entry| entry.name.clone())
+}
+
 /// The framework process is the one holding the arguments that name the application.
 fn process_id(node: &Properties, client: Option<&Properties>) -> Option<u32> {
     [Some(node), client].into_iter().flatten().find_map(|bag| {
@@ -115,6 +136,12 @@ impl Tracked {
 
         let mut key = app_key(&props, client.as_ref());
         let mut name = display_name(&props, client.as_ref());
+
+        // What the desktop calls a program beats what its toolkit calls itself. An SDL game
+        // announces itself as SDL Application whatever it is.
+        if let Some(installed) = installed_name(&props, client.as_ref()) {
+            name = installed;
+        }
 
         // Every Electron application calls itself Chromium, so without this the mixer shows
         // several identical rows and no way to tell which is which.

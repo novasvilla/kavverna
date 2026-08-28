@@ -56,6 +56,9 @@ not. See [CREDITS.md](CREDITS.md).
 - **Volume per application.** One row per application rather than per stream, because a single
   application can hold several and PipeWire gives them nothing to tell apart. The row shows its
   loudest stream and a change reaches all of them.
+- **Named by what it is, not by what it was built with.** A stream calls itself SDL Application
+  or Chromium; the desktop knows it as Dota 2 or Vesktop. Steam games are matched through the
+  identity Steam hands them, so every game is covered rather than a chosen few.
 - **Every output and input** with live volumes, mute, and switching which one is the default.
 - **Mute every microphone** in one click.
 
