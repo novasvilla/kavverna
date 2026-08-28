@@ -4,7 +4,7 @@ use cxx_qt::Threading;
 use cxx_qt_lib::QString;
 use keep_awake::{Hold, Scope, format_duration};
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[cxx_qt::bridge]
 pub mod qobject {
@@ -84,10 +84,6 @@ use core::pin::Pin;
 
 static PANEL: Mutex<Option<cxx_qt::CxxQtThread<qobject::KavvernaPanel>>> = Mutex::new(None);
 
-/// Clicking the tray while the panel is focused makes it lose focus first, so an unguarded
-/// open would immediately undo the dismissal and the icon would never close the panel.
-static DISMISSED_AT: Mutex<Option<Instant>> = Mutex::new(None);
-const DISMISS_GRACE: Duration = Duration::from_millis(400);
 
 pub struct KavvernaPanelRust {
     panel_open: bool,
@@ -207,9 +203,6 @@ impl qobject::KavvernaPanel {
     }
 
     fn dismiss(mut self: Pin<&mut Self>) {
-        if let Ok(mut at) = DISMISSED_AT.lock() {
-            *at = Some(Instant::now());
-        }
         self.as_mut().set_panel_open(false);
         tracing::info!("panel closed");
     }
@@ -340,30 +333,18 @@ pub fn publish_awake(active: bool, remaining: Option<Duration>) {
     with_panel(move |panel| panel.apply(active, remaining));
 }
 
-/// Opens unless the panel has just dismissed itself, which is what makes a second click on
-/// the tray icon close it rather than reopen it.
+/// Flipped on the Qt thread, where the panel's own state is the authority. Reading a mirror
+/// of it from the tray thread would race with the user closing the panel by hand.
 pub fn toggle() {
-    if let Ok(mut at) = DISMISSED_AT.lock() {
-        if at.is_some_and(|moment| moment.elapsed() < DISMISS_GRACE) {
-            *at = None;
-            tracing::info!("tray toggle: stayed closed");
-            return;
-        }
-        *at = None;
-    }
-
-    tracing::info!("tray toggle: opening");
     with_panel(|mut panel| {
+        let open = *panel.panel_open();
         panel.as_mut().set_showing_settings(false);
-        panel.as_mut().set_panel_open(true);
+        panel.as_mut().set_panel_open(!open);
+        tracing::info!(now_open = !open, "tray toggled the panel");
     });
 }
 
 pub fn open_hub() {
-    if let Ok(mut at) = DISMISSED_AT.lock() {
-        *at = None;
-    }
-
     with_panel(|mut panel| {
         panel.as_mut().set_showing_settings(false);
         panel.as_mut().set_panel_open(true);
@@ -380,10 +361,6 @@ pub fn open_page(name: &str) {
         _ => 0,
     };
 
-    if let Ok(mut at) = DISMISSED_AT.lock() {
-        *at = None;
-    }
-
     with_panel(move |mut panel| {
         panel.as_mut().set_showing_settings(false);
         panel.as_mut().set_page(page);
@@ -392,10 +369,6 @@ pub fn open_page(name: &str) {
 }
 
 pub fn open_settings() {
-    if let Ok(mut at) = DISMISSED_AT.lock() {
-        *at = None;
-    }
-
     with_panel(|mut panel| {
         panel.as_mut().set_showing_settings(true);
         panel.as_mut().set_panel_open(true);

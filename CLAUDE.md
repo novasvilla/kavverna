@@ -81,6 +81,18 @@ desktop and checked by hand: the mixer against two apps playing at once, the mon
 Nothing is tagged or packaged until it has been in daily use on the author's machine. The
 repository is public from the start; releases are what is held back.
 
+## Calling into Rust from QML
+
+An `#[qinvokable]` keeps the name it was given, so `toggle_awake` is `toggle_awake` in QML.
+A `#[qproperty]` does not: it generates camelCase accessors, so `page` becomes `getPage` and
+`setPage`. Calling `set_page` from QML therefore raises a TypeError and the whole handler is
+abandoned silently, which reads as a dead control rather than an error.
+
+Write to a property by assigning it (`hub.page = 2`), never by calling a setter. Reserve
+method calls for functions actually declared `#[qinvokable]`. When a control does nothing,
+read the generated header under `target/debug/build/*/out/cxxqtbuild/include/` and check what
+the member is really called before assuming anything.
+
 ## What blocks sleep on KDE
 
 PowerDevil, not logind, decides when a KDE session suspends. `AutoSuspendIdleTimeoutSec` in

@@ -185,7 +185,7 @@ Window {
                             HoverHandler { id: hover }
                             TapHandler {
                                 enabled: modelData.ready
-                                onTapped: hub.set_page(modelData.page)
+                                onTapped: hub.page = modelData.page
                             }
                         }
                     }
