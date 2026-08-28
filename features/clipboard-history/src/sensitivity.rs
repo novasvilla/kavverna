@@ -1,8 +1,5 @@
-//! Guessing whether a piece of text is a secret.
-//!
-//! The reliable signal is the mime type a password manager sets, and that is handled where the
-//! selection is read. This is the second line: text that nobody marked, but that has the shape
-//! of a key. It is a guess, so it errs toward dropping one copy too many.
+//! Guessing whether text is a secret nobody marked as one. The reliable signal is the mime
+//! type, handled in `selection`. This is a guess, and it errs toward dropping one copy too many.
 
 const NAMES: [&str; 7] =
     ["password", "passwd", "secret", "token", "apikey", "api_key", "authorization"];
@@ -33,7 +30,7 @@ fn is_a_web_address(text: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// An identifier is nobody's secret, and it has exactly the shape the guess above rejects.
+/// An identifier has the shape the guess below rejects, and is nobody's secret.
 fn is_an_identifier(text: &str) -> bool {
     let trimmed = text.trim_start_matches('{').trim_end_matches('}');
     let groups: Vec<&str> = trimmed.split('-').collect();

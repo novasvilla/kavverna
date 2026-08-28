@@ -10,6 +10,10 @@ pub const JIGGLE_ACTIVITY: &str = "mouse-jiggle.activity";
 pub const JIGGLE_KEYSTROKE: &str = "mouse-jiggle.keystroke";
 pub const DEFAULT_MINUTES: &str = "keep-awake.default-minutes";
 pub const MIDDLE_CLICK_TOGGLE: &str = "keep-awake.middle-click-toggle";
+pub const CLIPBOARD_ENABLED: &str = "clipboard-history.enabled";
+pub const CLIPBOARD_LIMIT: &str = "clipboard-history.limit";
+pub const CLIPBOARD_IMAGES_AND_FILES: &str = "clipboard-history.images-and-files";
+pub const CLIPBOARD_SKIP_SENSITIVE: &str = "clipboard-history.skip-sensitive";
 
 pub const ALLOW_DISPLAY_SLEEP_DEFAULT: bool = true;
 pub const RESTORE_ON_START_DEFAULT: bool = false;
@@ -21,6 +25,13 @@ pub const JIGGLE_KEYSTROKE_DEFAULT: i64 = 0;
 /// Zero means indefinite, matching the duration picker's first entry.
 pub const DEFAULT_MINUTES_DEFAULT: i64 = 0;
 pub const MIDDLE_CLICK_TOGGLE_DEFAULT: bool = false;
+
+/// Off until asked for. A history of everything copied is not something to start keeping on
+/// somebody's behalf.
+pub const CLIPBOARD_ENABLED_DEFAULT: bool = false;
+pub const CLIPBOARD_LIMIT_DEFAULT: i64 = 50;
+pub const CLIPBOARD_IMAGES_AND_FILES_DEFAULT: bool = true;
+pub const CLIPBOARD_SKIP_SENSITIVE_DEFAULT: bool = true;
 
 static STORE: Mutex<Option<Preferences>> = Mutex::new(None);
 

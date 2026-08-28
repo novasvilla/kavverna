@@ -1,9 +1,4 @@
 //! Where saved copies live.
-//!
-//! SQLite rather than a file read whole into memory: the search comes from FTS5 instead of a
-//! scan, and a list of ten thousand rows costs a page of previews rather than every byte ever
-//! copied. Images are files beside the database, named by their digest, so an image copied twice
-//! is stored once.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -38,7 +33,6 @@ pub enum StoreError {
     Directory { path: PathBuf, source: std::io::Error },
 }
 
-/// A copy on its way into the history, before it has an identity.
 pub struct Captured {
     pub kind: Kind,
     pub text: String,
@@ -46,8 +40,7 @@ pub struct Captured {
     pub image: Option<(StoredImage, Vec<u8>)>,
 }
 
-/// What a list row needs. The full text is fetched only for the entry being previewed, so a long
-/// history costs a page of previews rather than everything ever copied.
+/// A list row. The full text is fetched separately, so a long history costs only previews.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Summary {
     pub id: i64,
@@ -90,8 +83,7 @@ impl Store {
         self.images.join(format!("{digest}.png"))
     }
 
-    /// Pinned first, then the rest, each newest at the top. Manual moves reorder within a group,
-    /// never across one, so a pinned entry cannot be nudged out of the pinned half.
+    /// Pinned first, then the rest, each newest at the top.
     pub fn summaries(&self) -> Result<Vec<Summary>, StoreError> {
         let mut statement = self.db.prepare(
             "SELECT id, kind, body, file_paths, image_digest, image_width, image_height,
@@ -132,8 +124,7 @@ impl Store {
         Ok(found)
     }
 
-    /// A copy that is already in the history is not stored twice: it keeps its identity and its
-    /// pin, and moves back to the top of its own group with a fresh time.
+    /// A repeat keeps its identity and its pin, and returns to the top of its group.
     pub fn remember(&mut self, captured: Captured) -> Result<i64, StoreError> {
         if let Some((image, bytes)) = &captured.image {
             let path = self.image_path(&image.digest);
@@ -197,8 +188,6 @@ impl Store {
         Ok(id)
     }
 
-    /// Pasting an entry counts as copying it, so it returns to the top of its group with a
-    /// fresh time, exactly as if it had been copied from its source again.
     pub fn touch(&mut self, id: i64) -> Result<(), StoreError> {
         let position = self.next_position()?;
         self.db.execute(
@@ -208,7 +197,15 @@ impl Store {
         Ok(())
     }
 
-    /// Only text can be edited: an image or a file list has no text of its own to change.
+    /// Keeps an adopted entry's original time instead of the time it was imported.
+    pub fn backdate(&mut self, id: i64, copied_at: SystemTime) -> Result<(), StoreError> {
+        self.db.execute(
+            "UPDATE entry SET copied_at = ?2 WHERE id = ?1",
+            params![id, millis(copied_at)],
+        )?;
+        Ok(())
+    }
+
     pub fn rewrite(&mut self, id: i64, text: &str) -> Result<bool, StoreError> {
         let changed = self.db.execute(
             "UPDATE entry SET body = ?2 WHERE id = ?1 AND kind = 'text'",
@@ -235,8 +232,7 @@ impl Store {
         Ok(())
     }
 
-    /// Swaps the entry with its neighbour inside its own group, so the pinned half and the rest
-    /// stay separate however much the list is rearranged.
+    /// Swaps with the neighbour inside the same group, so pinned and recent never mix.
     pub fn move_entry(&mut self, id: i64, towards_top: bool) -> Result<bool, StoreError> {
         let Some((pinned, position)) = self
             .db
@@ -281,8 +277,7 @@ impl Store {
         self.sweep_images()
     }
 
-    /// Pinned entries are never removed in bulk, only one at a time. Losing something deliberately
-    /// kept to a button meant for tidying would be the worst bug this feature could have.
+    /// Pinned entries are never removed in bulk, only one at a time.
     pub fn clear_unpinned(&mut self) -> Result<(), StoreError> {
         self.db.execute(
             "DELETE FROM entry_search WHERE rowid IN (SELECT id FROM entry WHERE pinned_at IS NULL)",
@@ -292,8 +287,7 @@ impl Store {
         self.sweep_images()
     }
 
-    /// Pinned entries do not count toward the limit: the limit is about how much history to keep,
-    /// and a pinned entry is no longer history.
+    /// Pinned entries do not count toward the limit.
     pub fn trim_to(&mut self, limit: u32) -> Result<(), StoreError> {
         if limit == 0 {
             return Ok(());
@@ -333,8 +327,6 @@ impl Store {
         Ok(highest + 1)
     }
 
-    /// An image file outlives its row only until the next change, so a deleted entry does not
-    /// leave its picture on disk.
     fn sweep_images(&self) -> Result<(), StoreError> {
         let mut statement = self
             .db
@@ -359,8 +351,7 @@ impl Store {
     }
 }
 
-/// FTS5 reads its own syntax, and a user typing `a"b` or `NOT` means those characters, not an
-/// operator. Quoting the terms and asking for a prefix match is what a search field promises.
+/// FTS5 reads its own syntax, so terms are quoted: typing NOT searches for the word.
 fn match_pattern(query: &str) -> Option<String> {
     let terms: Vec<String> = query
         .split_whitespace()
@@ -551,6 +542,37 @@ mod tests {
         let id = store.remember(text("findable")).unwrap();
         store.forget(id).unwrap();
         assert!(store.search("findable").unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_file_list_is_the_same_copy_only_in_the_same_order() {
+        let (mut store, _room) = store();
+        let listed = |paths: Vec<&str>| Captured {
+            kind: Kind::Files,
+            text: String::new(),
+            file_paths: paths.into_iter().map(PathBuf::from).collect(),
+            image: None,
+        };
+        store.remember(listed(vec!["/a", "/b"])).unwrap();
+        store.remember(listed(vec!["/b", "/a"])).unwrap();
+        assert_eq!(store.counts().unwrap(), (0, 2));
+
+        store.remember(listed(vec!["/a", "/b"])).unwrap();
+        assert_eq!(store.counts().unwrap(), (0, 2));
+    }
+
+    #[test]
+    fn an_image_with_no_digest_is_never_the_same_copy_as_another() {
+        let (mut store, _room) = store();
+        let unnamed = || Captured {
+            kind: Kind::Image,
+            text: String::new(),
+            file_paths: Vec::new(),
+            image: None,
+        };
+        store.remember(unnamed()).unwrap();
+        store.remember(unnamed()).unwrap();
+        assert_eq!(store.counts().unwrap(), (0, 2));
     }
 
     #[test]

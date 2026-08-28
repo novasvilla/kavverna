@@ -1,29 +1,24 @@
-//! What a saved copy is, and the rules that decide whether it is worth saving.
+//! What a saved copy is.
 
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-/// Longer than this and the copy is not history, it is a document that happened to pass through
-/// the clipboard.
 pub const MAX_CHARACTERS: usize = 1_000_000;
-
-/// The whole history's text, held in memory at once.
-pub const MAX_TEXT_BUDGET: usize = 64 * 1024 * 1024;
 
 pub const PREVIEW_CHARACTERS: usize = 2_000;
 
-/// A copy of more than this many files is a folder operation, not something to keep a row for.
+/// Beyond this a copy is a folder operation, not an entry.
 pub const MAX_FILES: usize = 100;
 
 pub const MAX_IMAGE_BYTES: u64 = 16 * 1024 * 1024;
 
-/// The values the limit picker offers. Zero means no limit.
+/// Zero means no limit.
 pub const ALLOWED_LIMITS: [u32; 8] = [20, 50, 100, 250, 500, 1_000, 10_000, 0];
 
 pub const DEFAULT_LIMIT: u32 = 50;
 
-/// A value that is not on the list is not clamped to the nearest one: a limit nobody chose is a
-/// bug or a hand-edited file, and the default is the safer answer than the largest neighbour.
+/// Falls back to the default rather than the nearest neighbour: an unlisted value is a
+/// hand-edited file, not a choice.
 pub fn sanitized_limit(limit: u32) -> u32 {
     if ALLOWED_LIMITS.contains(&limit) { limit } else { DEFAULT_LIMIT }
 }
@@ -75,8 +70,7 @@ impl StoredImage {
 pub struct Entry {
     pub id: i64,
     pub kind: Kind,
-    /// Empty for images and file lists: their display text is derived, so it cannot go stale
-    /// when a file is renamed.
+    /// Empty for images and file lists, whose display text is derived so it cannot go stale.
     pub text: String,
     pub file_paths: Vec<PathBuf>,
     pub image: Option<StoredImage>,
@@ -107,8 +101,7 @@ impl Entry {
         }
     }
 
-    /// What the search index holds. An image is findable by the word and by its size, because
-    /// its own content offers nothing to match on.
+    /// An image is indexed by the word and its size, having no text of its own.
     pub fn searchable_text(&self) -> String {
         match self.kind {
             Kind::Text => self.text.clone(),
@@ -127,21 +120,6 @@ impl Entry {
         }
     }
 
-    /// Two copies are the same copy when they would paste the same thing. A file list compares
-    /// in order, because the order is what a paste reproduces.
-    pub fn holds_same_content_as(&self, other: &Self) -> bool {
-        if self.kind != other.kind {
-            return false;
-        }
-        match self.kind {
-            Kind::Text => self.text == other.text,
-            Kind::Image => match (&self.image, &other.image) {
-                (Some(mine), Some(theirs)) => mine.digest == theirs.digest,
-                _ => false,
-            },
-            Kind::Files => self.file_paths == other.file_paths,
-        }
-    }
 }
 
 fn shorten(text: &str) -> String {
@@ -163,7 +141,6 @@ pub fn looks_like_an_image(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Text worth saving: not blank, and short enough that the history stays a history.
 pub fn storable_text(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() || trimmed.chars().count() > MAX_CHARACTERS {
@@ -214,29 +191,6 @@ mod tests {
         assert_eq!(storable_text("  hello  ").as_deref(), Some("hello"));
         assert_eq!(storable_text("   \n "), None);
         assert_eq!(storable_text(&"x".repeat(MAX_CHARACTERS + 1)), None);
-    }
-
-    #[test]
-    fn an_image_without_a_digest_never_matches_another() {
-        let mut left = text_entry("");
-        left.kind = Kind::Image;
-        let right = left.clone();
-        assert!(!left.holds_same_content_as(&right));
-
-        left.image = Some(StoredImage { digest: "abc".into(), width: 1, height: 1 });
-        let mut same = left.clone();
-        same.id = 2;
-        assert!(left.holds_same_content_as(&same));
-    }
-
-    #[test]
-    fn a_file_list_matches_only_in_the_same_order() {
-        let mut left = text_entry("");
-        left.kind = Kind::Files;
-        left.file_paths = vec![PathBuf::from("/a"), PathBuf::from("/b")];
-        let mut reversed = left.clone();
-        reversed.file_paths.reverse();
-        assert!(!left.holds_same_content_as(&reversed));
     }
 
     #[test]

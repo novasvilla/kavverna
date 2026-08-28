@@ -1,8 +1,7 @@
 //! The clipboard history as a running feature.
 //!
-//! One thread owns the store and the connection to the compositor. Selection changes and commands
-//! from the interface arrive on the same channel, so there is no lock on the store and no order to
-//! get wrong between a copy landing and a button being pressed.
+//! Selection changes and interface commands share one channel, so the store needs no lock and
+//! a copy landing cannot race a button press.
 
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -40,6 +39,7 @@ pub enum Command {
     Rewrite { id: i64, text: String },
     Forget(i64),
     ClearUnpinned,
+    AdoptKlipperHistory,
     Apply(Settings),
     Stop,
 }
@@ -62,14 +62,27 @@ pub enum StartError {
     ThreadGone,
 }
 
-/// Stops the thread and drops the connection when it goes out of scope. Nothing is observed once
-/// this is gone, which is what switching the feature off has to mean.
+/// Dropping this stops the thread and unbinds from the compositor.
 pub struct History {
     commands: Sender<Event>,
     thread: Option<JoinHandle<()>>,
 }
 
+/// Holding one of these does not keep the feature alive; only `History` does.
+#[derive(Clone)]
+pub struct Commands(Sender<Event>);
+
+impl Commands {
+    pub fn send(&self, command: Command) {
+        let _ = self.0.send(Event::Asked(command));
+    }
+}
+
 impl History {
+    pub fn commands(&self) -> Commands {
+        Commands(self.commands.clone())
+    }
+
     pub fn start(
         root: &Path,
         settings: Settings,
@@ -154,8 +167,7 @@ fn run(
             Event::Copied(SelectionEvent::Copied { selection: Selection::Clipboard, payload }) => {
                 save(&mut store, payload, settings)
             }
-            // Emptying the clipboard is not a reason to forget what was copied before it, and the
-            // second selection has a list of its own still to come.
+            // Emptying the clipboard is not a reason to forget what was copied before it.
             Event::Copied(_) => false,
             Event::Asked(Command::Stop) => break,
             Event::Asked(command) => act(&mut store, &watcher, &mut settings, &mut query, command),
@@ -187,6 +199,7 @@ fn act(
         Command::Rewrite { id, text } => store.rewrite(id, &text).map(|_| ()),
         Command::Forget(id) => store.forget(id),
         Command::ClearUnpinned => store.clear_unpinned(),
+        Command::AdoptKlipperHistory => crate::klipper::import_into(store).map(|_| ()),
         Command::Apply(wanted) => {
             *settings = wanted;
             store.trim_to(entry::sanitized_limit(wanted.limit))
@@ -200,8 +213,7 @@ fn act(
     true
 }
 
-/// A stale entry leaves the clipboard exactly as it was. Writing an empty selection because an
-/// image was swept or a file was deleted would lose whatever the user had in hand.
+/// A stale entry leaves the clipboard untouched rather than emptying it.
 fn put_back(store: &mut Store, watcher: &SelectionWatcher, id: i64) -> bool {
     let Ok(Some(entry)) = store.entry(id) else {
         return false;
@@ -285,8 +297,7 @@ fn worth_keeping(payload: Payload, settings: Settings) -> Option<Captured> {
     }
 }
 
-/// Reads the header rather than decoding the picture, because the size is all that is wanted and
-/// a copied screenshot can be tens of megabytes.
+/// Reads the header only: a copied screenshot can be tens of megabytes.
 fn measure(png: &[u8]) -> Option<(u32, u32)> {
     image::ImageReader::new(Cursor::new(png)).with_guessed_format().ok()?.into_dimensions().ok()
 }

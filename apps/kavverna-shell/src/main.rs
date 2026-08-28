@@ -1,6 +1,8 @@
 mod app_icon;
 mod awake_loop;
 mod awake_state;
+mod clipboard_state;
+mod clipboard_view;
 mod command;
 mod jiggle_state;
 mod launch_at_login;
@@ -19,7 +21,11 @@ fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("kavverna_shell=info,keep_awake=info")),
+                .unwrap_or_else(|_| {
+                    tracing_subscriber::EnvFilter::new(
+                        "kavverna_shell=info,keep_awake=info,clipboard_history=info",
+                    )
+                }),
         )
         .init();
 
@@ -48,6 +54,7 @@ fn main() {
     let tray = tray::show();
     std::thread::spawn(move || awake_loop::run(requests, tray));
     std::thread::spawn(|| mixer_state::run(mixer_view::publish));
+    std::thread::spawn(|| clipboard_state::run(clipboard_view::publish));
     std::thread::spawn(|| {
         vitals_state::run(std::time::Duration::from_secs(2), vitals_view::publish)
     });

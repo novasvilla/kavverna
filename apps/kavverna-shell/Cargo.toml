@@ -11,6 +11,7 @@ cxx.workspace = true
 cxx-qt.workspace = true
 cxx-qt-lib = { workspace = true, features = ["qt_full"] }
 ksni.workspace = true
+clipboard-history.workspace = true
 feature-catalog.workspace = true
 directories.workspace = true
 keep-awake.workspace = true

@@ -12,6 +12,7 @@ Window {
     readonly property int energyPage: 0
     readonly property int soundPage: 1
     readonly property int monitoringPage: 2
+    readonly property int clipboardPage: 3
     readonly property int toolsPage: 4
     property int page: hub.page
 
@@ -59,6 +60,11 @@ Window {
 
     VitalsView {
         id: vitals
+        Component.onCompleted: attach()
+    }
+
+    ClipboardView {
+        id: clipboard
         Component.onCompleted: attach()
     }
 
@@ -153,7 +159,8 @@ Window {
                               ready: mixer.available },
                             { glyph: "\u25f4", name: "Monitoring", page: root.monitoringPage,
                               ready: true },
-                            { glyph: "\u2704", name: "Clipboard", page: 3, ready: false },
+                            { glyph: "\u2704", name: "Clipboard", page: root.clipboardPage,
+                              ready: true },
                             { glyph: "\ud83d\udee0", name: "Tools", page: root.toolsPage,
                               ready: true },
                             { glyph: "\u26a1", name: "Energy", page: root.energyPage,
@@ -210,6 +217,12 @@ Window {
                 visible: !hub.showing_settings && root.page === root.monitoringPage
             }
 
+            ClipboardSection {
+                theme: theme
+                clipboard: clipboard
+                visible: !hub.showing_settings && root.page === root.clipboardPage
+            }
+
             ToolsSection {
                 theme: theme
                 hub: hub
@@ -219,6 +232,7 @@ Window {
             SettingsPage {
                 theme: theme
                 hub: hub
+                clipboard: clipboard
                 visible: hub.showing_settings
             }
 

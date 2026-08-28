@@ -1,10 +1,7 @@
-//! Watching the Wayland selection, and owning it.
+//! Watching the Wayland selection, and owning it, over `ext_data_control_manager_v1`.
 //!
-//! `ext_data_control_manager_v1` is what a clipboard manager without a window gets on KWin. It
-//! reports every selection change and lets us take the selection back. Watching and owning share
-//! one connection on one thread on purpose: holding the selection means answering `send` for as
-//! long as we hold it, and being the owner is the only reliable way to recognise a selection
-//! change we caused ourselves.
+//! Both halves share one connection: holding the selection means answering `send` for as long
+//! as we hold it, and ownership is the only reliable way to recognise our own writes.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -33,13 +30,12 @@ use wayland_protocols::ext::data_control::v1::client::ext_data_control_source_v1
     self, ExtDataControlSourceV1,
 };
 
-/// Password managers on KDE advertise this type beside the secret. Its presence is the whole
-/// signal: the content is never read, so nothing sensitive reaches this process at all.
+/// Advertised by KDE password managers. Presence alone is the signal, so the content is
+/// never read and nothing sensitive reaches this process.
 pub const CONCEALED_HINT: &str = "x-kde-passwordManagerHint";
 
-/// Carried on every selection we set, so the change it causes is recognisable as ours. Taking
-/// the selection destroys the previous owner's offer, so a manager that re-read its own writes
-/// would rewrite history on every paste.
+/// Carried on every selection we set. Without it a paste would re-enter the history, since
+/// taking the selection destroys the previous owner's offer and looks like a fresh copy.
 const OWN_MARKER: &str = "application/x-kavverna-internal";
 
 const URI_LIST: &str = "text/uri-list";
@@ -77,8 +73,7 @@ pub enum SelectionEvent {
     Emptied(Selection),
 }
 
-/// Read at every selection change rather than captured once, so a setting change takes effect
-/// on the next copy instead of needing the watcher restarted.
+/// Read at every change, so a setting takes effect without restarting the watcher.
 #[derive(Debug)]
 pub struct CapturePolicy {
     pub images_and_files: AtomicBool,
@@ -116,8 +111,7 @@ enum Request {
     Stop,
 }
 
-/// Drops the connection when it goes out of scope, which is also how the feature is switched
-/// off: nothing is observed while no device is bound.
+/// Dropping this unbinds the device, which is how the feature is switched off.
 pub struct SelectionWatcher {
     requests: Sender<Request>,
     wake: OwnedFd,
@@ -374,8 +368,7 @@ impl Watcher {
         offer.destroy();
     }
 
-    /// Files win over text because a file manager also offers the names as a string, and an
-    /// image wins over the text fallback for the same reason.
+    /// Files and images win over text, which they also offer as a fallback.
     fn read(
         &self,
         offer: &ExtDataControlOfferV1,
@@ -476,7 +469,7 @@ fn encode(payload: &Payload) -> Vec<u8> {
     }
 }
 
-/// RFC 2483 asks for CRLF between entries, and Dolphin reads the list either way.
+/// RFC 2483 asks for CRLF.
 fn uri_list(paths: &[PathBuf]) -> String {
     paths
         .iter()

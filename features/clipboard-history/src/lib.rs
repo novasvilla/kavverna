@@ -2,12 +2,13 @@
 
 pub mod entry;
 pub mod history;
+pub mod klipper;
 pub mod selection;
 pub mod sensitivity;
 pub mod store;
 
 pub use entry::{Entry, Kind, StoredImage};
-pub use history::{Command, History, Settings, Snapshot, StartError};
+pub use history::{Command, Commands, History, Settings, Snapshot, StartError};
 pub use selection::{
     CONCEALED_HINT, CapturePolicy, Payload, Selection, SelectionEvent, SelectionWatcher, WatchError,
 };
