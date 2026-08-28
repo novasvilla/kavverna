@@ -3,6 +3,23 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## 0.1.2
+
+### Fixed
+
+- **Keep awake could hold a machine awake with nobody holding it.** A failure after the power
+  daemon had accepted the inhibition left it registered with no cookie anywhere to release it.
+- **The pointer nudge called itself available whenever the ydotool binary existed.** It needs
+  the daemon and a socket too, or every nudge fails while the switch looks as though it worked.
+- **The tray was asked for once.** Started from autostart, the panel that hosts it is often not
+  up yet, which left the application running with no way to reach it.
+
+### Removed
+
+- `feature-runtime`, a reconciling registry nothing used. `feature-catalog` earns its place
+  instead: a feature's enable key is named there once and the settings module reads it from
+  there, so the switch and the thing it switches cannot drift apart.
+
 ## 0.1.1
 
 Six independent reviewers went over the code before it had been out an hour. These are what
