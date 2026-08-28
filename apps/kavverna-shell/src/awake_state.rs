@@ -7,7 +7,6 @@ pub struct AwakeState {
     pub remaining: Option<Duration>,
 }
 
-/// Read by the tray, the panel and the keep awake thread, none of which share an event loop.
 static STATE: Mutex<AwakeState> = Mutex::new(AwakeState { active: false, remaining: None });
 
 fn lock() -> MutexGuard<'static, AwakeState> {

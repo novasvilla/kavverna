@@ -1,8 +1,6 @@
 use sound_mixer::{MixerCommand, MixerCommands, MixerSnapshot};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-/// Read by the panel and written by the mixer thread, neither of which shares an event loop
-/// with the other.
 static SNAPSHOT: Mutex<Option<MixerSnapshot>> = Mutex::new(None);
 static COMMANDS: OnceLock<MixerCommands> = OnceLock::new();
 

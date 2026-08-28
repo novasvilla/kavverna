@@ -183,7 +183,6 @@ impl qobject::VitalsView {
     }
 }
 
-/// Called from the sampler thread, which has no access to the Qt event loop.
 pub fn publish() {
     let Ok(view) = VIEW.lock() else {
         return;

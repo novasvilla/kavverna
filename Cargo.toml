@@ -37,8 +37,6 @@ libspa = "0.10.1"
 
 # System metrics
 nvml-wrapper = "0.12.1"
-sysinfo = "0.39.6"
-udev = "0.9.3"
 nix = "0.31.3"
 
 # Wayland
@@ -66,7 +64,6 @@ fastrand = "2.5.0"
 futures-util = "0.3.34"
 
 # Diagnostics
-anyhow = "1.0.104"
 thiserror = "2.0.20"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

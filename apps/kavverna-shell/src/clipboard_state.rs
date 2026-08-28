@@ -4,8 +4,6 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
-/// Read by the panel and written by the history thread, neither of which shares an event loop
-/// with the other.
 static SNAPSHOT: Mutex<Option<Snapshot>> = Mutex::new(None);
 static COMMANDS: Mutex<Option<Commands>> = Mutex::new(None);
 

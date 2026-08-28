@@ -1,4 +1,4 @@
-use keep_awake::{Hold, KeepAwake, Scope, Trigger};
+use keep_awake::{Hold, KeepAwake, Scope};
 use std::process::Command;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
@@ -56,10 +56,7 @@ async fn the_power_daemon_honours_the_hold() {
 
     assert!(!power_daemon_lists_kavverna(), "a previous run left an inhibition behind");
 
-    keep_awake
-        .engage(Hold::For(Duration::from_secs(60)), Scope::SystemOnly, Trigger::Manual)
-        .await
-        .expect("engage");
+    keep_awake.engage(Hold::For(Duration::from_secs(60)), Scope::SystemOnly).await.expect("engage");
 
     assert!(keep_awake.is_active());
     assert!(
@@ -89,7 +86,7 @@ async fn a_lapsed_hold_releases_itself() {
     };
 
     keep_awake
-        .engage(Hold::For(Duration::from_millis(50)), Scope::SystemOnly, Trigger::Manual)
+        .engage(Hold::For(Duration::from_millis(50)), Scope::SystemOnly)
         .await
         .expect("engage");
 
@@ -110,10 +107,7 @@ async fn extending_pushes_the_deadline_out() {
         return;
     };
 
-    keep_awake
-        .engage(Hold::For(Duration::from_secs(60)), Scope::SystemOnly, Trigger::Manual)
-        .await
-        .expect("engage");
+    keep_awake.engage(Hold::For(Duration::from_secs(60)), Scope::SystemOnly).await.expect("engage");
 
     let before = keep_awake.remaining().expect("timed hold");
     assert!(keep_awake.extend(Duration::from_secs(900)));
@@ -135,7 +129,7 @@ async fn an_indefinite_hold_has_nothing_to_extend() {
         return;
     };
 
-    keep_awake.engage(Hold::Indefinite, Scope::SystemOnly, Trigger::Manual).await.expect("engage");
+    keep_awake.engage(Hold::Indefinite, Scope::SystemOnly).await.expect("engage");
 
     assert!(!keep_awake.is_timed());
     assert!(!keep_awake.extend(Duration::from_secs(900)));

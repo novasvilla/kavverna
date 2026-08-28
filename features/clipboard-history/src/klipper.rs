@@ -25,12 +25,18 @@ pub fn waiting() -> usize {
     read(&path).map(|entries| entries.len()).unwrap_or(0)
 }
 
-/// Oldest first, so the newest ends up on top as it was in Klipper.
 pub fn import_into(store: &mut Store) -> Result<usize, StoreError> {
     let Some(path) = history_path() else {
         return Ok(0);
     };
-    let Some(entries) = read(&path) else {
+    import_from(&path, store)
+}
+
+/// Oldest first, so the newest ends up on top as it was in Klipper. Takes the database rather
+/// than looking it up, so a test can hand over one it wrote instead of moving `XDG_DATA_HOME`
+/// out from under every other thread in the binary.
+pub fn import_from(path: &std::path::Path, store: &mut Store) -> Result<usize, StoreError> {
+    let Some(entries) = read(path) else {
         return Ok(0);
     };
 
@@ -148,13 +154,10 @@ mod tests {
         .unwrap();
         drop(db);
 
-        // SAFETY: the whole point is to point the importer at a history we just wrote, and
-        // these tests run one at a time.
-        unsafe { std::env::set_var("XDG_DATA_HOME", room.path().join("share")) };
-
+        let theirs = theirs.join("history3.sqlite");
         let mut store = Store::open(&room.path().join("ours")).unwrap();
-        assert_eq!(import_into(&mut store).unwrap(), 1);
-        assert_eq!(import_into(&mut store).unwrap(), 1, "the same entry is adopted once");
+        assert_eq!(import_from(&theirs, &mut store).unwrap(), 1);
+        assert_eq!(import_from(&theirs, &mut store).unwrap(), 1, "the same entry is adopted once");
         assert_eq!(store.counts().unwrap(), (1, 0), "and it keeps the star it had");
     }
 }

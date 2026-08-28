@@ -10,8 +10,8 @@ ColumnLayout {
     required property var theme
     required property var clipboard
 
-    /// Which row the keyboard is on. Reset whenever the list changes, since the row that was
-    /// under the selection may no longer be there.
+    // Which row the keyboard is on. Reset whenever the list changes, since the row that was
+    // under the selection may no longer be there.
     property int selected: 0
     readonly property int rowCount: clipboard.row_ids.length
 

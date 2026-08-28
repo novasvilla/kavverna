@@ -1,3 +1,9 @@
+//! The tray, the panel and the settings window.
+//!
+//! Every feature runs on a thread of its own and Qt owns the main one, so nothing here is
+//! shared without a mutex, and nothing reaches QML except through `CxxQtThread::queue`. The
+//! `*_state` modules hold what a feature last published; the `*_view` modules push it across.
+
 mod app_icon;
 mod auto_clear;
 mod awake_loop;

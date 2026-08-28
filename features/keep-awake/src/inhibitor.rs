@@ -24,8 +24,6 @@ pub trait PolicyAgent {
     fn add_inhibition(&self, types: u32, app_name: &str, reason: &str) -> zbus::Result<u32>;
 
     fn release_inhibition(&self, cookie: u32) -> zbus::Result<()>;
-
-    fn has_inhibition(&self, types: u32) -> zbus::Result<bool>;
 }
 
 /// PowerDevil's `RequiredPolicies` bits.

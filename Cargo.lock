@@ -1425,7 +1425,6 @@ dependencies = [
  "notify-rust",
  "preferences",
  "sound-mixer",
- "strum",
  "system-monitor",
  "tempfile",
  "tokio",

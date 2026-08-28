@@ -2,8 +2,6 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 use system_monitor::{Vitals, Vitalsigns};
 
-/// Read by the panel and written by the sampler, neither of which shares an event loop with
-/// the other.
 static LATEST: Mutex<Option<Vitals>> = Mutex::new(None);
 
 fn lock() -> MutexGuard<'static, Option<Vitals>> {

@@ -51,14 +51,6 @@ impl Scope {
     }
 }
 
-/// Whether the user asked for this hold or a rule did, which decides whether a rule is
-/// allowed to end it again.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Trigger {
-    Manual,
-    Automation,
-}
-
 struct ActiveHold {
     /// Only held where no desktop power daemon answered, since PowerDevil mirrors logind's
     /// idle inhibitors and holding both would register the same hold twice.
@@ -66,8 +58,6 @@ struct ActiveHold {
     policy_cookie: Option<u32>,
     screen_saver_cookie: Option<u32>,
     expires_at: Option<Instant>,
-    scope: Scope,
-    trigger: Trigger,
 }
 
 pub struct KeepAwake {
@@ -112,14 +102,6 @@ impl KeepAwake {
         self.hold.is_some()
     }
 
-    pub fn scope(&self) -> Option<Scope> {
-        self.hold.as_ref().map(|hold| hold.scope)
-    }
-
-    pub fn trigger(&self) -> Option<Trigger> {
-        self.hold.as_ref().map(|hold| hold.trigger)
-    }
-
     pub fn remaining(&self) -> Option<Duration> {
         let expires_at = self.hold.as_ref()?.expires_at?;
         Some(expires_at.saturating_duration_since(Instant::now()))
@@ -137,7 +119,7 @@ impl KeepAwake {
 
     /// Replaces any hold already in place, so switching duration or scope needs no explicit
     /// release first.
-    pub async fn engage(&mut self, hold: Hold, scope: Scope, trigger: Trigger) -> Result<()> {
+    pub async fn engage(&mut self, hold: Hold, scope: Scope) -> Result<()> {
         self.release().await;
 
         let why = match hold {
@@ -211,11 +193,9 @@ impl KeepAwake {
                 Hold::Indefinite => None,
                 Hold::For(duration) => Instant::now().checked_add(duration),
             },
-            scope,
-            trigger,
         });
 
-        tracing::info!(?hold, ?scope, ?trigger, policy_cookie, "keep awake engaged");
+        tracing::info!(?hold, ?scope, policy_cookie, "keep awake engaged");
         Ok(())
     }
 
@@ -277,15 +257,6 @@ impl KeepAwake {
             self.release().await;
         }
         due
-    }
-
-    /// Asks the power daemon whether it is honouring a suspend inhibition right now, which
-    /// is the only answer that says the machine will actually stay up.
-    pub async fn power_daemon_honours_us(&self) -> bool {
-        match PolicyAgentProxy::new(&self.session).await {
-            Ok(agent) => agent.has_inhibition(INTERRUPT_SESSION).await.unwrap_or(false),
-            Err(_) => false,
-        }
     }
 }
 

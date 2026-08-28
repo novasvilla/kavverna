@@ -241,7 +241,6 @@ impl qobject::ClipboardView {
     }
 }
 
-/// Called from the history thread, which has no access to the Qt event loop.
 pub fn publish() {
     let Ok(view) = VIEW.lock() else {
         return;

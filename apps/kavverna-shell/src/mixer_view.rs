@@ -218,7 +218,6 @@ fn send_mute(node_id: i32, muted: bool) {
     }
 }
 
-/// Called from the mixer thread, which has no access to the Qt event loop.
 pub fn publish() {
     let Ok(view) = VIEW.lock() else {
         return;

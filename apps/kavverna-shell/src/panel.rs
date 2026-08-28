@@ -268,7 +268,7 @@ impl qobject::KavvernaPanel {
         settings::put_integer(settings::JIGGLE_SHORTEST, i64::from(minutes));
         self.as_mut().set_jiggle_shortest(minutes);
 
-        if *self.longest_now() < minutes {
+        if *self.jiggle_longest() < minutes {
             self.as_mut().choose_jiggle_longest(minutes);
         }
     }
@@ -281,10 +281,6 @@ impl qobject::KavvernaPanel {
             settings::put_integer(settings::JIGGLE_SHORTEST, i64::from(minutes));
             self.as_mut().set_jiggle_shortest(minutes);
         }
-    }
-
-    fn longest_now(&self) -> &i32 {
-        self.jiggle_longest()
     }
 
     fn choose_jiggle_activity(mut self: Pin<&mut Self>, activity: i32) {
@@ -351,7 +347,8 @@ fn with_panel(action: impl FnOnce(Pin<&mut qobject::KavvernaPanel>) + Send + 'st
             static SAID: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
             if !SAID.swap(true, std::sync::atomic::Ordering::Relaxed) {
                 tracing::error!(
-                    "the interface never loaded; run with QT_LOGGING_RULES='qt.qml.*=true' to                      see why, since a QML failure is otherwise silent"
+                    "the interface never loaded; run with QT_LOGGING_RULES='qt.qml.*=true' to \
+                     see why, since a QML failure is otherwise silent"
                 );
             }
         }

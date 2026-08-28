@@ -17,12 +17,11 @@ Window {
     property int page: hub.page
 
     width: 360
-    // Two nested margins sit between the layout and the window edge: the card's 6 and the
-    // content's 12, on both sides.
-    // The settings page is far taller than any other. Letting the panel grow to fit it gives a
-    // column the length of the screen that nobody can read, so every page keeps to the height
-    // the rest of them use and anything longer scrolls.
+    // A panel the length of the screen is one nobody reads, so every page keeps to the height
+    // the rest of them use.
     readonly property int tallest: Math.min(720, Screen.desktopAvailableHeight - 24)
+    // Two nested margins sit between the layout and the window edge, the card's 6 and the
+    // content's 12, and each is paid on both sides.
     height: Math.min(body.implicitHeight + 36, tallest)
     visible: hub.panel_open
     color: "transparent"
@@ -203,8 +202,7 @@ Window {
                 }
             }
 
-            // The settings page is taller than some screens. The chrome stays put and the
-            // pages scroll, rather than the window growing past the display.
+            // Only the pages scroll; the header, tabs and footer stay put.
             ScrollView {
                 id: scroller
                 Layout.fillWidth: true
