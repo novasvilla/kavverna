@@ -1,4 +1,7 @@
-use crate::app_identity::{Properties, app_key, display_name};
+use crate::app_identity::{
+    Properties, app_key, cmdline_of_process, display_name, is_generic, presentable,
+    refine_from_cmdline,
+};
 use crate::model::{AudioDevice, AudioStream, DeviceRole, MixerSnapshot};
 use crate::volume::Volume;
 use libspa::param::ParamType;
@@ -83,6 +86,19 @@ struct Tracked {
     default_source: Option<String>,
 }
 
+/// The framework process is the one holding the arguments that name the application.
+fn process_id(node: &Properties, client: Option<&Properties>) -> Option<u32> {
+    [Some(node), client]
+        .into_iter()
+        .flatten()
+        .find_map(|bag| {
+            ["application.process.id", "pipewire.sec.pid"]
+                .iter()
+                .find_map(|key| bag.get(*key))
+                .and_then(|value| value.parse().ok())
+        })
+}
+
 impl Tracked {
     /// Identity is worked out again whenever more is known: a node reaches the registry
     /// before its client, and the registry hands out fewer properties than the bound
@@ -94,8 +110,24 @@ impl Tracked {
         let client =
             self.client_of.get(&node_id).and_then(|owner| self.clients.get(owner)).cloned();
 
-        let key = app_key(&props, client.as_ref());
-        let name = display_name(&props, client.as_ref());
+        let mut key = app_key(&props, client.as_ref());
+        let mut name = display_name(&props, client.as_ref());
+
+        // Every Electron application calls itself Chromium, so without this the mixer shows
+        // several identical rows and no way to tell which is which.
+        if is_generic(&name) || is_generic(key.as_str()) {
+            if let Some(real) = process_id(&props, client.as_ref())
+                .map(cmdline_of_process)
+                .and_then(|args| refine_from_cmdline(&args))
+            {
+                if is_generic(&name) {
+                    name = presentable(&real);
+                }
+                if is_generic(key.as_str()) {
+                    key = crate::AppKey::from_refined(&real);
+                }
+            }
+        }
 
         if let Some(stream) = self.streams.get_mut(&node_id) {
             stream.key = key;

@@ -23,7 +23,10 @@ pub mod qobject {
         #[qproperty(bool, allow_display_sleep)]
         #[qproperty(bool, restore_on_start)]
         #[qproperty(bool, mouse_jiggle)]
-        #[qproperty(i32, jiggle_minutes)]
+        #[qproperty(i32, jiggle_shortest)]
+        #[qproperty(i32, jiggle_longest)]
+        #[qproperty(i32, jiggle_activity)]
+        #[qproperty(i32, jiggle_keystroke)]
         #[qproperty(i32, default_minutes)]
         #[qproperty(bool, middle_click_toggle)]
         #[qproperty(bool, timed)]
@@ -54,7 +57,15 @@ pub mod qobject {
         #[qinvokable]
         fn choose_mouse_jiggle(self: Pin<&mut KavvernaPanel>, jiggle: bool);
         #[qinvokable]
-        fn choose_jiggle_minutes(self: Pin<&mut KavvernaPanel>, minutes: i32);
+        fn choose_jiggle_shortest(self: Pin<&mut KavvernaPanel>, minutes: i32);
+        #[qinvokable]
+        fn choose_jiggle_longest(self: Pin<&mut KavvernaPanel>, minutes: i32);
+        #[qinvokable]
+        fn report_screen(self: Pin<&mut KavvernaPanel>, width: i32, height: i32);
+        #[qinvokable]
+        fn choose_jiggle_activity(self: Pin<&mut KavvernaPanel>, activity: i32);
+        #[qinvokable]
+        fn choose_jiggle_keystroke(self: Pin<&mut KavvernaPanel>, keystroke: i32);
         #[qinvokable]
         fn choose_default_minutes(self: Pin<&mut KavvernaPanel>, minutes: i32);
         #[qinvokable]
@@ -85,7 +96,10 @@ pub struct KavvernaPanelRust {
     allow_display_sleep: bool,
     restore_on_start: bool,
     mouse_jiggle: bool,
-    jiggle_minutes: i32,
+    jiggle_shortest: i32,
+    jiggle_longest: i32,
+    jiggle_activity: i32,
+    jiggle_keystroke: i32,
     default_minutes: i32,
     middle_click_toggle: bool,
     timed: bool,
@@ -111,9 +125,21 @@ impl Default for KavvernaPanelRust {
             allow_display_sleep,
             restore_on_start,
             mouse_jiggle: settings::bool_at(settings::MOUSE_JIGGLE, settings::MOUSE_JIGGLE_DEFAULT),
-            jiggle_minutes: as_i32(
-                settings::integer_at(settings::JIGGLE_MINUTES, settings::JIGGLE_MINUTES_DEFAULT),
-                5,
+            jiggle_shortest: as_i32(
+                settings::integer_at(settings::JIGGLE_SHORTEST, settings::JIGGLE_SHORTEST_DEFAULT),
+                2,
+            ),
+            jiggle_longest: as_i32(
+                settings::integer_at(settings::JIGGLE_LONGEST, settings::JIGGLE_LONGEST_DEFAULT),
+                7,
+            ),
+            jiggle_activity: as_i32(
+                settings::integer_at(settings::JIGGLE_ACTIVITY, settings::JIGGLE_ACTIVITY_DEFAULT),
+                0,
+            ),
+            jiggle_keystroke: as_i32(
+                settings::integer_at(settings::JIGGLE_KEYSTROKE, settings::JIGGLE_KEYSTROKE_DEFAULT),
+                0,
             ),
             default_minutes: as_i32(
                 settings::integer_at(settings::DEFAULT_MINUTES, settings::DEFAULT_MINUTES_DEFAULT),
@@ -147,8 +173,12 @@ fn describe_jiggle(state: crate::jiggle_state::JiggleState) -> String {
         return "Off".into();
     }
 
+    let waiting = state.waiting_seconds / 60;
     match state.seconds_until_next {
-        Some(seconds) => format!("Next nudge in {seconds}s  ·  {} so far", state.nudges),
+        Some(seconds) if seconds >= 60 => {
+            format!("Next in {}m {:02}s of {waiting}m  ·  {} so far", seconds / 60, seconds % 60, state.nudges)
+        }
+        Some(seconds) => format!("Next in {seconds}s of {waiting}m  ·  {} so far", state.nudges),
         None => "Starting".into(),
     }
 }
@@ -218,9 +248,42 @@ impl qobject::KavvernaPanel {
         self.as_mut().set_mouse_jiggle(jiggle);
     }
 
-    fn choose_jiggle_minutes(mut self: Pin<&mut Self>, minutes: i32) {
-        settings::put_integer(settings::JIGGLE_MINUTES, i64::from(minutes));
-        self.as_mut().set_jiggle_minutes(minutes);
+    /// The two ends are kept apart, since a range that collapses gives a fixed rhythm again.
+    fn choose_jiggle_shortest(mut self: Pin<&mut Self>, minutes: i32) {
+        settings::put_integer(settings::JIGGLE_SHORTEST, i64::from(minutes));
+        self.as_mut().set_jiggle_shortest(minutes);
+
+        if *self.longest_now() < minutes {
+            self.as_mut().choose_jiggle_longest(minutes);
+        }
+    }
+
+    fn choose_jiggle_longest(mut self: Pin<&mut Self>, minutes: i32) {
+        settings::put_integer(settings::JIGGLE_LONGEST, i64::from(minutes));
+        self.as_mut().set_jiggle_longest(minutes);
+
+        if *self.jiggle_shortest() > minutes {
+            settings::put_integer(settings::JIGGLE_SHORTEST, i64::from(minutes));
+            self.as_mut().set_jiggle_shortest(minutes);
+        }
+    }
+
+    fn longest_now(&self) -> &i32 {
+        self.jiggle_longest()
+    }
+
+    fn choose_jiggle_activity(mut self: Pin<&mut Self>, activity: i32) {
+        settings::put_integer(settings::JIGGLE_ACTIVITY, i64::from(activity));
+        self.as_mut().set_jiggle_activity(activity);
+    }
+
+    fn choose_jiggle_keystroke(mut self: Pin<&mut Self>, keystroke: i32) {
+        settings::put_integer(settings::JIGGLE_KEYSTROKE, i64::from(keystroke));
+        self.as_mut().set_jiggle_keystroke(keystroke);
+    }
+
+    fn report_screen(self: Pin<&mut Self>, width: i32, height: i32) {
+        crate::jiggle_state::set_screen(width, height);
     }
 
     fn choose_default_minutes(mut self: Pin<&mut Self>, minutes: i32) {

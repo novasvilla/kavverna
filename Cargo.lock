@@ -903,6 +903,7 @@ dependencies = [
 name = "keep-awake"
 version = "0.1.0"
 dependencies = [
+ "fastrand",
  "thiserror 2.0.20",
  "tokio",
  "tracing",

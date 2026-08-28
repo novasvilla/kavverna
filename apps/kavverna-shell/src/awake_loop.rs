@@ -1,7 +1,7 @@
 use crate::command::Command;
 use crate::tray::StatusIcon;
 use crate::{awake_state, jiggle_state, panel, settings};
-use keep_awake::{Hold, KeepAwake, MouseJiggle, Scope, Trigger};
+use keep_awake::{Activity, Hold, KeepAwake, Keystroke, MouseJiggle, Scope, Trigger};
 use ksni::blocking::Handle;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
@@ -27,7 +27,8 @@ pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
         }
     };
 
-    let mut jiggle = MouseJiggle::every(jiggle_interval());
+    let (shortest, longest) = jiggle_range();
+    let mut jiggle = MouseJiggle::between(shortest, longest);
 
     if settings::bool_at(settings::RESTORE_ON_START, settings::RESTORE_ON_START_DEFAULT) {
         let hold = default_hold();
@@ -52,7 +53,12 @@ pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
                 }
             }
             Ok(Command::Release) => runtime.block_on(keep_awake.release()),
-            Ok(Command::NudgeNow) => jiggle.nudge_now(),
+            Ok(Command::NudgeNow) => {
+                jiggle.set_screen(jiggle_state::screen());
+                let (activity, keystroke) = jiggle_activity();
+                jiggle.set_activity(activity, keystroke);
+                jiggle.nudge_now();
+            }
             Err(RecvTimeoutError::Timeout) => {
                 if runtime.block_on(keep_awake.expire_if_due()) {
                     announce_expiry();
@@ -68,7 +74,11 @@ pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
         // is being held off.
         let jiggling = settings::bool_at(settings::MOUSE_JIGGLE, settings::MOUSE_JIGGLE_DEFAULT);
         if jiggling {
-            jiggle.set_interval(jiggle_interval());
+            let (shortest, longest) = jiggle_range();
+            jiggle.set_range(shortest, longest);
+            jiggle.set_screen(jiggle_state::screen());
+            let (activity, keystroke) = jiggle_activity();
+            jiggle.set_activity(activity, keystroke);
             jiggle.tick();
         } else {
             jiggle.rest();
@@ -78,6 +88,7 @@ pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
             running: jiggling,
             nudges: jiggle.nudges(),
             seconds_until_next: jiggle.until_next().map(|left| left.as_secs()),
+            waiting_seconds: jiggle.next_interval().as_secs(),
         });
 
         let active = keep_awake.is_active();
@@ -110,10 +121,26 @@ fn default_hold() -> Hold {
     }
 }
 
-fn jiggle_interval() -> Duration {
-    let minutes =
-        settings::integer_at(settings::JIGGLE_MINUTES, settings::JIGGLE_MINUTES_DEFAULT).max(1);
-    Duration::from_secs(minutes.unsigned_abs() * 60)
+fn jiggle_activity() -> (Activity, Keystroke) {
+    let read = |key, fallback| {
+        i32::try_from(settings::integer_at(key, fallback)).unwrap_or(0)
+    };
+
+    (
+        Activity::from_id(read(settings::JIGGLE_ACTIVITY, settings::JIGGLE_ACTIVITY_DEFAULT)),
+        Keystroke::from_id(read(settings::JIGGLE_KEYSTROKE, settings::JIGGLE_KEYSTROKE_DEFAULT)),
+    )
+}
+
+fn jiggle_range() -> (Duration, Duration) {
+    let minutes = |key, fallback| {
+        Duration::from_secs(settings::integer_at(key, fallback).max(1).unsigned_abs() * 60)
+    };
+
+    (
+        minutes(settings::JIGGLE_SHORTEST, settings::JIGGLE_SHORTEST_DEFAULT),
+        minutes(settings::JIGGLE_LONGEST, settings::JIGGLE_LONGEST_DEFAULT),
+    )
 }
 
 fn announce_expiry() {

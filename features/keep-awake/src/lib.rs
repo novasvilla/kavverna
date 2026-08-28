@@ -6,7 +6,7 @@ use zbus::zvariant::OwnedFd;
 mod inhibitor;
 mod mouse_jiggle;
 
-pub use mouse_jiggle::MouseJiggle;
+pub use mouse_jiggle::{Activity, Keystroke, MouseJiggle, Screen};
 
 use inhibitor::{
     CHANGE_SCREEN_SETTINGS, INTERRUPT_SESSION, Login1ManagerProxy, PolicyAgentProxy,
