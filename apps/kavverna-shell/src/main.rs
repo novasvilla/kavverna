@@ -1,3 +1,4 @@
+mod awake_loop;
 mod feature_list;
 mod tray;
 
@@ -6,8 +7,9 @@ use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
 fn main() {
     tracing_subscriber::fmt::init();
 
-    // Held for the process lifetime: dropping the handle unregisters the tray item.
-    let _tray = tray::show("Kavverna is running".into());
+    let (commands, requests) = std::sync::mpsc::channel();
+    let tray = tray::show(commands);
+    std::thread::spawn(move || awake_loop::run(requests, tray));
 
     let mut app = QGuiApplication::new();
     let mut engine = QQmlApplicationEngine::new();

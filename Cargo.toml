@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["apps/kavverna-shell", "domain/feature-catalog", "domain/feature-runtime"]
+members = [
+    "apps/kavverna-shell",
+    "domain/feature-catalog",
+    "domain/feature-runtime",
+    "features/keep-awake",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -61,3 +66,4 @@ strum = "0.28.0"
 strum_macros = "0.28.0"
 feature-catalog = { path = "domain/feature-catalog" }
 feature-runtime = { path = "domain/feature-runtime" }
+keep-awake = { path = "features/keep-awake" }
