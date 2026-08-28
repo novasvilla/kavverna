@@ -34,25 +34,25 @@ Window {
     // fullscreen game on the other monitor.
     LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
 
-    // A layer surface does not take keyboard focus on its own, so a bare "lost focus" check
-    // fires the moment the panel appears and closes it again. Only a panel that actually had
-    // focus can lose it.
-    property bool everFocused: false
-
-    onActiveChanged: {
-        if (active) {
-            everFocused = true
-        } else if (everFocused && hub.panel_open) {
-            hub.dismiss()
-        }
+    // Closing on lost focus reads well until anything else takes focus on its own: a
+    // fullscreen window reclaiming it would shut the panel a moment after it opened. The
+    // tray icon and Escape close it instead, which is predictable.
+    Shortcut {
+        sequence: "Escape"
+        onActivated: hub.dismiss()
     }
-
-    onVisibleChanged: if (visible) everFocused = false
 
     KavvernaPanel {
         id: hub
         Component.onCompleted: attach()
     }
+
+    MixerView {
+        id: mixer
+        Component.onCompleted: attach()
+    }
+
+    property int page: 0
 
     component SectionLabel: Label {
         font.pixelSize: 10
@@ -246,25 +246,27 @@ Window {
 
                     Repeater {
                         model: [
-                            { glyph: "♪", name: "Sound", ready: false },
-                            { glyph: "◴", name: "Monitoring", ready: false },
-                            { glyph: "✄", name: "Clipboard", ready: false },
-                            { glyph: "⚡", name: "Energy", ready: true }
+                            { glyph: "♪", name: "Sound", page: 1, ready: mixer.available },
+                            { glyph: "◴", name: "Monitoring", page: 2, ready: false },
+                            { glyph: "✄", name: "Clipboard", page: 3, ready: false },
+                            { glyph: "⚡", name: "Energy", page: 0, ready: true }
                         ]
 
                         delegate: Rectangle {
                             required property var modelData
+                            readonly property bool current: root.page === modelData.page
 
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             radius: 8
-                            color: modelData.ready ? Qt.rgba(0.24, 0.68, 0.91, 0.22) : "transparent"
+                            color: current ? Qt.rgba(0.24, 0.68, 0.91, 0.22) : "transparent"
 
                             Label {
                                 anchors.centerIn: parent
                                 text: parent.modelData.glyph
                                 font.pixelSize: 16
-                                color: parent.modelData.ready ? root.accent
+                                color: parent.current ? root.accent
+                                     : parent.modelData.ready ? Qt.rgba(1, 1, 1, 0.6)
                                                               : Qt.rgba(1, 1, 1, 0.25)
                             }
 
@@ -273,6 +275,10 @@ Window {
                                                           : modelData.name + " is not built yet"
 
                             HoverHandler { id: hover }
+                            TapHandler {
+                                enabled: modelData.ready
+                                onTapped: root.page = modelData.page
+                            }
                         }
                     }
                 }
@@ -280,7 +286,7 @@ Window {
 
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: !hub.showing_settings
+                visible: !hub.showing_settings && root.page === 0
                 spacing: 12
 
                 SectionLabel { text: "ENERGY" }
@@ -408,6 +414,193 @@ Window {
                             checked: hub.allow_display_sleep
                             font.pixelSize: 11
                             onToggled: hub.choose_display_sleep(checked)
+                        }
+                    }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: !hub.showing_settings && root.page === 1
+                spacing: 12
+
+                SectionLabel { text: "OUTPUT" }
+
+                Card {
+                    implicitHeight: outputCard.implicitHeight + 24
+
+                    ColumnLayout {
+                        id: outputCard
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 8
+
+                        Repeater {
+                            model: mixer.output_names.length
+
+                            delegate: ColumnLayout {
+                                required property int index
+                                readonly property bool isDefault:
+                                    mixer.output_ids[index] === mixer.default_output_id
+
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    Label {
+                                        text: parent.parent.isDefault ? "●" : "○"
+                                        font.pixelSize: 10
+                                        color: parent.parent.isDefault ? root.accent
+                                                                       : root.secondaryText
+                                    }
+
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: mixer.output_names[parent.parent.index]
+                                        font.pixelSize: 11
+                                        font.bold: parent.parent.isDefault
+                                        color: root.primaryText
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Label {
+                                        text: mixer.output_volumes[parent.parent.index] + "%"
+                                        font.pixelSize: 11
+                                        color: root.secondaryText
+                                    }
+                                }
+
+                                Slider {
+                                    Layout.fillWidth: true
+                                    implicitHeight: 18
+                                    from: 0
+                                    to: 100
+                                    value: mixer.output_volumes[parent.index]
+                                    onMoved: mixer.set_output_volume(
+                                        mixer.output_ids[parent.index], Math.round(value))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                SectionLabel { text: "APPLICATIONS" }
+
+                Card {
+                    implicitHeight: streamCard.implicitHeight + 24
+
+                    ColumnLayout {
+                        id: streamCard
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 8
+
+                        Label {
+                            visible: mixer.stream_names.length === 0
+                            text: "Nothing is playing"
+                            font.pixelSize: 11
+                            color: root.secondaryText
+                        }
+
+                        Repeater {
+                            model: mixer.stream_names.length
+
+                            delegate: ColumnLayout {
+                                required property int index
+
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: mixer.stream_names[parent.parent.index]
+                                        font.pixelSize: 11
+                                        color: root.primaryText
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Label {
+                                        text: mixer.stream_volumes[parent.parent.index] + "%"
+                                        font.pixelSize: 11
+                                        color: mixer.stream_volumes[parent.parent.index] > 100
+                                               ? root.awakeTint : root.secondaryText
+                                    }
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    Slider {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 18
+                                        from: 0
+                                        to: 200
+                                        value: mixer.stream_volumes[parent.parent.index]
+                                        onMoved: mixer.set_stream_volume(
+                                            mixer.stream_ids[parent.parent.index],
+                                            Math.round(value))
+                                    }
+
+                                    Label {
+                                        text: mixer.stream_muted[parent.parent.index] ? "🔇" : "🔊"
+                                        font.pixelSize: 12
+                                        TapHandler {
+                                            onTapped: mixer.mute_stream(
+                                                mixer.stream_ids[parent.parent.parent.index],
+                                                !mixer.stream_muted[parent.parent.parent.index])
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                SectionLabel { text: "MICROPHONE" }
+
+                Card {
+                    implicitHeight: micCard.implicitHeight + 24
+
+                    RowLayout {
+                        id: micCard
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 10
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+
+                            Label {
+                                text: mixer.default_input
+                                font.pixelSize: 12
+                                font.bold: true
+                                color: root.primaryText
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+
+                            Label {
+                                text: mixer.inputs_muted ? "Every microphone is muted"
+                                                         : mixer.input_names.length + " inputs"
+                                font.pixelSize: 11
+                                color: root.secondaryText
+                            }
+                        }
+
+                        Button {
+                            text: mixer.inputs_muted ? "Unmute all" : "Mute all"
+                            font.pixelSize: 11
+                            implicitHeight: 26
+                            onClicked: mixer.mute_every_input(!mixer.inputs_muted)
                         }
                     }
                 }

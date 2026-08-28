@@ -843,6 +843,7 @@ dependencies = [
  "ksni",
  "notify-rust",
  "preferences",
+ "sound-mixer",
  "strum",
  "tempfile",
  "tokio",

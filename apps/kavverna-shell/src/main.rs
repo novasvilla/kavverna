@@ -3,6 +3,8 @@ mod awake_loop;
 mod awake_state;
 mod command;
 mod launch_at_login;
+mod mixer_state;
+mod mixer_view;
 mod settings;
 mod panel;
 mod remote;
@@ -42,6 +44,7 @@ fn main() {
 
     let tray = tray::show();
     std::thread::spawn(move || awake_loop::run(requests, tray));
+    std::thread::spawn(|| mixer_state::run(mixer_view::publish));
 
     let mut app = QGuiApplication::new();
     let mut engine = QQmlApplicationEngine::new();

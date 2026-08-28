@@ -25,28 +25,27 @@ pub enum MixerCommand {
     Stop,
 }
 
-pub struct MixerHandle {
-    commands: pipewire::channel::Sender<MixerCommand>,
-    pub changes: Receiver<MixerSnapshot>,
-}
+/// Separate from the snapshot receiver so it can be shared: a receiver is not `Sync`, and
+/// the whole point of this half is that any thread can drive the mixer.
+pub struct MixerCommands(pipewire::channel::Sender<MixerCommand>);
 
-impl MixerHandle {
+impl MixerCommands {
     pub fn send(&self, command: MixerCommand) {
-        if self.commands.send(command).is_err() {
+        if self.0.send(command).is_err() {
             tracing::warn!("the mixer session has stopped listening");
         }
     }
 }
 
-impl Drop for MixerHandle {
+impl Drop for MixerCommands {
     fn drop(&mut self) {
-        let _ = self.commands.send(MixerCommand::Stop);
+        let _ = self.0.send(MixerCommand::Stop);
     }
 }
 
 /// PipeWire's objects are not `Send`, so the whole session lives on one thread and talks to
 /// the rest of the app through channels.
-pub fn start() -> Result<MixerHandle, MixerError> {
+pub fn start() -> Result<(MixerCommands, Receiver<MixerSnapshot>), MixerError> {
     let (commands, receiver) = pipewire::channel::channel();
     let (changes_out, changes) = std::sync::mpsc::channel();
     let (ready_out, ready) = std::sync::mpsc::channel::<MixerError>();
@@ -66,7 +65,7 @@ pub fn start() -> Result<MixerHandle, MixerError> {
     // the session is up.
     match ready.recv_timeout(std::time::Duration::from_millis(500)) {
         Ok(err) => Err(err),
-        Err(_) => Ok(MixerHandle { commands, changes }),
+        Err(_) => Ok((MixerCommands(commands), changes)),
     }
 }
 

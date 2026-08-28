@@ -4,8 +4,8 @@ use sound_mixer::{MixerCommand, Volume};
 use std::time::Duration;
 
 fn main() {
-    let handle = match sound_mixer::start() {
-        Ok(handle) => handle,
+    let (handle, changes) = match sound_mixer::start() {
+        Ok(parts) => parts,
         Err(err) => {
             eprintln!("could not start: {err}");
             return;
@@ -15,7 +15,7 @@ fn main() {
     let mut latest = None;
     let deadline = std::time::Instant::now() + Duration::from_secs(3);
     while std::time::Instant::now() < deadline {
-        if let Ok(snapshot) = handle.changes.recv_timeout(Duration::from_millis(200)) {
+        if let Ok(snapshot) = changes.recv_timeout(Duration::from_millis(200)) {
             latest = Some(snapshot);
         }
     }
@@ -66,7 +66,7 @@ fn main() {
         handle.send(MixerCommand::SetVolume { node_id: stream.node_id, volume: Volume::from_percent(40.0) });
         std::thread::sleep(Duration::from_millis(600));
 
-        while let Ok(fresh) = handle.changes.try_recv() {
+        while let Ok(fresh) = changes.try_recv() {
             latest = Some(fresh);
         }
         if let Some(updated) = latest

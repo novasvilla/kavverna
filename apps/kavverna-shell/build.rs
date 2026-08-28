@@ -1,7 +1,7 @@
 use cxx_qt_build::{CxxQtBuilder, QmlModule};
 
 const QML: &[&str] = &["qml/main.qml"];
-const RUST: &[&str] = &["src/panel.rs"];
+const RUST: &[&str] = &["src/panel.rs", "src/mixer_view.rs"];
 
 fn main() {
     // Declared by hand because the builder only tracks the Rust sources, so without this a
