@@ -758,9 +758,11 @@ dependencies = [
  "notify-rust",
  "preferences",
  "strum",
+ "tempfile",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "zbus",
 ]
 
 [[package]]

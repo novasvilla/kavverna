@@ -29,9 +29,25 @@ Window {
     LayerShell.Window.margins: Qt.rect(0, 0, 12, 12)
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityOnDemand
     LayerShell.Window.scope: "kavverna-panel"
-    LayerShell.Window.wantsToBeOnActiveScreen: true
+    // Pinned to the window's own screen, which is the primary one, rather than letting the
+    // compositor pick: the active screen follows focus and would drag the panel into a
+    // fullscreen game on the other monitor.
+    LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
 
-    onActiveChanged: if (!active && hub.panel_open) hub.dismiss()
+    // A layer surface does not take keyboard focus on its own, so a bare "lost focus" check
+    // fires the moment the panel appears and closes it again. Only a panel that actually had
+    // focus can lose it.
+    property bool everFocused: false
+
+    onActiveChanged: {
+        if (active) {
+            everFocused = true
+        } else if (everFocused && hub.panel_open) {
+            hub.dismiss()
+        }
+    }
+
+    onVisibleChanged: if (visible) everFocused = false
 
     KavvernaPanel {
         id: hub
@@ -49,6 +65,61 @@ Window {
         radius: 10
         color: root.raised
         Layout.fillWidth: true
+    }
+
+    component ChoiceRow: ColumnLayout {
+        id: choiceRow
+        property alias title: choiceTitle.text
+        property alias detail: choiceDetail.text
+        property var choices: []
+        property int current: 0
+        signal picked(int value)
+
+        Layout.fillWidth: true
+        spacing: 6
+
+        Label {
+            id: choiceTitle
+            font.pixelSize: 13
+            font.bold: true
+            color: root.primaryText
+        }
+
+        Label {
+            id: choiceDetail
+            font.pixelSize: 11
+            color: root.secondaryText
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 4
+
+            Repeater {
+                model: choiceRow.choices
+
+                delegate: Button {
+                    required property var modelData
+                    readonly property bool active: modelData.value === choiceRow.current
+
+                    Layout.fillWidth: true
+                    implicitHeight: 26
+                    text: modelData.label
+                    font.pixelSize: 11
+                    leftPadding: 2
+                    rightPadding: 2
+                    onClicked: choiceRow.picked(modelData.value)
+
+                    background: Rectangle {
+                        radius: 6
+                        color: parent.active ? Qt.rgba(0.24, 0.68, 0.91, 0.30)
+                                             : Qt.rgba(1, 1, 1, 0.08)
+                    }
+                }
+            }
+        }
     }
 
     component SettingRow: RowLayout {
@@ -270,7 +341,8 @@ Window {
                                     { label: "30m", minutes: 30 },
                                     { label: "1h", minutes: 60 },
                                     { label: "2h", minutes: 120 },
-                                    { label: "4h", minutes: 240 }
+                                    { label: "4h", minutes: 240 },
+                                    { label: "8h", minutes: 480 }
                                 ]
 
                                 delegate: Button {
@@ -283,6 +355,44 @@ Window {
                                     leftPadding: 2
                                     rightPadding: 2
                                     onClicked: hub.keep_awake_minutes(modelData.minutes)
+
+                                    background: Rectangle {
+                                        radius: 6
+                                        color: parent.down ? Qt.rgba(1, 1, 1, 0.16)
+                                                           : Qt.rgba(1, 1, 1, 0.08)
+                                    }
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            visible: hub.timed
+                            spacing: 6
+
+                            Label {
+                                text: "Add more"
+                                font.pixelSize: 11
+                                color: root.secondaryText
+                            }
+
+                            Repeater {
+                                model: [
+                                    { label: "+15m", minutes: 15 },
+                                    { label: "+30m", minutes: 30 },
+                                    { label: "+1h", minutes: 60 }
+                                ]
+
+                                delegate: Button {
+                                    required property var modelData
+
+                                    Layout.fillWidth: true
+                                    implicitHeight: 24
+                                    text: modelData.label
+                                    font.pixelSize: 11
+                                    leftPadding: 2
+                                    rightPadding: 2
+                                    onClicked: hub.extend_minutes(modelData.minutes)
 
                                     background: Rectangle {
                                         radius: 6
@@ -344,13 +454,71 @@ Window {
                         id: energyCard
                         anchors.fill: parent
                         anchors.margins: 12
-                        spacing: 12
+                        spacing: 14
 
                         SettingRow {
                             title: "Let displays sleep"
                             detail: "Blocks automatic suspend only, so screens still turn off and a deliberate suspend still works."
                             checked: hub.allow_display_sleep
                             onToggled: (value) => hub.choose_display_sleep(value)
+                        }
+
+                        SettingRow {
+                            title: "Middle click toggles"
+                            detail: "Middle click the tray icon to switch keep awake on and off. The right button belongs to the menu."
+                            checked: hub.middle_click_toggle
+                            onToggled: (value) => hub.choose_middle_click_toggle(value)
+                        }
+
+                        ChoiceRow {
+                            title: "Default duration"
+                            detail: "Used by the switch and by auto start."
+                            current: hub.default_minutes
+                            choices: [
+                                { label: "∞", value: 0 },
+                                { label: "15m", value: 15 },
+                                { label: "30m", value: 30 },
+                                { label: "1h", value: 60 },
+                                { label: "2h", value: 120 },
+                                { label: "4h", value: 240 }
+                            ]
+                            onPicked: (value) => hub.choose_default_minutes(value)
+                        }
+                    }
+                }
+
+                SectionLabel { text: "MOUSE JIGGLE" }
+
+                Card {
+                    implicitHeight: jiggleCard.implicitHeight + 24
+
+                    ColumnLayout {
+                        id: jiggleCard
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 14
+
+                        SettingRow {
+                            title: "Nudge the pointer"
+                            detail: hub.jiggle_available
+                                    ? "Moves the pointer and puts it back, for applications that watch for input rather than power inhibitions."
+                                    : "Needs ydotool and a running ydotoold."
+                            checked: hub.mouse_jiggle
+                            onToggled: (value) => hub.choose_mouse_jiggle(value)
+                        }
+
+                        ChoiceRow {
+                            visible: hub.mouse_jiggle
+                            title: "Every"
+                            current: hub.jiggle_minutes
+                            choices: [
+                                { label: "1m", value: 1 },
+                                { label: "2m", value: 2 },
+                                { label: "5m", value: 5 },
+                                { label: "10m", value: 10 },
+                                { label: "15m", value: 15 }
+                            ]
+                            onPicked: (value) => hub.choose_jiggle_minutes(value)
                         }
                     }
                 }

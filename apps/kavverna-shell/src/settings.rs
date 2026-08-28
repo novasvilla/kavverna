@@ -6,7 +6,7 @@ pub const RESTORE_ON_START: &str = "keep-awake.restore-on-start";
 pub const MOUSE_JIGGLE: &str = "keep-awake.mouse-jiggle";
 pub const JIGGLE_MINUTES: &str = "keep-awake.mouse-jiggle-minutes";
 pub const DEFAULT_MINUTES: &str = "keep-awake.default-minutes";
-pub const RIGHT_CLICK_TOGGLE: &str = "keep-awake.right-click-toggle";
+pub const MIDDLE_CLICK_TOGGLE: &str = "keep-awake.middle-click-toggle";
 
 pub const ALLOW_DISPLAY_SLEEP_DEFAULT: bool = true;
 pub const RESTORE_ON_START_DEFAULT: bool = false;
@@ -14,7 +14,7 @@ pub const MOUSE_JIGGLE_DEFAULT: bool = false;
 pub const JIGGLE_MINUTES_DEFAULT: i64 = 5;
 /// Zero means indefinite, matching the duration picker's first entry.
 pub const DEFAULT_MINUTES_DEFAULT: i64 = 0;
-pub const RIGHT_CLICK_TOGGLE_DEFAULT: bool = false;
+pub const MIDDLE_CLICK_TOGGLE_DEFAULT: bool = false;
 
 static STORE: Mutex<Option<Preferences>> = Mutex::new(None);
 

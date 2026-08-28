@@ -25,7 +25,7 @@ pub mod qobject {
         #[qproperty(bool, mouse_jiggle)]
         #[qproperty(i32, jiggle_minutes)]
         #[qproperty(i32, default_minutes)]
-        #[qproperty(bool, right_click_toggle)]
+        #[qproperty(bool, middle_click_toggle)]
         #[qproperty(bool, timed)]
         #[qproperty(bool, jiggle_available)]
         #[qproperty(bool, launch_at_login)]
@@ -57,7 +57,7 @@ pub mod qobject {
         #[qinvokable]
         fn choose_default_minutes(self: Pin<&mut KavvernaPanel>, minutes: i32);
         #[qinvokable]
-        fn choose_right_click_toggle(self: Pin<&mut KavvernaPanel>, toggle: bool);
+        fn choose_middle_click_toggle(self: Pin<&mut KavvernaPanel>, toggle: bool);
         #[qinvokable]
         fn extend_minutes(self: Pin<&mut KavvernaPanel>, minutes: i32);
         #[qinvokable]
@@ -84,7 +84,7 @@ pub struct KavvernaPanelRust {
     mouse_jiggle: bool,
     jiggle_minutes: i32,
     default_minutes: i32,
-    right_click_toggle: bool,
+    middle_click_toggle: bool,
     timed: bool,
     jiggle_available: bool,
     launch_at_login: bool,
@@ -115,9 +115,9 @@ impl Default for KavvernaPanelRust {
                 settings::integer_at(settings::DEFAULT_MINUTES, settings::DEFAULT_MINUTES_DEFAULT),
                 0,
             ),
-            right_click_toggle: settings::bool_at(
-                settings::RIGHT_CLICK_TOGGLE,
-                settings::RIGHT_CLICK_TOGGLE_DEFAULT,
+            middle_click_toggle: settings::bool_at(
+                settings::MIDDLE_CLICK_TOGGLE,
+                settings::MIDDLE_CLICK_TOGGLE_DEFAULT,
             ),
             timed: false,
             jiggle_available: keep_awake::MouseJiggle::is_available(),
@@ -212,9 +212,9 @@ impl qobject::KavvernaPanel {
         self.as_mut().set_default_minutes(minutes);
     }
 
-    fn choose_right_click_toggle(mut self: Pin<&mut Self>, toggle: bool) {
-        settings::put_bool(settings::RIGHT_CLICK_TOGGLE, toggle);
-        self.as_mut().set_right_click_toggle(toggle);
+    fn choose_middle_click_toggle(mut self: Pin<&mut Self>, toggle: bool) {
+        settings::put_bool(settings::MIDDLE_CLICK_TOGGLE, toggle);
+        self.as_mut().set_middle_click_toggle(toggle);
     }
 
     fn extend_minutes(self: Pin<&mut Self>, minutes: i32) {
@@ -265,6 +265,17 @@ pub fn toggle() {
     }
 
     tracing::info!("tray toggle: opening");
+    with_panel(|mut panel| {
+        panel.as_mut().set_showing_settings(false);
+        panel.as_mut().set_panel_open(true);
+    });
+}
+
+pub fn open_hub() {
+    if let Ok(mut at) = DISMISSED_AT.lock() {
+        *at = None;
+    }
+
     with_panel(|mut panel| {
         panel.as_mut().set_showing_settings(false);
         panel.as_mut().set_panel_open(true);

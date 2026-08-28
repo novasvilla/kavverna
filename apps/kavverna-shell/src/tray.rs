@@ -1,24 +1,37 @@
 use crate::command::{self, Command};
 use crate::settings;
 use crate::{app_icon, panel};
-use keep_awake::{Hold, Scope, format_duration};
+use keep_awake::{Hold, Scope, format_compact, format_duration};
 use ksni::blocking::{Handle, TrayMethods};
 use ksni::menu::{StandardItem, SubMenu};
 use ksni::{MenuItem, ToolTip, Tray};
 use std::time::Duration;
 
-const DURATIONS: [(&str, u64); 5] = [
+const DURATIONS: [(&str, u64); 6] = [
     ("15 minutes", 15),
     ("30 minutes", 30),
     ("1 hour", 60),
     ("2 hours", 120),
     ("4 hours", 240),
+    ("8 hours", 480),
 ];
+
+const EXTENSIONS: [(&str, u64); 3] = [("15 minutes", 15), ("30 minutes", 30), ("1 hour", 60)];
 
 #[derive(Default)]
 pub struct StatusIcon {
     pub awake: bool,
     pub remaining: Option<Duration>,
+}
+
+/// Read from settings rather than held in the icon, so the tray, the panel and the remote
+/// interface cannot disagree about it.
+pub fn configured_scope() -> Scope {
+    if settings::bool_at(settings::ALLOW_DISPLAY_SLEEP, settings::ALLOW_DISPLAY_SLEEP_DEFAULT) {
+        Scope::SystemOnly
+    } else {
+        Scope::SystemAndDisplay
+    }
 }
 
 impl StatusIcon {
@@ -30,14 +43,6 @@ impl StatusIcon {
         }
     }
 
-    fn scope() -> Scope {
-        if settings::bool_at(settings::ALLOW_DISPLAY_SLEEP, settings::ALLOW_DISPLAY_SLEEP_DEFAULT)
-        {
-            Scope::SystemOnly
-        } else {
-            Scope::SystemAndDisplay
-        }
-    }
 }
 
 impl Tray for StatusIcon {
@@ -54,11 +59,29 @@ impl Tray for StatusIcon {
     }
 
     fn tool_tip(&self) -> ToolTip {
-        ToolTip {
-            title: "Kavverna".into(),
-            description: self.summary(),
-            ..Default::default()
+        let description = if self.awake {
+            format!("{}  ({})", self.summary(), format_compact(self.remaining))
+        } else {
+            self.summary()
+        };
+
+        ToolTip { title: "Kavverna".into(), description, ..Default::default() }
+    }
+
+    /// Middle click rather than right: on a StatusNotifierItem the host owns the right
+    /// button for the context menu, so it never reaches us.
+    fn secondary_activate(&mut self, _x: i32, _y: i32) {
+        if !settings::bool_at(settings::MIDDLE_CLICK_TOGGLE, settings::MIDDLE_CLICK_TOGGLE_DEFAULT)
+        {
+            return;
         }
+
+        let command = if self.awake {
+            Command::Release
+        } else {
+            Command::Engage(Hold::Indefinite, configured_scope())
+        };
+        command::send(command);
     }
 
     fn activate(&mut self, _x: i32, _y: i32) {
@@ -74,7 +97,7 @@ impl Tray for StatusIcon {
                     activate: Box::new(move |_: &mut Self| {
                         command::send(Command::Engage(
                             Hold::For(Duration::from_secs(minutes * 60)),
-                            Self::scope(),
+                            configured_scope(),
                         ));
                     }),
                     ..Default::default()
@@ -93,13 +116,32 @@ impl Tray for StatusIcon {
             MenuItem::Separator,
             StandardItem { label: self.summary(), enabled: false, ..Default::default() }.into(),
             SubMenu { label: "Keep awake for".into(), submenu: timed, ..Default::default() }.into(),
+            SubMenu {
+                label: "Add more time".into(),
+                enabled: self.remaining.is_some(),
+                submenu: EXTENSIONS
+                    .iter()
+                    .map(|&(label, minutes)| {
+                        StandardItem {
+                            label: format!("+ {label}"),
+                            activate: Box::new(move |_: &mut Self| {
+                                command::send(Command::Extend(Duration::from_secs(minutes * 60)));
+                            }),
+                            ..Default::default()
+                        }
+                        .into()
+                    })
+                    .collect(),
+                ..Default::default()
+            }
+            .into(),
             StandardItem {
                 label: if self.awake { "Allow sleep now" } else { "Keep awake" }.into(),
                 activate: Box::new(|icon: &mut Self| {
                     let command = if icon.awake {
                         Command::Release
                     } else {
-                        Command::Engage(Hold::Indefinite, Self::scope())
+                        Command::Engage(Hold::Indefinite, configured_scope())
                     };
                     command::send(command);
                 }),

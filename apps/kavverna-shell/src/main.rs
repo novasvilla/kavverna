@@ -5,6 +5,7 @@ mod command;
 mod launch_at_login;
 mod settings;
 mod panel;
+mod remote;
 mod tray;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
@@ -18,6 +19,23 @@ fn main() {
         .init();
 
     tracing::info!(version = env!("CARGO_PKG_VERSION"), "kavverna starting");
+
+    let bus = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+        Ok(runtime) => runtime,
+        Err(err) => {
+            tracing::error!(%err, "no runtime for the session bus");
+            return;
+        }
+    };
+
+    match bus.block_on(remote::claim()) {
+        Ok(remote::Claim::AlreadyRunning) => {
+            tracing::info!("another instance is already running, raised its panel instead");
+            return;
+        }
+        Ok(remote::Claim::Ours) => {}
+        Err(err) => tracing::warn!(%err, "running without a remote interface: {}", err),
+    }
 
     let (sender, requests) = std::sync::mpsc::channel();
     command::publish(sender);
@@ -35,4 +53,6 @@ fn main() {
     if let Some(app) = app.as_mut() {
         app.exec();
     }
+
+    drop(bus);
 }

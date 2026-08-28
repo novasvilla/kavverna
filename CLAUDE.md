@@ -81,6 +81,25 @@ desktop and checked by hand: the mixer against two apps playing at once, the mon
 Nothing is tagged or packaged until it has been in daily use on the author's machine. The
 repository is public from the start; releases are what is held back.
 
+## What blocks sleep on KDE
+
+PowerDevil, not logind, decides when a KDE session suspends. `AutoSuspendIdleTimeoutSec` in
+`powerdevilrc` is the timeout it acts on.
+
+Both routes work and PowerDevil honours each: an inhibition through
+`org.kde.Solid.PowerManagement.PolicyAgent.AddInhibition`, and a plain logind `idle` block
+inhibitor, which PowerDevil picks up as well. Kavverna asks the policy agent because that is
+explicit and because it can also request `ChangeScreenSettings` to hold the display on,
+which logind has no way to express. The logind inhibitor stays as a fallback for sessions
+with no desktop power daemon, and is skipped when the policy agent answers, since holding
+both registers the same hold twice.
+
+Verify with `ListInhibitions` on the policy agent, but note two traps. It is marked
+deprecated and lags the actual registration by several seconds, so a read straight after the
+call reports nothing and proves nothing. And a quiet moment where it returns an empty list
+says only that nothing is inhibiting right now. `AddInhibition` returning a cookie is the
+immediate, authoritative answer.
+
 ## Hazards
 
 Fan control writes PWM values to `/sys/class/hwmon/*` as root. A fan left at 0 RPM can
