@@ -17,14 +17,12 @@ pub enum KeepAwakeError {
 
 type Result<T> = std::result::Result<T, KeepAwakeError>;
 
-/// How long the machine should stay awake.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Hold {
     Indefinite,
     For(Duration),
 }
 
-/// Whether displays are allowed to sleep while the system stays up.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
     /// Blocks automatic idle suspend only. Displays sleep as usual and local work carries
@@ -72,7 +70,6 @@ impl KeepAwake {
         self.hold.as_ref().map(|hold| hold.scope)
     }
 
-    /// `None` while inactive or held indefinitely.
     pub fn remaining(&self) -> Option<Duration> {
         let expires_at = self.hold.as_ref()?.expires_at?;
         Some(expires_at.saturating_duration_since(Instant::now()))
@@ -137,7 +134,6 @@ impl KeepAwake {
         tracing::info!("keep awake released");
     }
 
-    /// Drops a timed hold once it has run out. Returns whether this call ended one.
     pub async fn expire_if_due(&mut self) -> bool {
         let due = self
             .hold

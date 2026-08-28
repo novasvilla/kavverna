@@ -29,7 +29,6 @@ pub trait RunningFeature: Send {
     fn shutdown(self: Box<Self>);
 }
 
-/// Whether the user has a feature installed *and* switched on.
 pub trait FeatureDemand {
     fn is_wanted(&self, feature: Feature) -> bool;
 }

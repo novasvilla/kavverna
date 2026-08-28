@@ -1,40 +1,40 @@
+use crate::awake_state;
+use crate::command::{self, Command};
+use crate::{cup_icon, panel};
 use keep_awake::{Hold, Scope, format_duration};
 use ksni::blocking::{Handle, TrayMethods};
-use ksni::menu::{CheckmarkItem, StandardItem, SubMenu};
+use ksni::menu::{StandardItem, SubMenu};
 use ksni::{MenuItem, ToolTip, Tray};
-use std::sync::mpsc::Sender;
 use std::time::Duration;
 
-pub enum Command {
-    Engage(Hold, Scope),
-    Release,
-}
-
 const DURATIONS: [(&str, u64); 5] = [
-    ("15 minutes", 15 * 60),
-    ("30 minutes", 30 * 60),
-    ("1 hour", 60 * 60),
-    ("2 hours", 2 * 60 * 60),
-    ("4 hours", 4 * 60 * 60),
+    ("15 minutes", 15),
+    ("30 minutes", 30),
+    ("1 hour", 60),
+    ("2 hours", 120),
+    ("4 hours", 240),
 ];
 
+#[derive(Default)]
 pub struct StatusIcon {
     pub awake: bool,
     pub remaining: Option<Duration>,
-    pub allow_display_sleep: bool,
-    pub commands: Sender<Command>,
 }
 
 impl StatusIcon {
-    fn scope(&self) -> Scope {
-        if self.allow_display_sleep { Scope::SystemOnly } else { Scope::SystemAndDisplay }
-    }
-
     fn summary(&self) -> String {
         match (self.awake, self.remaining) {
             (false, _) => "Sleep allowed".into(),
             (true, Some(left)) => format!("Awake for {}", format_duration(left)),
             (true, None) => "Awake until switched off".into(),
+        }
+    }
+
+    fn scope() -> Scope {
+        if awake_state::get().allow_display_sleep {
+            Scope::SystemOnly
+        } else {
+            Scope::SystemAndDisplay
         }
     }
 }
@@ -48,8 +48,8 @@ impl Tray for StatusIcon {
         "Kavverna".into()
     }
 
-    fn icon_name(&self) -> String {
-        if self.awake { "caffeine-cup-full".into() } else { "caffeine-cup-empty".into() }
+    fn icon_pixmap(&self) -> Vec<ksni::Icon> {
+        cup_icon::cup(self.awake)
     }
 
     fn tool_tip(&self) -> ToolTip {
@@ -60,26 +60,20 @@ impl Tray for StatusIcon {
         }
     }
 
-    /// Left click is the fast path: switch off if awake, otherwise hold indefinitely.
     fn activate(&mut self, _x: i32, _y: i32) {
-        let command = if self.awake {
-            Command::Release
-        } else {
-            Command::Engage(Hold::Indefinite, self.scope())
-        };
-        let _ = self.commands.send(command);
+        panel::open();
     }
 
     fn menu(&self) -> Vec<MenuItem<Self>> {
-        let mut timed: Vec<MenuItem<Self>> = DURATIONS
+        let timed = DURATIONS
             .iter()
-            .map(|&(label, seconds)| {
+            .map(|&(label, minutes)| {
                 StandardItem {
                     label: label.into(),
-                    activate: Box::new(move |icon: &mut Self| {
-                        let _ = icon.commands.send(Command::Engage(
-                            Hold::For(Duration::from_secs(seconds)),
-                            icon.scope(),
+                    activate: Box::new(move |_: &mut Self| {
+                        command::send(Command::Engage(
+                            Hold::For(Duration::from_secs(minutes * 60)),
+                            Self::scope(),
                         ));
                     }),
                     ..Default::default()
@@ -88,45 +82,25 @@ impl Tray for StatusIcon {
             })
             .collect();
 
-        timed.push(MenuItem::Separator);
-        timed.push(
-            StandardItem {
-                label: "Until I switch it off".into(),
-                activate: Box::new(|icon: &mut Self| {
-                    let _ = icon
-                        .commands
-                        .send(Command::Engage(Hold::Indefinite, icon.scope()));
-                }),
-                ..Default::default()
-            }
-            .into(),
-        );
-
         vec![
-            StandardItem { label: self.summary(), enabled: false, ..Default::default() }.into(),
-            MenuItem::Separator,
-            SubMenu { label: "Keep awake for".into(), submenu: timed, ..Default::default() }.into(),
-            CheckmarkItem {
-                label: "Let displays sleep".into(),
-                checked: self.allow_display_sleep,
-                activate: Box::new(|icon: &mut Self| {
-                    icon.allow_display_sleep = !icon.allow_display_sleep;
-                    if icon.awake {
-                        let hold = icon
-                            .remaining
-                            .map(Hold::For)
-                            .unwrap_or(Hold::Indefinite);
-                        let _ = icon.commands.send(Command::Engage(hold, icon.scope()));
-                    }
-                }),
+            StandardItem {
+                label: "Open Kavverna".into(),
+                activate: Box::new(|_| panel::open()),
                 ..Default::default()
             }
             .into(),
+            MenuItem::Separator,
+            StandardItem { label: self.summary(), enabled: false, ..Default::default() }.into(),
+            SubMenu { label: "Keep awake for".into(), submenu: timed, ..Default::default() }.into(),
             StandardItem {
-                label: "Allow sleep now".into(),
-                enabled: self.awake,
+                label: if self.awake { "Allow sleep now" } else { "Keep awake" }.into(),
                 activate: Box::new(|icon: &mut Self| {
-                    let _ = icon.commands.send(Command::Release);
+                    let command = if icon.awake {
+                        Command::Release
+                    } else {
+                        Command::Engage(Hold::Indefinite, Self::scope())
+                    };
+                    command::send(command);
                 }),
                 ..Default::default()
             }
@@ -145,15 +119,8 @@ impl Tray for StatusIcon {
 
 /// Fails when no StatusNotifierItem host is running, which on a bare session is expected
 /// rather than fatal.
-pub fn show(commands: Sender<Command>) -> Option<Handle<StatusIcon>> {
-    let icon = StatusIcon {
-        awake: false,
-        remaining: None,
-        allow_display_sleep: true,
-        commands,
-    };
-
-    match icon.spawn() {
+pub fn show() -> Option<Handle<StatusIcon>> {
+    match StatusIcon::default().spawn() {
         Ok(handle) => Some(handle),
         Err(err) => {
             tracing::warn!(%err, "no StatusNotifierItem host, running without a tray icon");

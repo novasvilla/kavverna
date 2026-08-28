@@ -18,7 +18,6 @@ fn logind_reports_kavverna() -> bool {
         .unwrap_or(false)
 }
 
-/// Skips rather than fails without a session bus, so the suite stays runnable headless.
 #[tokio::test]
 async fn the_inhibitor_appears_and_disappears_with_the_hold() {
     let _exclusive = exclusive();

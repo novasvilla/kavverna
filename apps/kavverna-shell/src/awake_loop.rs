@@ -1,4 +1,6 @@
-use crate::tray::{Command, StatusIcon};
+use crate::command::Command;
+use crate::tray::StatusIcon;
+use crate::{awake_state, panel};
 use keep_awake::KeepAwake;
 use ksni::blocking::Handle;
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
@@ -42,12 +44,15 @@ pub fn run(commands: Receiver<Command>, tray: Option<Handle<StatusIcon>>) {
             }
         }
 
-        let awake = keep_awake.is_active();
+        let active = keep_awake.is_active();
         let remaining = keep_awake.remaining();
+
+        awake_state::set_hold(active, remaining);
+        panel::publish_awake(active, remaining);
 
         if let Some(tray) = tray.as_ref() {
             tray.update(move |icon: &mut StatusIcon| {
-                icon.awake = awake;
+                icon.awake = active;
                 icon.remaining = remaining;
             });
         }
