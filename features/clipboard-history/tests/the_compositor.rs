@@ -81,7 +81,7 @@ fn next_copy(events: &Receiver<SelectionEvent>) -> Payload {
                 assert_eq!(selection, Selection::Clipboard);
                 return payload;
             }
-            Ok(SelectionEvent::Emptied(_)) => {}
+            Ok(SelectionEvent::Emptied(_) | SelectionEvent::Changed(_)) => {}
             Err(RecvTimeoutError::Timeout) => panic!("the compositor reported no copy"),
             Err(RecvTimeoutError::Disconnected) => panic!("the watcher thread stopped"),
         }
@@ -210,4 +210,25 @@ fn a_copy_reaches_the_history_and_can_be_put_back() {
         }
     }
     assert!(back.is_some(), "the entry should be on the clipboard again");
+}
+
+/// Plasma puts the content back the moment anything empties the selection. Reading its
+/// re-assertion as a fresh copy restarts the auto clear timer, and the two then fight once a
+/// second until one of them stops.
+#[test]
+fn plasma_putting_the_clipboard_back_is_not_a_new_copy() {
+    let _guard = one_at_a_time();
+    let _restore = RestoredClipboard::save();
+
+    let (_watcher, events) = watching();
+
+    let replaced = detached("wl-copy")
+        .args(["--type", "application/x-kde-onlyReplaceEmpty", "--", "back again"])
+        .status();
+    assert!(matches!(replaced, Ok(code) if code.success()), "wl-copy failed");
+
+    assert!(
+        matches!(events.recv_timeout(Duration::from_millis(800)), Err(RecvTimeoutError::Timeout)),
+        "an offer Plasma re-asserted is not a copy anyone made"
+    );
 }

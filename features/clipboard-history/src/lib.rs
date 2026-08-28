@@ -1,5 +1,6 @@
 //! The clipboard: what was copied, what is kept, and what goes back.
 
+pub mod auto_clear;
 pub mod entry;
 pub mod history;
 pub mod klipper;
@@ -7,6 +8,7 @@ pub mod selection;
 pub mod sensitivity;
 pub mod store;
 
+pub use auto_clear::{AutoClear, Trigger};
 pub use entry::{Entry, Kind, StoredImage};
 pub use history::{Command, Commands, History, Settings, Snapshot, StartError};
 pub use selection::{

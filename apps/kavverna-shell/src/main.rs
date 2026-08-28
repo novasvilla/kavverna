@@ -1,4 +1,5 @@
 mod app_icon;
+mod auto_clear;
 mod awake_loop;
 mod awake_state;
 mod clipboard_state;
@@ -53,6 +54,7 @@ fn main() {
     command::publish(sender);
 
     shortcuts::serve(bus.handle().clone());
+    auto_clear::serve(bus.handle().clone());
 
     let tray = tray::show();
     std::thread::spawn(move || awake_loop::run(requests, tray));

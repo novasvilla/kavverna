@@ -30,8 +30,34 @@ pub fn send(command: Command) {
     }
 }
 
-pub fn wanted() -> bool {
+pub fn keeps_history() -> bool {
     settings::bool_at(settings::CLIPBOARD_ENABLED, settings::CLIPBOARD_ENABLED_DEFAULT)
+}
+
+pub fn clears_on_suspend() -> bool {
+    settings::bool_at(settings::CLEAR_ON_SUSPEND, settings::CLEAR_ON_SUSPEND_DEFAULT)
+}
+
+pub fn clears_on_screen_lock() -> bool {
+    settings::bool_at(settings::CLEAR_ON_SCREEN_LOCK, settings::CLEAR_ON_SCREEN_LOCK_DEFAULT)
+}
+
+/// Auto clear needs the connection as much as the history does, and it has to keep working with
+/// the history switched off. With it off nothing is read: the compositor still reports that a
+/// copy happened, which is all the timer needs.
+pub fn wanted() -> bool {
+    keeps_history()
+        || clears_on_suspend()
+        || clears_on_screen_lock()
+        || clear_after().is_some()
+}
+
+fn clear_after() -> Option<Duration> {
+    let seconds = settings::integer_at(
+        settings::CLEAR_AFTER_SECONDS,
+        settings::CLEAR_AFTER_SECONDS_DEFAULT,
+    );
+    (seconds > 0).then(|| Duration::from_secs(seconds.unsigned_abs()))
 }
 
 /// Starts and stops with the setting, so switching it off really does unbind the device.
@@ -76,7 +102,7 @@ pub fn run(on_change: impl Fn()) {
         };
 
         let current = read_settings();
-        if !same(current, applied) {
+        if current != applied {
             applied = current;
             history.send(Command::Apply(current));
         }
@@ -106,6 +132,8 @@ fn set_commands(commands: Option<Commands>) {
 
 fn read_settings() -> Settings {
     Settings {
+        keep_history: keeps_history(),
+        clear_after: clear_after(),
         limit: u32::try_from(settings::integer_at(
             settings::CLIPBOARD_LIMIT,
             settings::CLIPBOARD_LIMIT_DEFAULT,
@@ -120,12 +148,6 @@ fn read_settings() -> Settings {
             settings::CLIPBOARD_IMAGES_AND_FILES_DEFAULT,
         ),
     }
-}
-
-fn same(left: Settings, right: Settings) -> bool {
-    left.limit == right.limit
-        && left.skip_sensitive == right.skip_sensitive
-        && left.images_and_files == right.images_and_files
 }
 
 /// Content, not settings: a settings backup has no business carrying what was copied.

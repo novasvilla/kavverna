@@ -35,6 +35,9 @@ pub mod qobject {
         #[qproperty(bool, images_and_files)]
         #[qproperty(bool, skip_sensitive)]
         #[qproperty(i32, klipper_waiting)]
+        #[qproperty(i32, clear_after)]
+        #[qproperty(bool, clear_on_suspend)]
+        #[qproperty(bool, clear_on_screen_lock)]
         type ClipboardView = super::ClipboardViewRust;
     }
 
@@ -65,6 +68,12 @@ pub mod qobject {
         fn choose_skip_sensitive(self: Pin<&mut ClipboardView>, on: bool);
         #[qinvokable]
         fn adopt_klipper_history(self: Pin<&mut ClipboardView>);
+        #[qinvokable]
+        fn choose_clear_after(self: Pin<&mut ClipboardView>, seconds: i32);
+        #[qinvokable]
+        fn choose_clear_on_suspend(self: Pin<&mut ClipboardView>, on: bool);
+        #[qinvokable]
+        fn choose_clear_on_screen_lock(self: Pin<&mut ClipboardView>, on: bool);
     }
 }
 
@@ -88,6 +97,9 @@ pub struct ClipboardViewRust {
     images_and_files: bool,
     skip_sensitive: bool,
     klipper_waiting: i32,
+    clear_after: i32,
+    clear_on_suspend: bool,
+    clear_on_screen_lock: bool,
 }
 
 impl qobject::ClipboardView {
@@ -148,6 +160,21 @@ impl qobject::ClipboardView {
         self.as_mut().set_skip_sensitive(on);
     }
 
+    fn choose_clear_after(mut self: Pin<&mut Self>, seconds: i32) {
+        settings::put_integer(settings::CLEAR_AFTER_SECONDS, seconds as i64);
+        self.as_mut().set_clear_after(seconds);
+    }
+
+    fn choose_clear_on_suspend(mut self: Pin<&mut Self>, on: bool) {
+        settings::put_bool(settings::CLEAR_ON_SUSPEND, on);
+        self.as_mut().set_clear_on_suspend(on);
+    }
+
+    fn choose_clear_on_screen_lock(mut self: Pin<&mut Self>, on: bool) {
+        settings::put_bool(settings::CLEAR_ON_SCREEN_LOCK, on);
+        self.as_mut().set_clear_on_screen_lock(on);
+    }
+
     fn adopt_klipper_history(mut self: Pin<&mut Self>) {
         clipboard_state::send(Command::AdoptKlipperHistory);
         self.as_mut().set_klipper_waiting(0);
@@ -195,6 +222,14 @@ impl qobject::ClipboardView {
             settings::CLIPBOARD_SKIP_SENSITIVE,
             settings::CLIPBOARD_SKIP_SENSITIVE_DEFAULT,
         ));
+        self.as_mut().set_clear_after(
+            settings::integer_at(
+                settings::CLEAR_AFTER_SECONDS,
+                settings::CLEAR_AFTER_SECONDS_DEFAULT,
+            ) as i32,
+        );
+        self.as_mut().set_clear_on_suspend(clipboard_state::clears_on_suspend());
+        self.as_mut().set_clear_on_screen_lock(clipboard_state::clears_on_screen_lock());
     }
 }
 

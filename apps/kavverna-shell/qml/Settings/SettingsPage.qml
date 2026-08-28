@@ -158,6 +158,50 @@ ColumnLayout {
                 onPicked: (value) => page.clipboard.choose_limit(value)
             }
 
+            ChoiceRow {
+                theme: page.theme
+                title: "Empty the clipboard after"
+                detail: "Clears what is still pasteable. Saved entries are left alone, and this works with the history switched off."
+                current: page.clipboard.clear_after
+                choices: [
+                    { label: "Never", value: 0 },
+                    { label: "20s", value: 20 },
+                    { label: "1m", value: 60 },
+                    { label: "5m", value: 300 },
+                    { label: "30m", value: 1800 }
+                ]
+                onPicked: (value) => page.clipboard.choose_clear_after(value)
+            }
+
+            SettingRow {
+                theme: page.theme
+                title: "Empty it when the machine suspends"
+                detail: "Announced by logind just before going to sleep."
+                on: page.clipboard.clear_on_suspend
+                onToggled: (value) => page.clipboard.choose_clear_on_suspend(value)
+            }
+
+            SettingRow {
+                theme: page.theme
+                title: "Empty it when the screen locks"
+                detail: "There is no signal for the displays turning off, so that one is not offered rather than approximated."
+                on: page.clipboard.clear_on_screen_lock
+                onToggled: (value) => page.clipboard.choose_clear_on_screen_lock(value)
+            }
+
+            Label {
+                Layout.fillWidth: true
+                visible: page.clipboard.clear_after > 0
+                         || page.clipboard.clear_on_suspend
+                         || page.clipboard.clear_on_screen_lock
+                text: "Plasma's own clipboard puts the content straight back whenever anything "
+                      + "empties it. Until Prevent empty clipboard is turned off in System "
+                      + "Settings under Clipboard, none of this has any visible effect."
+                font.pixelSize: 11
+                color: page.theme.secondaryText
+                wrapMode: Text.WordWrap
+            }
+
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 6

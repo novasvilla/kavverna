@@ -5,11 +5,13 @@
 
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
-use std::sync::mpsc::{Receiver, Sender, SyncSender, channel, sync_channel};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, SyncSender, channel, sync_channel};
 use std::thread::JoinHandle;
 
+use crate::auto_clear::AutoClear;
 use crate::entry::{self, Entry, Kind, MAX_FILES, MAX_IMAGE_BYTES, StoredImage};
 use crate::selection::{
     CapturePolicy, Payload, Selection, SelectionEvent, SelectionWatcher, WatchError,
@@ -17,16 +19,26 @@ use crate::selection::{
 use crate::sensitivity::looks_sensitive;
 use crate::store::{Captured, Store, StoreError, Summary};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
+    /// With this off nothing is read at all: the compositor still says a copy happened, which
+    /// is all auto clear needs, but the content never reaches this process.
+    pub keep_history: bool,
     pub limit: u32,
     pub skip_sensitive: bool,
     pub images_and_files: bool,
+    pub clear_after: Option<Duration>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { limit: entry::DEFAULT_LIMIT, skip_sensitive: true, images_and_files: true }
+        Self {
+            keep_history: true,
+            limit: entry::DEFAULT_LIMIT,
+            skip_sensitive: true,
+            images_and_files: true,
+            clear_after: None,
+        }
     }
 }
 
@@ -39,6 +51,7 @@ pub enum Command {
     Rewrite { id: i64, text: String },
     Forget(i64),
     ClearUnpinned,
+    ClearClipboard,
     AdoptKlipperHistory,
     Apply(Settings),
     Stop,
@@ -141,7 +154,7 @@ fn run(
     };
 
     let policy = Arc::new(CapturePolicy::default());
-    policy.images_and_files.store(settings.images_and_files, Ordering::Relaxed);
+    apply_policy(&policy, settings);
 
     let report = events_out.clone();
     let watcher = match SelectionWatcher::start(
@@ -160,24 +173,68 @@ fn run(
 
     let mut settings = settings;
     let mut query = String::new();
+    let mut clearing = AutoClear::default();
+    clearing.set_delay(settings.clear_after);
     publish(&store, &query, &snapshots);
 
-    while let Ok(event) = events_in.recv() {
-        let changed = match event {
-            Event::Copied(SelectionEvent::Copied { selection: Selection::Clipboard, payload }) => {
+    loop {
+        let changed = match events_in.recv_timeout(TICK) {
+            Ok(Event::Copied(SelectionEvent::Copied {
+                selection: Selection::Clipboard,
+                payload,
+            })) => {
+                clearing.noticed_copy(Instant::now());
                 save(&mut store, payload, settings)
             }
-            // Emptying the clipboard is not a reason to forget what was copied before it.
-            Event::Copied(_) => false,
-            Event::Asked(Command::Stop) => break,
-            Event::Asked(command) => act(&mut store, &watcher, &mut settings, &mut query, command),
+            Ok(Event::Copied(SelectionEvent::Changed(Selection::Clipboard))) => {
+                clearing.noticed_copy(Instant::now());
+                false
+            }
+            // Emptying the clipboard is not a reason to forget what was copied before it, and
+            // there is nothing left to clear.
+            Ok(Event::Copied(SelectionEvent::Emptied(_))) => {
+                clearing.forget();
+                false
+            }
+            Ok(Event::Copied(_)) => false,
+            Ok(Event::Asked(Command::Stop)) => break,
+            Ok(Event::Asked(Command::ClearClipboard)) => {
+                empty(&watcher, &mut clearing);
+                false
+            }
+            Ok(Event::Asked(command)) => {
+                let changed = act(&mut store, &watcher, &mut settings, &mut query, command);
+                clearing.set_delay(settings.clear_after);
+                apply_policy(&policy, settings);
+                changed
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                if clearing.due(Instant::now()) {
+                    empty(&watcher, &mut clearing);
+                }
+                false
+            }
+            Err(RecvTimeoutError::Disconnected) => break,
         };
 
         if changed {
             publish(&store, &query, &snapshots);
         }
-        policy.images_and_files.store(settings.images_and_files, Ordering::Relaxed);
     }
+}
+
+/// Short enough that a five second delay is not noticeably late, and idle the rest of the time.
+const TICK: Duration = Duration::from_secs(1);
+
+fn apply_policy(policy: &CapturePolicy, settings: Settings) {
+    policy.read_content.store(settings.keep_history, Ordering::Relaxed);
+    policy.images_and_files.store(settings.images_and_files, Ordering::Relaxed);
+}
+
+fn empty(watcher: &SelectionWatcher, clearing: &mut AutoClear) {
+    watcher.clear(Selection::Clipboard);
+    clearing.forget();
+    tracing::info!("the clipboard was emptied");
 }
 
 fn act(
@@ -199,6 +256,7 @@ fn act(
         Command::Rewrite { id, text } => store.rewrite(id, &text).map(|_| ()),
         Command::Forget(id) => store.forget(id),
         Command::ClearUnpinned => store.clear_unpinned(),
+        Command::ClearClipboard => return false,
         Command::AdoptKlipperHistory => crate::klipper::import_into(store).map(|_| ()),
         Command::Apply(wanted) => {
             *settings = wanted;

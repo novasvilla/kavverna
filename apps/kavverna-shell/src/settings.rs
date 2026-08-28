@@ -14,6 +14,9 @@ pub const CLIPBOARD_ENABLED: &str = "clipboard-history.enabled";
 pub const CLIPBOARD_LIMIT: &str = "clipboard-history.limit";
 pub const CLIPBOARD_IMAGES_AND_FILES: &str = "clipboard-history.images-and-files";
 pub const CLIPBOARD_SKIP_SENSITIVE: &str = "clipboard-history.skip-sensitive";
+pub const CLEAR_AFTER_SECONDS: &str = "clipboard-auto-clear.after-seconds";
+pub const CLEAR_ON_SUSPEND: &str = "clipboard-auto-clear.on-suspend";
+pub const CLEAR_ON_SCREEN_LOCK: &str = "clipboard-auto-clear.on-screen-lock";
 
 pub const ALLOW_DISPLAY_SLEEP_DEFAULT: bool = true;
 pub const RESTORE_ON_START_DEFAULT: bool = false;
@@ -32,6 +35,12 @@ pub const CLIPBOARD_ENABLED_DEFAULT: bool = false;
 pub const CLIPBOARD_LIMIT_DEFAULT: i64 = 50;
 pub const CLIPBOARD_IMAGES_AND_FILES_DEFAULT: bool = true;
 pub const CLIPBOARD_SKIP_SENSITIVE_DEFAULT: bool = true;
+
+/// Zero means never. One setting rather than a switch and a number, because a delay of nothing
+/// and a delay switched off are the same thing to whoever is reading the page.
+pub const CLEAR_AFTER_SECONDS_DEFAULT: i64 = 0;
+pub const CLEAR_ON_SUSPEND_DEFAULT: bool = false;
+pub const CLEAR_ON_SCREEN_LOCK_DEFAULT: bool = false;
 
 static STORE: Mutex<Option<Preferences>> = Mutex::new(None);
 

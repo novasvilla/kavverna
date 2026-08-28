@@ -38,6 +38,11 @@ pub const CONCEALED_HINT: &str = "x-kde-passwordManagerHint";
 /// taking the selection destroys the previous owner's offer and looks like a fresh copy.
 const OWN_MARKER: &str = "application/x-kavverna-internal";
 
+/// Plasma's own clipboard puts the content straight back when anything empties the selection,
+/// and marks the offer it re-asserts with this. Reading it as a fresh copy restarts the auto
+/// clear timer, so the two fight each other once a second until one gives up.
+const PLASMA_REPLACED_EMPTY: &str = "application/x-kde-onlyReplaceEmpty";
+
 const URI_LIST: &str = "text/uri-list";
 const PNG: &str = "image/png";
 const UTF8_TEXT: &str = "text/plain;charset=utf-8";
@@ -70,12 +75,16 @@ pub enum Payload {
 #[derive(Debug)]
 pub enum SelectionEvent {
     Copied { selection: Selection, payload: Payload },
+    /// Something was copied and deliberately not read, because nothing is keeping it. Auto
+    /// clear needs to know a copy happened; it never needs to know what it was.
+    Changed(Selection),
     Emptied(Selection),
 }
 
 /// Read at every change, so a setting takes effect without restarting the watcher.
 #[derive(Debug)]
 pub struct CapturePolicy {
+    pub read_content: AtomicBool,
     pub images_and_files: AtomicBool,
     pub primary_selection: AtomicBool,
 }
@@ -83,6 +92,7 @@ pub struct CapturePolicy {
 impl Default for CapturePolicy {
     fn default() -> Self {
         Self {
+            read_content: AtomicBool::new(true),
             images_and_files: AtomicBool::new(true),
             primary_selection: AtomicBool::new(false),
         }
@@ -351,7 +361,7 @@ impl Watcher {
 
         let types = self.offered.remove(&offer.id().protocol_id()).unwrap_or_default();
 
-        if types.iter().any(|mime| mime == OWN_MARKER) {
+        if types.iter().any(|mime| mime == OWN_MARKER || mime == PLASMA_REPLACED_EMPTY) {
             offer.destroy();
             return;
         }
