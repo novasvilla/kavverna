@@ -1,7 +1,7 @@
 use crate::command::Command;
 use crate::tray::{StatusIcon, TrayIcon};
 use crate::{awake_state, jiggle_state, panel, settings};
-use keep_awake::{Activity, Hold, KeepAwake, Keystroke, MouseJiggle, Scope};
+use keep_awake::{Activity, Hold, KeepAwake, Keystroke, MouseJiggle};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 
@@ -32,7 +32,7 @@ pub fn run(commands: Receiver<Command>, tray: TrayIcon) {
     if settings::bool_at(settings::RESTORE_ON_START, settings::RESTORE_ON_START_DEFAULT) {
         match remembered_hold(now_in_seconds()) {
             Some(hold) => {
-                if let Err(err) = runtime.block_on(keep_awake.engage(hold, scope())) {
+                if let Err(err) = runtime.block_on(keep_awake.engage(hold, settings::scope())) {
                     tracing::error!(%err, "could not restore keep awake on start");
                 } else {
                     tracing::info!(?hold, "keep awake restored on start");
@@ -186,14 +186,6 @@ mod tests {
         let record = record_for(true, Some(Duration::from_secs(1800)), NOW);
 
         assert_eq!(hold_from_record(record, NOW + 7200), None);
-    }
-}
-
-fn scope() -> Scope {
-    if settings::bool_at(settings::ALLOW_DISPLAY_SLEEP, settings::ALLOW_DISPLAY_SLEEP_DEFAULT) {
-        Scope::SystemOnly
-    } else {
-        Scope::SystemAndDisplay
     }
 }
 

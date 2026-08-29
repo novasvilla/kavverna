@@ -1,5 +1,5 @@
 use feature_catalog::Feature;
-use keep_awake::Hold;
+use keep_awake::{Hold, Scope};
 use preferences::Preferences;
 use std::sync::{Mutex, MutexGuard};
 
@@ -90,6 +90,17 @@ pub fn default_hold() -> Hold {
     match integer_at(DEFAULT_MINUTES, DEFAULT_MINUTES_DEFAULT) {
         0 => Hold::Indefinite,
         minutes => Hold::For(std::time::Duration::from_secs(minutes.unsigned_abs() * 60)),
+    }
+}
+
+/// The setting resolved into how much a hold covers. Everything that starts one reads it from
+/// here rather than from a copy of its own: the panel used to answer from a property it held,
+/// which is a second source of the same truth waiting to disagree.
+pub fn scope() -> Scope {
+    if bool_at(ALLOW_DISPLAY_SLEEP, ALLOW_DISPLAY_SLEEP_DEFAULT) {
+        Scope::SystemOnly
+    } else {
+        Scope::SystemAndDisplay
     }
 }
 

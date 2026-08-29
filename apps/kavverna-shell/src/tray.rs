@@ -1,8 +1,8 @@
 use crate::command::{self, Command};
 use crate::settings;
-use crate::{app_icon, mixer_state, panel};
+use crate::{app_icon, awake_state, mixer_state, panel};
 use feature_catalog::Feature;
-use keep_awake::{Hold, Scope, format_compact, format_duration};
+use keep_awake::{Hold, format_compact, format_duration};
 use ksni::blocking::{Handle, TrayMethods};
 use ksni::menu::{StandardItem, SubMenu};
 use ksni::{MenuItem, ToolTip, Tray};
@@ -25,16 +25,6 @@ pub struct StatusIcon {
     pub remaining: Option<Duration>,
 }
 
-/// Read from settings rather than held in the icon, so the tray, the panel and the remote
-/// interface cannot disagree about it.
-pub fn configured_scope() -> Scope {
-    if settings::bool_at(settings::ALLOW_DISPLAY_SLEEP, settings::ALLOW_DISPLAY_SLEEP_DEFAULT) {
-        Scope::SystemOnly
-    } else {
-        Scope::SystemAndDisplay
-    }
-}
-
 impl StatusIcon {
     fn summary(&self) -> String {
         match (self.awake, self.remaining) {
@@ -55,7 +45,7 @@ impl StatusIcon {
                     activate: Box::new(move |_: &mut Self| {
                         command::send(Command::Engage(
                             Hold::For(Duration::from_secs(minutes * 60)),
-                            configured_scope(),
+                            settings::scope(),
                         ));
                     }),
                     ..Default::default()
@@ -90,14 +80,7 @@ impl StatusIcon {
             .into(),
             StandardItem {
                 label: if self.awake { "Allow sleep now" } else { "Keep awake" }.into(),
-                activate: Box::new(|icon: &mut Self| {
-                    let command = if icon.awake {
-                        Command::Release
-                    } else {
-                        Command::Engage(settings::default_hold(), configured_scope())
-                    };
-                    command::send(command);
-                }),
+                activate: Box::new(|_: &mut Self| awake_state::toggle()),
                 ..Default::default()
             }
             .into(),
@@ -180,12 +163,7 @@ impl Tray for StatusIcon {
             return;
         }
 
-        let command = if self.awake {
-            Command::Release
-        } else {
-            Command::Engage(Hold::Indefinite, configured_scope())
-        };
-        command::send(command);
+        awake_state::toggle();
     }
 
     fn activate(&mut self, _x: i32, _y: i32) {

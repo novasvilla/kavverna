@@ -35,13 +35,12 @@ fn main() {
         _ => {}
     }
 
+    // Everything of ours at info, with the libraries turned down, rather than naming our own
+    // crates one by one. The list used to be by name and had already rotted: `kde_bridge` was
+    // never on it, so global shortcuts registered and failed in silence.
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(
-            |_| {
-                tracing_subscriber::EnvFilter::new(
-                    "kavverna_shell=info,keep_awake=info,clipboard_history=info",
-                )
-            },
+            |_| tracing_subscriber::EnvFilter::new("info,zbus=warn,tracing=warn,ksni=warn"),
         ))
         .init();
 
@@ -78,9 +77,10 @@ fn main() {
     let clipboard = [Feature::ClipboardHistory, Feature::ClipboardAutoClear, Feature::CleanUrl];
     let sound = [Feature::VolumeMixer, Feature::OutputSwitcher, Feature::MicrophoneTools];
 
-    if settings::is_installed(Feature::ClipboardHistory) {
-        shortcuts::serve(bus.handle().clone());
-    }
+    // Not gated on any one utility, unlike everything below it: showing the panel is a shortcut
+    // in its own right, and the rest are filtered inside against what is installed.
+    shortcuts::serve(bus.handle().clone());
+
     if settings::is_installed(Feature::ClipboardAutoClear) {
         auto_clear::serve(bus.handle().clone());
     }

@@ -39,7 +39,7 @@ impl Shell {
         } else {
             Hold::For(Duration::from_secs(u64::from(minutes) * 60))
         };
-        command::send(Command::Engage(hold, crate::tray::configured_scope()));
+        command::send(Command::Engage(hold, crate::settings::scope()));
     }
 
     fn add_minutes(&self, minutes: u32) {

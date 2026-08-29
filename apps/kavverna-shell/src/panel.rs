@@ -2,7 +2,7 @@ use crate::command::{self, Command};
 use crate::{launch_at_login, settings};
 use cxx_qt::Threading;
 use cxx_qt_lib::QString;
-use keep_awake::{Hold, Scope, format_duration};
+use keep_awake::{Hold, format_duration};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -221,10 +221,6 @@ impl qobject::KavvernaPanel {
         }
     }
 
-    fn scope(&self) -> Scope {
-        if *self.allow_display_sleep() { Scope::SystemOnly } else { Scope::SystemAndDisplay }
-    }
-
     fn dismiss(mut self: Pin<&mut Self>) {
         self.as_mut().set_panel_open(false);
         tracing::info!("panel closed");
@@ -235,16 +231,12 @@ impl qobject::KavvernaPanel {
     }
 
     fn toggle_awake(self: Pin<&mut Self>) {
-        if *self.awake() {
-            command::send(Command::Release);
-        } else {
-            command::send(Command::Engage(settings::default_hold(), self.scope()));
-        }
+        crate::awake_state::toggle();
     }
 
     fn keep_awake_minutes(self: Pin<&mut Self>, minutes: i32) {
         let seconds = u64::try_from(minutes).unwrap_or(0).saturating_mul(60);
-        command::send(Command::Engage(Hold::For(Duration::from_secs(seconds)), self.scope()));
+        command::send(Command::Engage(Hold::For(Duration::from_secs(seconds)), settings::scope()));
     }
 
     fn choose_display_sleep(mut self: Pin<&mut Self>, allow: bool) {
@@ -253,7 +245,7 @@ impl qobject::KavvernaPanel {
 
         if *self.awake() {
             let hold = crate::awake_state::get().remaining.map_or(Hold::Indefinite, Hold::For);
-            command::send(Command::Engage(hold, self.scope()));
+            command::send(Command::Engage(hold, settings::scope()));
         }
     }
 
