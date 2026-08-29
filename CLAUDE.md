@@ -6,7 +6,7 @@ Linux. Fresh implementation, not a port. See CREDITS.md.
 
 ## Target
 
-CachyOS (Arch), KDE Plasma 6.7, KWin on Wayland, Qt 6.11, PipeWire, Rust 1.85+ on edition
+CachyOS (Arch), KDE Plasma 6.7, KWin on Wayland, Qt 6, Kirigami, PipeWire, Rust 1.85+ on edition
 2024. Desktop machine with no battery, so battery features are out of scope. Two GPUs: an
 NVIDIA discrete card read through NVML and an AMD integrated one read through sysfs. They
 are never summed into one figure.
@@ -16,8 +16,9 @@ are never summed into one figure.
 Crate boundaries enforce what would otherwise be convention.
 
 ```
-domain/feature-catalog    Feature enum and descriptors, including each one's settings keys.
-                          Depends on no feature crate.
+domain/feature-catalog    Feature enum and descriptors: title, summary, group, icon, energy,
+                          readiness, and the settings keys. Read by the features page and by
+                          `settings.rs`. Depends on no feature crate.
 domain/preferences        Settings store: JSON, atomic writes, 0700 dirs and 0600 files.
 desktop/kde-bridge        zbus proxies: KGlobalAccel, logind, ScreenSaver.
 features/*                One crate per feature. No Qt, no display needed to test.
@@ -35,16 +36,22 @@ Two rules follow from this and must hold:
 ### How a feature runs
 
 Each one is a thread started from `main`, owning its work and publishing snapshots the shell
-pushes into QML. `clipboard_state.rs` is the pattern worth copying: it starts and stops with
-its setting, so switching a feature off really does close what it had open rather than leaving
-it listening quietly.
+pushes into QML. `clipboard_state.rs` is the shape to aim for: it starts and stops with its
+setting, so switching a feature off really does close what it had open. The mixer and the
+sampler do not yet, and that is a gap rather than a choice.
+
+**Availability sits above the enable keys.** `settings::is_installed` decides whether a feature
+exists at all, and `main` never spawns a thread for one that is off. Removing a feature never
+writes to its enable keys, so putting it back restores what it was configured to do. Anything
+whose `Readiness` is `Planned` has no code behind it, can never be installed, and is listed only
+so the catalogue stays honest about where the app is going.
 
 A feature's enable key is named once, in the catalogue, and `settings.rs` reads it from there.
 Writing it out a second time is how the switch and the thing it switches drift apart.
 
-There was a `feature-runtime` crate with a reconciling registry and an availability layer above
-the enable keys, taken from the reference application. Nothing ever used it, so it is gone. It
-is in the history if the two-layer model turns out to be wanted.
+There was a `feature-runtime` crate with a reconciling registry, taken from the reference
+application. Nothing ever used it, so it is gone; the two-layer model it carried now lives in
+`settings.rs` and the features page, which is the smaller half that was actually wanted.
 
 ## Conventions
 
@@ -59,7 +66,8 @@ narrate code that already reads clearly, do not restate signatures, do not leave
 notes or changelog entries in comments.
 
 **Simplicity.** Build what the current phase needs. No speculative config knobs or plugin
-seams. Delete dead code rather than keeping it around.
+seams. Delete dead code rather than keeping it around. A comment describing behaviour that was
+removed is worse than no comment, because the next reader believes it.
 
 **Commits.** No AI attribution of any kind. No `Co-Authored-By` trailer, no generated-with
 footer. Write the message as the author.
@@ -70,8 +78,20 @@ aspires to.
 
 ## Testing and release
 
-`cargo test --workspace` must pass, and the `domain/` and `features/` crates must pass with
-no display available.
+`cargo test --workspace --exclude kavverna-shell` must pass, which is what CI runs. Anything
+needing a live compositor, a live session bus or real sensors carries `#[ignore]` and says what
+it needs, so plain `--workspace` picks up everything else. Run the rest with
+`-- --include-ignored` on a desktop, and stop Kavverna first or the compositor tests write their
+own copies into the real history.
+
+**Build with `RUSTFLAGS="-D warnings"` before pushing.** CI sets it, the shell crate is not
+linted by clippy there, and `cargo build` is the only thing standing between a dead-code warning
+and a red main. A warning that is a yellow line locally is a failure there.
+
+A discovery function that scans a system directory takes the root as a parameter, with a thin
+wrapper passing the real one. `desktop_entry::build` and `Thermometer::discover_in` are the
+shape. Fusing the path constant to the walk is what put a test on the machine's own hardware and
+turned main red.
 
 Tests are not enough on their own. A feature is done when it has been run in the real
 desktop and checked by hand: the mixer against two apps playing at once, the monitor against
@@ -173,9 +193,17 @@ finds no interface attached.
 
 The target is Linux with Plasma, and a design borrowed from elsewhere brings its platform with
 it. `font.pixelSize` is an integer here, and a fractional size copied from a macOS layout cost a
-whole session's debugging for one line. For anything that has an icon, use `icon.name` from the
-desktop theme rather than a character, so it matches Breeze and cannot land on a glyph the font
-does not carry.
+whole session's debugging for one line. For anything that has an icon, draw it with
+`Kirigami.Icon` from the desktop theme rather than a character, so it matches Breeze and cannot
+land on a glyph the font does not carry.
+
+**Every colour and every repeated dimension comes from `Theme.qml`.** It asks the desktop one
+question, light or dark, and answers with Kavverna's own palette either way. Nothing writes a
+colour at its use site. The stock Switch, CheckBox and Slider take the desktop's accent, so
+`Toggle`, `Tick` and `Level` exist to wear the panel's instead; `PillButton` and `IconButton`
+are the other two shared controls. Contrast was measured with every colour flattened onto what
+sits behind it, since nearly all of them carry alpha and a translucent colour compared against
+nothing is not what anybody sees.
 
 Running the test suite while Kavverna is running writes the tests' own copies into the real
 clipboard history. Stop the app first, or clear the history afterwards.
