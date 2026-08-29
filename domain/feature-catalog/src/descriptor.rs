@@ -78,7 +78,7 @@ impl Feature {
             },
             Self::OutputSwitcher => Descriptor {
                 title: "Output switcher",
-                summary: "Cycle chosen outputs from a shortcut and duck on headphone loss.",
+                summary: "Step through the outputs you choose, from a shortcut or the tray.",
                 group: Group::Sound,
                 icon: "audio-headphones",
                 energy: EnergyProfile::Idle,

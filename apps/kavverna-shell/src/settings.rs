@@ -26,6 +26,11 @@ pub const CLEAR_AFTER_SECONDS: &str = "clipboard-auto-clear.after-seconds";
 pub const CLEAR_ON_SUSPEND: &str = "clipboard-auto-clear.on-suspend";
 pub const CLEAR_ON_SCREEN_LOCK: &str = "clipboard-auto-clear.on-screen-lock";
 pub const CLEAN_LINKS: &str = enable_key(Feature::CleanUrl);
+/// `node.name` of the input to come back to, which is what survives a restart. Empty for none.
+pub const PREFERRED_INPUT: &str = "microphone-tools.preferred-input";
+/// The outputs the switcher moves between. Absent means every output, which is what somebody
+/// who has never opened this expects.
+pub const OUTPUT_CYCLE: &str = "output-switcher.cycle";
 pub const APPEARANCE: &str = "appearance";
 pub const HOLD_UNTIL: &str = "keep-awake.hold-until";
 
@@ -134,6 +139,30 @@ pub fn put_integer(key: &str, value: i64) {
     let mut guard = store();
     if let Some(prefs) = guard.as_mut() {
         prefs.set_integer(key, value);
+        persist(prefs);
+    }
+}
+
+pub fn text_at(key: &str, fallback: &str) -> String {
+    store().as_ref().map_or_else(|| fallback.to_owned(), |prefs| prefs.text(key, fallback))
+}
+
+pub fn put_text(key: &str, value: &str) {
+    let mut guard = store();
+    if let Some(prefs) = guard.as_mut() {
+        prefs.set_text(key, value);
+        persist(prefs);
+    }
+}
+
+pub fn texts_at(key: &str) -> Option<Vec<String>> {
+    store().as_ref().and_then(|prefs| prefs.texts(key))
+}
+
+pub fn put_texts(key: &str, values: &[String]) {
+    let mut guard = store();
+    if let Some(prefs) = guard.as_mut() {
+        prefs.set_texts(key, values);
         persist(prefs);
     }
 }

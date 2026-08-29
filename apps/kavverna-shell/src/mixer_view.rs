@@ -1,4 +1,4 @@
-use crate::mixer_state;
+use crate::{mixer_state, settings};
 use cxx_qt::Threading;
 use cxx_qt_lib::{QList, QString, QStringList};
 use sound_mixer::{MixerCommand, MixerSnapshot, Volume};
@@ -29,11 +29,14 @@ pub mod qobject {
         #[qproperty(QList_i32, output_ids)]
         #[qproperty(QList_i32, output_volumes)]
         #[qproperty(QList_bool, output_muted)]
+        #[qproperty(QList_bool, output_in_cycle)]
         #[qproperty(QString, default_output)]
         #[qproperty(i32, default_output_id)]
         #[qproperty(QStringList, input_names)]
         #[qproperty(QList_i32, input_ids)]
+        #[qproperty(QList_bool, input_preferred)]
         #[qproperty(QString, default_input)]
+        #[qproperty(i32, default_input_id)]
         #[qproperty(bool, inputs_muted)]
         type MixerView = super::MixerViewRust;
     }
@@ -57,6 +60,10 @@ pub mod qobject {
         fn make_default_output(self: Pin<&mut MixerView>, node_id: i32);
         #[qinvokable]
         fn make_default_input(self: Pin<&mut MixerView>, node_id: i32);
+        #[qinvokable]
+        fn choose_output_in_cycle(self: Pin<&mut MixerView>, node_id: i32, included: bool);
+        #[qinvokable]
+        fn choose_preferred_input(self: Pin<&mut MixerView>, node_id: i32, preferred: bool);
     }
 }
 
@@ -76,11 +83,14 @@ pub struct MixerViewRust {
     output_ids: QList<i32>,
     output_volumes: QList<i32>,
     output_muted: QList<bool>,
+    output_in_cycle: QList<bool>,
     default_output: QString,
     default_output_id: i32,
     input_names: QStringList,
     input_ids: QList<i32>,
+    input_preferred: QList<bool>,
     default_input: QString,
+    default_input_id: i32,
     inputs_muted: bool,
 }
 
@@ -131,6 +141,36 @@ impl qobject::MixerView {
         }
     }
 
+    fn choose_output_in_cycle(mut self: Pin<&mut Self>, node_id: i32, included: bool) {
+        let Some(name) = device_name(node_id, true) else {
+            return;
+        };
+
+        let mut cycle =
+            settings::texts_at(settings::OUTPUT_CYCLE).unwrap_or_else(|| every_device_name(true));
+        cycle.retain(|chosen| *chosen != name);
+        if included {
+            cycle.push(name);
+        }
+
+        settings::put_texts(settings::OUTPUT_CYCLE, &cycle);
+        self.as_mut().apply(mixer_state::get());
+    }
+
+    /// One preferred input at a time, so choosing another replaces it rather than growing a
+    /// list nothing knows how to pick from.
+    fn choose_preferred_input(mut self: Pin<&mut Self>, node_id: i32, preferred: bool) {
+        let Some(name) = device_name(node_id, false) else {
+            return;
+        };
+
+        settings::put_text(settings::PREFERRED_INPUT, if preferred { &name } else { "" });
+        if preferred {
+            mixer_state::send(MixerCommand::MakeDefaultInput(name));
+        }
+        self.as_mut().apply(mixer_state::get());
+    }
+
     fn apply(mut self: Pin<&mut Self>, snapshot: MixerSnapshot) {
         let mut names = QStringList::default();
         let mut icons = QStringList::default();
@@ -161,17 +201,24 @@ impl qobject::MixerView {
         let mut volumes = QList::<i32>::default();
         let mut muted = QList::<bool>::default();
 
+        // Absent means every output is in the cycle, which is what somebody who has never opened
+        // this expects, and is why it is not stored as a list of all of them on first run.
+        let chosen = settings::texts_at(settings::OUTPUT_CYCLE);
+        let mut in_cycle = QList::<bool>::default();
+
         for device in &snapshot.outputs {
             names.append(QString::from(&device.description));
             ids.append(device.node_id as i32);
             volumes.append(device.volume.percent().round() as i32);
             muted.append(device.muted);
+            in_cycle.append(chosen.as_ref().is_none_or(|chosen| chosen.contains(&device.name)));
         }
 
         self.as_mut().set_output_names(names);
         self.as_mut().set_output_ids(ids);
         self.as_mut().set_output_volumes(volumes);
         self.as_mut().set_output_muted(muted);
+        self.as_mut().set_output_in_cycle(in_cycle);
 
         let default_output = snapshot.default_output();
         self.as_mut().set_default_output(QString::from(
@@ -180,18 +227,25 @@ impl qobject::MixerView {
         self.as_mut()
             .set_default_output_id(default_output.map_or(-1, |device| device.node_id as i32));
 
+        let preferred = settings::text_at(settings::PREFERRED_INPUT, "");
         let mut names = QStringList::default();
         let mut ids = QList::<i32>::default();
+        let mut pinned = QList::<bool>::default();
         for device in &snapshot.inputs {
             names.append(QString::from(&device.description));
             ids.append(device.node_id as i32);
+            pinned.append(device.name == preferred);
         }
 
+        let default_input = snapshot.default_input();
         self.as_mut().set_input_names(names);
         self.as_mut().set_input_ids(ids);
+        self.as_mut().set_input_preferred(pinned);
         self.as_mut().set_default_input(QString::from(
-            snapshot.default_input().map_or("No input", |device| device.description.as_str()),
+            default_input.map_or("No input", |device| device.description.as_str()),
         ));
+        self.as_mut()
+            .set_default_input_id(default_input.map_or(-1, |device| device.node_id as i32));
         self.as_mut().set_inputs_muted(snapshot.every_input_muted());
         self.as_mut().set_available(mixer_state::is_running());
     }
@@ -210,6 +264,12 @@ fn device_name(node_id: i32, output: bool) -> Option<String> {
     let snapshot = mixer_state::get();
     let devices = if output { snapshot.outputs } else { snapshot.inputs };
     devices.into_iter().find(|device| device.node_id as i32 == node_id).map(|device| device.name)
+}
+
+fn every_device_name(output: bool) -> Vec<String> {
+    let snapshot = mixer_state::get();
+    let devices = if output { snapshot.outputs } else { snapshot.inputs };
+    devices.into_iter().map(|device| device.name).collect()
 }
 
 fn send_volume(node_id: i32, percent: i32) {

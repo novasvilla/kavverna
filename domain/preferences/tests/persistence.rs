@@ -18,12 +18,47 @@ fn values_survive_a_reload() {
 }
 
 #[test]
+fn text_and_lists_of_it_survive_a_reload() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("kavverna").join("settings.json");
+
+    let mut prefs = Preferences::load_from(&path);
+    prefs.set_text("microphone-tools.preferred-input", "alsa_input.usb-headset");
+    prefs.set_texts("output-switcher.cycle", &["analog".into(), "headset".into()]);
+    prefs.save().expect("save");
+
+    let reloaded = Preferences::load_from(&path);
+
+    assert_eq!(reloaded.text("microphone-tools.preferred-input", ""), "alsa_input.usb-headset");
+    assert_eq!(
+        reloaded.texts("output-switcher.cycle"),
+        Some(vec!["analog".into(), "headset".into()])
+    );
+}
+
+/// A set nobody has chosen from yet means every device; one somebody emptied means none. The
+/// two cannot be the same answer or unticking the last device would silently restore all of
+/// them.
+#[test]
+fn a_list_never_written_is_not_a_list_left_empty() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("settings.json");
+
+    let mut prefs = Preferences::load_from(&path);
+    assert_eq!(prefs.texts("output-switcher.cycle"), None);
+
+    prefs.set_texts("output-switcher.cycle", &[]);
+    assert_eq!(prefs.texts("output-switcher.cycle"), Some(Vec::new()));
+}
+
+#[test]
 fn an_unset_key_falls_back() {
     let dir = tempfile::tempdir().expect("tempdir");
     let prefs = Preferences::load_from(dir.path().join("settings.json"));
 
     assert!(prefs.bool("never.written", true));
     assert_eq!(prefs.integer("never.written", 7), 7);
+    assert_eq!(prefs.text("never.written", "nothing"), "nothing");
 }
 
 /// Settings can name machines and habits, so they are not world readable.

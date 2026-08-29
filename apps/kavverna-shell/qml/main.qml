@@ -339,6 +339,7 @@ Window {
                     hub: hub
                     clipboard: clipboard
                     features: features
+                    mixer: mixer
                     shows: root.shows
                     visible: hub.showing_settings
                 }

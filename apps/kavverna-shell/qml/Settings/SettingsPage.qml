@@ -10,6 +10,7 @@ ColumnLayout {
     required property var hub
     required property var clipboard
     required property var features
+    required property var mixer
     /// A row for a utility that was removed would offer settings for something not
     /// running, so each one answers for the utility that owns it.
     required property var shows
@@ -65,6 +66,105 @@ ColumnLayout {
                 ]
                 current: page.hub.appearance
                 onPicked: (value) => page.hub.choose_appearance(value)
+            }
+        }
+    }
+
+    SectionLabel {
+        theme: page.theme
+        text: "SOUND"
+        visible: page.shows("microphone-tools") || page.shows("output-switcher")
+    }
+
+    Card {
+        theme: page.theme
+        implicitHeight: sound.implicitHeight + page.theme.pad * 2
+        visible: page.shows("microphone-tools") || page.shows("output-switcher")
+
+        ColumnLayout {
+            id: sound
+            anchors.fill: parent
+            anchors.margins: page.theme.pad
+            spacing: 14
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: page.theme.gapSnug
+                visible: page.shows("microphone-tools")
+
+                Label {
+                    text: "Come back to this microphone"
+                    font.pixelSize: page.theme.textStrong
+                    font.bold: true
+                    color: page.theme.primaryText
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: "Made the default again whenever it is plugged back in. Choosing another one while it is here still works."
+                    font.pixelSize: page.theme.textBody
+                    color: page.theme.secondaryText
+                    wrapMode: Text.WordWrap
+                }
+
+                Repeater {
+                    model: page.mixer.input_names.length
+
+                    delegate: Tick {
+                        required property int index
+
+                        Layout.fillWidth: true
+                        theme: page.theme
+                        text: page.mixer.input_names[index]
+                        checked: page.mixer.input_preferred[index]
+                        onToggled: page.mixer.choose_preferred_input(
+                            page.mixer.input_ids[index], checked)
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: page.mixer.input_names.length === 0
+                    text: "No microphone is connected."
+                    font.pixelSize: page.theme.textBody
+                    color: page.theme.mutedText
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: page.theme.gapSnug
+                visible: page.shows("output-switcher")
+
+                Label {
+                    text: "Move between these outputs"
+                    font.pixelSize: page.theme.textStrong
+                    font.bold: true
+                    color: page.theme.primaryText
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: "What the shortcut and the tray menu step through. Leave them all ticked to reach every one."
+                    font.pixelSize: page.theme.textBody
+                    color: page.theme.secondaryText
+                    wrapMode: Text.WordWrap
+                }
+
+                Repeater {
+                    model: page.mixer.output_names.length
+
+                    delegate: Tick {
+                        required property int index
+
+                        Layout.fillWidth: true
+                        theme: page.theme
+                        text: page.mixer.output_names[index]
+                        checked: page.mixer.output_in_cycle[index]
+                        onToggled: page.mixer.choose_output_in_cycle(
+                            page.mixer.output_ids[index], checked)
+                    }
+                }
             }
         }
     }

@@ -46,12 +46,33 @@ impl Preferences {
         self.values.get(key).and_then(Value::as_i64).unwrap_or(fallback)
     }
 
+    pub fn text(&self, key: &str, fallback: &str) -> String {
+        self.values.get(key).and_then(Value::as_str).unwrap_or(fallback).to_owned()
+    }
+
+    /// `None` for a key that was never written, which is not the same as one deliberately left
+    /// empty: a chosen set of devices that nobody has chosen from yet means all of them, and a
+    /// set somebody emptied means none.
+    pub fn texts(&self, key: &str) -> Option<Vec<String>> {
+        let items = self.values.get(key)?.as_array()?;
+        Some(items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+    }
+
     pub fn set_bool(&mut self, key: &str, value: bool) {
         self.values.insert(key.to_owned(), Value::Bool(value));
     }
 
     pub fn set_integer(&mut self, key: &str, value: i64) {
         self.values.insert(key.to_owned(), Value::Number(value.into()));
+    }
+
+    pub fn set_text(&mut self, key: &str, value: &str) {
+        self.values.insert(key.to_owned(), Value::String(value.to_owned()));
+    }
+
+    pub fn set_texts(&mut self, key: &str, values: &[String]) {
+        let items = values.iter().map(|value| Value::String(value.clone())).collect();
+        self.values.insert(key.to_owned(), Value::Array(items));
     }
 
     pub fn path(&self) -> &Path {
