@@ -18,6 +18,11 @@ pub struct Entry {
 struct Index {
     by_binary: HashMap<String, Entry>,
     by_icon: HashMap<String, Entry>,
+    /// What a program calls itself, which for anything built on Electron is the only thing that
+    /// matches: those report `electron` as their binary, and no entry runs a program by that
+    /// name. `StartupWMClass` exists to tie an announced identity back to an entry, and the
+    /// file's own name is the other half of the same convention.
+    by_identity: HashMap<String, Entry>,
 }
 
 /// Read once. Entries change when software is installed, which is rare enough that rescanning
@@ -33,6 +38,10 @@ pub fn named_after_binary(binary: &str) -> Option<&'static Entry> {
 
 pub fn named_after_icon(icon: &str) -> Option<&'static Entry> {
     index().by_icon.get(icon)
+}
+
+pub fn named_after_identity(identity: &str) -> Option<&'static Entry> {
+    index().by_identity.get(&identity.to_ascii_lowercase())
 }
 
 fn search_path() -> Vec<PathBuf> {
@@ -75,15 +84,21 @@ fn build(directories: &[PathBuf]) -> Index {
             let Ok(text) = std::fs::read_to_string(&path) else {
                 continue;
             };
-            let Some((entry, binary)) = parse(&text) else {
+            let Some(found) = parse(&text) else {
                 continue;
             };
 
-            if let Some(binary) = binary {
-                index.by_binary.entry(binary).or_insert_with(|| entry.clone());
+            if let Some(binary) = found.binary {
+                index.by_binary.entry(binary).or_insert_with(|| found.entry.clone());
             }
-            if let Some(icon) = entry.icon.clone() {
-                index.by_icon.entry(icon).or_insert(entry);
+            for identity in [found.window_class, file_stem(&path)].into_iter().flatten() {
+                index
+                    .by_identity
+                    .entry(identity.to_ascii_lowercase())
+                    .or_insert_with(|| found.entry.clone());
+            }
+            if let Some(icon) = found.entry.icon.clone() {
+                index.by_icon.entry(icon).or_insert(found.entry);
             }
         }
     }
@@ -91,12 +106,23 @@ fn build(directories: &[PathBuf]) -> Index {
     index
 }
 
-fn parse(text: &str) -> Option<(Entry, Option<String>)> {
+fn file_stem(path: &std::path::Path) -> Option<String> {
+    path.file_stem().map(|stem| stem.to_string_lossy().into_owned())
+}
+
+struct Found {
+    entry: Entry,
+    binary: Option<String>,
+    window_class: Option<String>,
+}
+
+fn parse(text: &str) -> Option<Found> {
     let mut name = None;
     let mut icon = None;
     let mut command = None;
     let mut try_command = None;
     let mut kind = None;
+    let mut window_class = None;
     let mut inside = false;
 
     for line in text.lines() {
@@ -118,6 +144,7 @@ fn parse(text: &str) -> Option<(Entry, Option<String>)> {
             "Exec" => command = Some(value.trim().to_owned()),
             "TryExec" => try_command = Some(value.trim().to_owned()),
             "Type" => kind = Some(value.trim().to_owned()),
+            "StartupWMClass" => window_class = Some(value.trim().to_owned()),
             _ => {}
         }
     }
@@ -125,8 +152,11 @@ fn parse(text: &str) -> Option<(Entry, Option<String>)> {
     if kind.as_deref() != Some("Application") {
         return None;
     }
-    let entry = Entry { name: name?, icon };
-    Some((entry, try_command.or(command).and_then(|line| binary_of(&line))))
+    Some(Found {
+        entry: Entry { name: name?, icon },
+        binary: try_command.or(command).and_then(|line| binary_of(&line)),
+        window_class,
+    })
 }
 
 /// The first word that is not an environment assignment or a launcher wrapper, reduced to its
@@ -189,6 +219,54 @@ mod tests {
         assert_eq!(index.by_icon.get("steam_icon_570").unwrap().name, "Dota 2");
         // Its Exec runs the launcher, so the launcher is what it is indexed under.
         assert!(index.by_binary.contains_key("steam"));
+    }
+
+    /// The case every Electron program lands in: it reports `electron` as its binary, which no
+    /// entry runs, so the only way back to its entry is the identity it announces.
+    #[test]
+    fn a_program_is_found_by_the_identity_it_announces() {
+        let room = tempfile::tempdir().unwrap();
+        written(
+            room.path(),
+            "vesktop.desktop",
+            "[Desktop Entry]\nType=Application\nName=Vesktop\nExec=vesktop %U\n\
+             Icon=vesktop\nStartupWMClass=vesktop\n",
+        );
+        let index = build(&[room.path().to_path_buf()]);
+
+        let found = index.by_identity.get("vesktop").unwrap();
+        assert_eq!(found.name, "Vesktop");
+        assert_eq!(found.icon.as_deref(), Some("vesktop"));
+        assert!(!index.by_binary.contains_key("electron"), "the binary leads nowhere, as expected");
+    }
+
+    /// The other half of the same convention: the file is named after the program even when the
+    /// entry says nothing about a window class.
+    #[test]
+    fn the_entry_file_name_is_an_identity_too() {
+        let room = tempfile::tempdir().unwrap();
+        written(
+            room.path(),
+            "org.kde.kate.desktop",
+            "[Desktop Entry]\nType=Application\nName=Kate\nExec=kate %U\nIcon=kate\n",
+        );
+        let index = build(&[room.path().to_path_buf()]);
+
+        assert_eq!(index.by_identity.get("org.kde.kate").unwrap().name, "Kate");
+    }
+
+    #[test]
+    fn an_identity_is_matched_whatever_its_case() {
+        let room = tempfile::tempdir().unwrap();
+        written(
+            room.path(),
+            "signal.desktop",
+            "[Desktop Entry]\nType=Application\nName=Signal\nExec=signal-desktop\n\
+             StartupWMClass=Signal\n",
+        );
+        let index = build(&[room.path().to_path_buf()]);
+
+        assert!(index.by_identity.contains_key("signal"), "stored lowercased");
     }
 
     #[test]

@@ -94,11 +94,24 @@ struct Tracked {
 
 /// Steam hands each game its own identity, and the entry Steam writes for that game names its
 /// icon after the same number, so one lookup covers every game rather than a chosen few.
+/// Three ways in, most specific first.
+///
+/// Steam hands each game its own identity, and the entry Steam writes for that game names its
+/// icon after the same number, so one lookup covers every game rather than a chosen few.
+///
+/// Then what the program calls itself. Anything built on Electron reports `electron` as its
+/// binary, so the binary is useless there, but the entry carries a `StartupWMClass` naming the
+/// identity the program announces, and its file is named after it too.
+///
+/// The binary last, for programs whose entry says nothing about identity.
 fn installed_entry(
     node: &Properties,
     client: Option<&Properties>,
 ) -> Option<&'static crate::desktop_entry::Entry> {
     let pid = process_id(node, client);
+    let reads = |key: &str| {
+        [Some(node), client].into_iter().flatten().find_map(|bag| bag.get(key).cloned())
+    };
 
     if let Some(entry) = pid
         .and_then(crate::steam_icon_of_process)
@@ -107,11 +120,16 @@ fn installed_entry(
         return Some(entry);
     }
 
-    let binary = [Some(node), client]
-        .into_iter()
-        .flatten()
-        .find_map(|bag| bag.get("application.process.binary").cloned())
-        .or_else(|| pid.and_then(crate::binary_of_process))?;
+    if let Some(entry) = ["application.id", "application.name", "node.name"]
+        .iter()
+        .filter_map(|key| reads(key))
+        .find_map(|identity| crate::desktop_entry::named_after_identity(&identity))
+    {
+        return Some(entry);
+    }
+
+    let binary =
+        reads("application.process.binary").or_else(|| pid.and_then(crate::binary_of_process))?;
 
     crate::desktop_entry::named_after_binary(&binary)
 }
