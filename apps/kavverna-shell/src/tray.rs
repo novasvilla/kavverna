@@ -94,7 +94,7 @@ impl StatusIcon {
                     let command = if icon.awake {
                         Command::Release
                     } else {
-                        Command::Engage(Hold::Indefinite, configured_scope())
+                        Command::Engage(settings::default_hold(), configured_scope())
                     };
                     command::send(command);
                 }),

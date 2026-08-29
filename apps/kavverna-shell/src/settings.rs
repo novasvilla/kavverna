@@ -1,4 +1,5 @@
 use feature_catalog::Feature;
+use keep_awake::Hold;
 use preferences::Preferences;
 use std::sync::{Mutex, MutexGuard};
 
@@ -26,6 +27,7 @@ pub const CLEAR_ON_SUSPEND: &str = "clipboard-auto-clear.on-suspend";
 pub const CLEAR_ON_SCREEN_LOCK: &str = "clipboard-auto-clear.on-screen-lock";
 pub const CLEAN_LINKS: &str = enable_key(Feature::CleanUrl);
 pub const APPEARANCE: &str = "appearance";
+pub const HOLD_UNTIL: &str = "keep-awake.hold-until";
 
 pub const ALLOW_DISPLAY_SLEEP_DEFAULT: bool = true;
 pub const RESTORE_ON_START_DEFAULT: bool = false;
@@ -58,6 +60,13 @@ pub const CLEAN_LINKS_DEFAULT: bool = false;
 /// somebody who switched their desktop to light meant it.
 pub const APPEARANCE_DEFAULT: i64 = 0;
 
+/// What was being held when Kavverna last had a say. Zero for nothing, negative for a hold with
+/// no end, and otherwise the wall clock second the hold runs out at. Wall clock rather than the
+/// monotonic one the hold itself uses, because this has to survive the machine being off, and
+/// a deadline that passed while it was off is a hold that is over.
+pub const HOLD_UNTIL_NOTHING: i64 = 0;
+pub const HOLD_UNTIL_INDEFINITE: i64 = -1;
+
 /// Sits above a feature's own switch. Removing one hides it everywhere and stops it starting
 /// next time, and never touches its enable keys, so putting it back restores what it was set to
 /// do rather than a fresh default.
@@ -72,6 +81,16 @@ pub fn any_installed(features: &[Feature]) -> bool {
 
 pub fn set_installed(feature: Feature, installed: bool) {
     put_bool(&feature.availability_key(), installed);
+}
+
+/// The setting resolved into a hold. Read from here by the panel switch, the tray menu and
+/// anything else that starts a hold without being told how long for, so the three cannot
+/// disagree about what the default duration means.
+pub fn default_hold() -> Hold {
+    match integer_at(DEFAULT_MINUTES, DEFAULT_MINUTES_DEFAULT) {
+        0 => Hold::Indefinite,
+        minutes => Hold::For(std::time::Duration::from_secs(minutes.unsigned_abs() * 60)),
+    }
 }
 
 static STORE: Mutex<Option<Preferences>> = Mutex::new(None);

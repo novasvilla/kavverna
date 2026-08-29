@@ -238,7 +238,7 @@ impl qobject::KavvernaPanel {
         if *self.awake() {
             command::send(Command::Release);
         } else {
-            command::send(Command::Engage(Hold::Indefinite, self.scope()));
+            command::send(Command::Engage(settings::default_hold(), self.scope()));
         }
     }
 

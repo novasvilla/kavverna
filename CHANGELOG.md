@@ -3,6 +3,20 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## 0.2.3
+
+### Fixed
+
+- **Restarting turned a timed hold into a permanent one.** Restore keep awake on start engaged
+  the default duration rather than putting back what was running, so a thirty minute hold came
+  back as one with no end at all, and a machine could stay awake indefinitely because Kavverna
+  had been restarted. It now remembers what was held and puts back what is left of it. A hold
+  that ran out while Kavverna was closed is over, and nothing is put back, since coming home to
+  a machine that stayed awake all night is worse than losing the hold.
+- **The default duration did nothing.** It said it was used by the switch and by auto start, and
+  the switch and the tray menu both started a hold with no end whatever it was set to. All three
+  read it now, which is what the setting always claimed.
+
 ## 0.2.2
 
 ### Added

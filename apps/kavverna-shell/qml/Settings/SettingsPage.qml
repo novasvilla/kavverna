@@ -49,7 +49,7 @@ ColumnLayout {
             SettingRow {
                 theme: page.theme
                 title: "Restore keep awake on start"
-                detail: "Hold off sleep again as soon as Kavverna launches."
+                detail: "Puts back the hold that was running when Kavverna last closed, minus the time that passed."
                 on: page.hub.restore_on_start
                 onToggled: (value) => page.hub.choose_restore_on_start(value)
             }
@@ -105,7 +105,7 @@ ColumnLayout {
             ChoiceRow {
                 theme: page.theme
                 title: "Default duration"
-                detail: "Used by the switch and by auto start."
+                detail: "What the switch and the tray menu start when they are not told how long for."
                 current: page.hub.default_minutes
                 choices: [
                     { label: "\u221e", value: 0 },
