@@ -13,7 +13,9 @@ session bus are left out, since a build chroot has neither.
 
 ## Publishing to the AUR
 
-Not done yet, and it needs an account rather than a change here. Once
+Not done yet, and it needs an account rather than a change here. Registration is closed at the
+time of writing while the AUR deals with automated sign-ups, and reopening is announced on
+aur-general and the Arch news feed rather than on the register page. Once
 [aur.archlinux.org](https://aur.archlinux.org) has an account with the machine's public key on
 it:
 
@@ -22,7 +24,7 @@ git clone ssh://aur@aur.archlinux.org/kavverna.git aur-kavverna
 cd aur-kavverna
 cp ../packaging/PKGBUILD ../packaging/.SRCINFO .
 git add PKGBUILD .SRCINFO
-git commit -m "Add kavverna 0.1.1"
+git commit -m "Add kavverna 0.2.1"
 git push
 ```
 
