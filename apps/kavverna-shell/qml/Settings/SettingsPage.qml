@@ -10,12 +10,10 @@ ColumnLayout {
     required property var hub
     required property var clipboard
     required property var features
+    /// A row for a utility that was removed would offer settings for something not
+    /// running, so each one answers for the utility that owns it.
+    required property var shows
 
-    /// A card for a utility that was removed would offer settings for something not running.
-    function shows(id) {
-        const at = page.features.ids.indexOf(id)
-        return at >= 0 && page.features.installed[at]
-    }
 
     Layout.fillWidth: true
     spacing: 12
@@ -125,13 +123,15 @@ ColumnLayout {
     SectionLabel {
         theme: page.theme
         text: "CLIPBOARD"
-        visible: page.shows("clipboard-history")
+        visible: page.shows("clipboard-history") || page.shows("clipboard-auto-clear")
+                 || page.shows("clean-url")
     }
 
     Card {
         theme: page.theme
         implicitHeight: saving.implicitHeight + page.theme.pad * 2
-        visible: page.shows("clipboard-history")
+        visible: page.shows("clipboard-history") || page.shows("clipboard-auto-clear")
+                 || page.shows("clean-url")
 
         ColumnLayout {
             id: saving
@@ -141,6 +141,7 @@ ColumnLayout {
 
             SettingRow {
                 theme: page.theme
+                visible: page.shows("clipboard-history")
                 title: "Save clipboard history"
                 detail: "Everything stays on this machine and can be cleared at any time."
                 on: page.clipboard.enabled
@@ -149,6 +150,7 @@ ColumnLayout {
 
             SettingRow {
                 theme: page.theme
+                visible: page.shows("clipboard-history")
                 title: "Also save copied images and files"
                 detail: "Images join the history, and files are remembered by where they are."
                 on: page.clipboard.images_and_files
@@ -157,6 +159,7 @@ ColumnLayout {
 
             SettingRow {
                 theme: page.theme
+                visible: page.shows("clipboard-history")
                 title: "Skip text that looks sensitive"
                 detail: "Leaves out short strings with no spaces that read like passwords, tokens or keys. Anything an application marks as a secret is never read at all."
                 on: page.clipboard.skip_sensitive
@@ -165,6 +168,7 @@ ColumnLayout {
 
             ChoiceRow {
                 theme: page.theme
+                visible: page.shows("clipboard-history")
                 title: "Keep"
                 detail: "Pinned entries do not count toward this."
                 current: page.clipboard.limit
@@ -180,6 +184,7 @@ ColumnLayout {
 
             SettingRow {
                 theme: page.theme
+                visible: page.shows("clean-url")
                 title: "Take the tracking out of copied links"
                 detail: "Removes campaign and click parameters the moment a link reaches the clipboard, and leaves everything else exactly as it was. Never touches a copy that carries formatting or files."
                 on: page.clipboard.clean_links
@@ -188,6 +193,7 @@ ColumnLayout {
 
             ChoiceRow {
                 theme: page.theme
+                visible: page.shows("clipboard-auto-clear")
                 title: "Empty the clipboard after"
                 detail: "Clears what is still pasteable. Saved entries are left alone, and this works with the history switched off."
                 current: page.clipboard.clear_after
@@ -203,6 +209,7 @@ ColumnLayout {
 
             SettingRow {
                 theme: page.theme
+                visible: page.shows("clipboard-auto-clear")
                 title: "Empty it when the machine suspends"
                 detail: "Announced by logind just before going to sleep."
                 on: page.clipboard.clear_on_suspend
@@ -211,6 +218,7 @@ ColumnLayout {
 
             SettingRow {
                 theme: page.theme
+                visible: page.shows("clipboard-auto-clear")
                 title: "Empty it when the screen locks"
                 detail: "There is no signal for the displays turning off, so that one is not offered rather than approximated."
                 on: page.clipboard.clear_on_screen_lock

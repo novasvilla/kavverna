@@ -9,6 +9,9 @@ ColumnLayout {
 
     required property var theme
     required property var mixer
+    /// Answers whether a utility is installed. The sound page hosts three, so the page staying
+    /// when one of them is switched off is right, and each card closing itself is the rest of it.
+    required property var shows
 
     Layout.fillWidth: true
     spacing: 12
@@ -16,11 +19,13 @@ ColumnLayout {
     SectionLabel {
         theme: section.theme
         text: "OUTPUT"
+        visible: section.shows("output-switcher")
     }
 
     Card {
         theme: section.theme
         implicitHeight: outputs.implicitHeight + section.theme.pad * 2
+        visible: section.shows("output-switcher")
 
         ColumnLayout {
             id: outputs
@@ -98,11 +103,13 @@ ColumnLayout {
     SectionLabel {
         theme: section.theme
         text: "APPLICATIONS"
+        visible: section.shows("volume-mixer")
     }
 
     Card {
         theme: section.theme
         implicitHeight: streams.implicitHeight + section.theme.pad * 2
+        visible: section.shows("volume-mixer")
 
         ColumnLayout {
             id: streams
@@ -185,11 +192,13 @@ ColumnLayout {
     SectionLabel {
         theme: section.theme
         text: "MICROPHONE"
+        visible: section.shows("microphone-tools")
     }
 
     Card {
         theme: section.theme
         implicitHeight: microphone.implicitHeight + section.theme.pad * 2
+        visible: section.shows("microphone-tools")
 
         ColumnLayout {
             id: microphone

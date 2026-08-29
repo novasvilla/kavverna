@@ -3,6 +3,19 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## 0.2.1
+
+### Fixed
+
+- **Switching off one utility on a page that hosts several did nothing visible.** Turning the
+  volume mixer off left its rows on the sound page, because the gating stopped at the page and
+  the page stays while any of the three sound utilities is installed. System monitor looked
+  fine only because its page holds one utility and vanished whole. Each card and each settings
+  row now answers for the utility that owns it.
+- A release carried a debug package beside the real one. What makepkg splits out is decided by
+  the machine it runs on, and that is pinned in the package definition now, like the link time
+  optimisation option beside it.
+
 ## 0.2.0
 
 ### Added

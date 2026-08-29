@@ -8,6 +8,7 @@ ColumnLayout {
 
     required property var theme
     required property var vitals
+    required property var shows
 
     Layout.fillWidth: true
     spacing: 12

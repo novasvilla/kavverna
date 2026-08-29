@@ -293,6 +293,7 @@ Window {
 
                 EnergySection {
                     theme: theme
+                    shows: root.shows
                     hub: hub
                     visible: !hub.showing_settings && root.page === root.energyPage
                              && root.pageShown(root.energyPage)
@@ -300,6 +301,7 @@ Window {
 
                 SoundSection {
                     theme: theme
+                    shows: root.shows
                     mixer: mixer
                     visible: !hub.showing_settings && root.page === root.soundPage
                              && root.pageShown(root.soundPage)
@@ -307,6 +309,7 @@ Window {
 
                 MonitoringSection {
                     theme: theme
+                    shows: root.shows
                     vitals: vitals
                     visible: !hub.showing_settings && root.page === root.monitoringPage
                              && root.pageShown(root.monitoringPage)
@@ -314,6 +317,7 @@ Window {
 
                 ClipboardSection {
                     theme: theme
+                    shows: root.shows
                     clipboard: clipboard
                     visible: !hub.showing_settings && root.page === root.clipboardPage
                              && root.pageShown(root.clipboardPage)
@@ -324,6 +328,7 @@ Window {
 
                 ToolsSection {
                     theme: theme
+                    shows: root.shows
                     hub: hub
                     visible: !hub.showing_settings && root.page === root.toolsPage
                              && root.pageShown(root.toolsPage)
@@ -334,6 +339,7 @@ Window {
                     hub: hub
                     clipboard: clipboard
                     features: features
+                    shows: root.shows
                     visible: hub.showing_settings
                 }
                 }

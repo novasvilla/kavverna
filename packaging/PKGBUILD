@@ -1,7 +1,7 @@
 # Maintainer: novasvilla <https://github.com/novasvilla>
 
 pkgname=kavverna
-pkgver=0.2.0
+pkgver=0.2.1
 pkgrel=1
 pkgdesc="One tray icon for the utilities a KDE Plasma desktop is missing"
 arch=('x86_64')
@@ -10,9 +10,11 @@ license=('GPL-3.0-or-later')
 depends=('qt6-base' 'qt6-declarative' 'layer-shell-qt' 'kirigami' 'libpipewire' 'sqlite'
          'hicolor-icon-theme')
 makedepends=('git' 'rust' 'clang' 'pkgconf')
-# makepkg turns link time optimisation on by default, and it drops the symbols cxx-qt generates
-# to bridge Rust and C++, so the binary fails to link with the whole bridge undefined.
-options=('!lto')
+# Two things makepkg.conf decides differently from one machine to the next, pinned here so a
+# package built anywhere is the same package. Link time optimisation drops the symbols cxx-qt
+# generates to bridge Rust and C++, leaving the binary unlinkable. Debug packaging splits the
+# symbols into a second package, which the release then published beside the real one.
+options=('!lto' '!debug')
 optdepends=('ydotool: synthetic paste, once a feature asks for it')
 # The tag, not the tarball GitHub generates from it. A checksum for that tarball cannot exist in
 # a commit made before the tag does, so pinning one here left every tagged commit failing its own

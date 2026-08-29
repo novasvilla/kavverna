@@ -9,6 +9,7 @@ ColumnLayout {
 
     required property var theme
     required property var hub
+    required property var shows
 
     Layout.fillWidth: true
     spacing: 12

@@ -9,6 +9,7 @@ ColumnLayout {
 
     required property var theme
     required property var clipboard
+    required property var shows
 
     // Which row the keyboard is on. Reset whenever the list changes, since the row that was
     // under the selection may no longer be there.
