@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
 import "../Shared"
 
 ColumnLayout {
@@ -32,11 +31,7 @@ ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 10
 
-                Kirigami.Icon {
-                    source: "preferences-system-power-management"
-                    implicitWidth: 18
-                    implicitHeight: 18
-                    isMask: true
+                Bolt {
                     color: section.hub.awake ? section.theme.accent : section.theme.secondaryText
                 }
 

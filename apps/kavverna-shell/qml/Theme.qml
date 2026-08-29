@@ -18,25 +18,27 @@ QtObject {
     /// The top of it. Load or heat past the point where noticing is enough.
     readonly property color ember: dark ? "#E9573D" : "#B33923"
 
+    // Light needs more separation than dark does. Ink on parchment starts from a bright ground,
+    // so a tint that reads clearly against charcoal disappears against paper.
     readonly property color surface: dark ? Qt.rgba(0.102, 0.094, 0.086, 0.97)
-                                          : Qt.rgba(0.957, 0.933, 0.890, 0.97)
+                                          : Qt.rgba(0.925, 0.894, 0.843, 0.97)
 
-    readonly property color raised: dark ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(1, 1, 1, 0.55)
-    readonly property color sunken: dark ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(0.35, 0.28, 0.18, 0.07)
+    readonly property color raised: dark ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(1, 1, 1, 0.72)
+    readonly property color sunken: dark ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(0.30, 0.24, 0.15, 0.11)
     readonly property color hairline: dark ? Qt.rgba(1, 1, 1, 0.09)
-                                           : Qt.rgba(0.35, 0.28, 0.18, 0.15)
+                                           : Qt.rgba(0.30, 0.24, 0.15, 0.24)
     readonly property color control: dark ? Qt.rgba(1, 1, 1, 0.08)
-                                          : Qt.rgba(0.35, 0.28, 0.18, 0.09)
+                                          : Qt.rgba(0.30, 0.24, 0.15, 0.15)
     readonly property color controlDown: dark ? Qt.rgba(1, 1, 1, 0.16)
-                                              : Qt.rgba(0.35, 0.28, 0.18, 0.18)
+                                              : Qt.rgba(0.30, 0.24, 0.15, 0.28)
     readonly property color selected: Qt.alpha(accent, dark ? 0.26 : 0.22)
 
     readonly property color primaryText: dark ? Qt.rgba(1, 1, 1, 0.95)
                                               : Qt.rgba(0.13, 0.10, 0.07, 0.95)
     readonly property color secondaryText: dark ? Qt.rgba(1, 1, 1, 0.52)
-                                                : Qt.rgba(0.13, 0.10, 0.07, 0.62)
+                                                : Qt.rgba(0.11, 0.09, 0.06, 0.72)
     readonly property color mutedText: dark ? Qt.rgba(1, 1, 1, 0.25)
-                                            : Qt.rgba(0.13, 0.10, 0.07, 0.38)
+                                            : Qt.rgba(0.11, 0.09, 0.06, 0.50)
 
     // Only what is genuinely repeated. A one-off pixel value doing a local job, the seven pixel
     // dot or the one pixel gap between a title and its detail, is geometry rather than scale and

@@ -253,11 +253,10 @@ ColumnLayout {
                     wrapMode: Text.WordWrap
                 }
 
-                Button {
+                PillButton {
+                    theme: page.theme
                     Layout.fillWidth: true
-                    implicitHeight: 26
                     text: "Adopt " + page.clipboard.klipper_waiting + " entries"
-                    font.pixelSize: page.theme.textBody
                     onClicked: page.clipboard.adopt_klipper_history()
                 }
             }
@@ -329,12 +328,11 @@ ColumnLayout {
                         { label: "Author", url: "https://github.com/novasvilla" }
                     ]
 
-                    delegate: Button {
+                    delegate: PillButton {
                         required property var modelData
+                        theme: page.theme
                         Layout.fillWidth: true
-                        implicitHeight: 26
                         text: modelData.label
-                        font.pixelSize: page.theme.textBody
                         onClicked: Qt.openUrlExternally(modelData.url)
                     }
                 }

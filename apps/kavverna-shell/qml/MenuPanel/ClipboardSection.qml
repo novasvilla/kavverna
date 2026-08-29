@@ -98,8 +98,11 @@ ColumnLayout {
                     id: search
                     Layout.fillWidth: true
                     placeholderText: "Search copied text"
+                    placeholderTextColor: section.theme.mutedText
                     font.pixelSize: section.theme.textBody
                     color: section.theme.primaryText
+                    selectionColor: section.theme.selected
+                    selectedTextColor: section.theme.primaryText
                     enabled: section.clipboard.row_ids.length > 0
                              || section.clipboard.query.length > 0
                     onTextEdited: section.clipboard.search(text)
@@ -107,17 +110,17 @@ ColumnLayout {
                     onVisibleChanged: if (visible) forceActiveFocus()
 
                     background: Rectangle {
-                        radius: 6
+                        radius: section.theme.radiusSmall
                         color: section.theme.sunken
                         border.width: search.activeFocus ? 1 : 0
                         border.color: section.theme.accent
                     }
                 }
 
-                Button {
-                    icon.name: "edit-clear"
-                    icon.width: 12
-                    icon.height: 12
+                IconButton {
+                    theme: section.theme
+                    source: "edit-clear"
+                    size: 12
                     implicitWidth: 26
                     implicitHeight: 26
                     visible: section.clipboard.query.length > 0
@@ -129,10 +132,10 @@ ColumnLayout {
                     }
                 }
 
-                Button {
-                    icon.name: "edit-delete"
-                    icon.width: 12
-                    icon.height: 12
+                IconButton {
+                    theme: section.theme
+                    source: "edit-delete"
+                    size: 12
                     implicitWidth: 26
                     implicitHeight: 26
                     enabled: section.clipboard.recent_count > 0
@@ -238,10 +241,10 @@ ColumnLayout {
                                 spacing: 4
                                 visible: hover.hovered
 
-                                Button {
-                                    icon.name: "go-up"
-                                    icon.width: 11
-                                    icon.height: 11
+                                IconButton {
+                                    theme: section.theme
+                                    source: "go-up"
+                                    size: 11
                                     implicitWidth: 22
                                     implicitHeight: 22
                                     enabled: section.clipboard.query.length === 0
@@ -250,10 +253,10 @@ ColumnLayout {
                                     onClicked: section.clipboard.move_towards_top(row.entryId, true)
                                 }
 
-                                Button {
-                                    icon.name: "go-down"
-                                    icon.width: 11
-                                    icon.height: 11
+                                IconButton {
+                                    theme: section.theme
+                                    source: "go-down"
+                                    size: 11
                                     implicitWidth: 22
                                     implicitHeight: 22
                                     enabled: section.clipboard.query.length === 0
@@ -262,20 +265,21 @@ ColumnLayout {
                                     onClicked: section.clipboard.move_towards_top(row.entryId, false)
                                 }
 
-                                Button {
-                                    text: row.pinned ? "◆" : "◇"
+                                IconButton {
+                                    theme: section.theme
+                                    source: row.pinned ? "window-pin" : "window-unpin"
+                                    size: 12
                                     implicitWidth: 22
                                     implicitHeight: 22
-                                    font.pixelSize: 10
                                     ToolTip.visible: hovered
                                     ToolTip.text: row.pinned ? "Unpin" : "Pin"
                                     onClicked: section.clipboard.pin(row.entryId, !row.pinned)
                                 }
 
-                                Button {
+                                PillButton {
+                                    theme: section.theme
                                     text: copied.running ? "Copied" : "Copy"
                                     implicitHeight: 22
-                                    font.pixelSize: 10
                                     onClicked: {
                                         section.clipboard.put_back(row.entryId);
                                         copied.restart();
@@ -289,10 +293,10 @@ ColumnLayout {
 
                                 Item { Layout.fillWidth: true }
 
-                                Button {
-                                    icon.name: "edit-delete"
-                                    icon.width: 11
-                                    icon.height: 11
+                                IconButton {
+                                    theme: section.theme
+                                    source: "edit-delete"
+                                    size: 11
                                     implicitWidth: 22
                                     implicitHeight: 22
                                     ToolTip.visible: hovered

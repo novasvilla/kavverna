@@ -15,6 +15,16 @@ Button {
     leftPadding: pill.theme.gapTight / 2
     rightPadding: pill.theme.gapTight / 2
 
+    contentItem: Label {
+        text: pill.text
+        font: pill.font
+        color: pill.theme.primaryText
+        opacity: pill.enabled ? 1 : 0.4
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
+        elide: Text.ElideRight
+    }
+
     background: Rectangle {
         radius: pill.theme.radiusSmall
         color: pill.active ? pill.theme.selected

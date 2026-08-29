@@ -5,6 +5,7 @@ import org.kde.layershell as LayerShell
 import org.kde.kirigami as Kirigami
 import dev.kavverna.shell
 import "MenuPanel"
+import "Shared"
 import "Settings"
 
 Window {
@@ -213,7 +214,7 @@ Window {
                               ready: mixer.available,
                               unready: "Sound is waiting for PipeWire",
                               needs: root.pageNeeds[root.soundPage] },
-                            { icon: "utilities-system-monitor", name: "Monitoring", page: root.monitoringPage,
+                            { icon: "office-chart-area", name: "Monitoring", page: root.monitoringPage,
                               ready: true, unready: "",
                               needs: root.pageNeeds[root.monitoringPage] },
                             { icon: "edit-paste", name: "Clipboard", page: root.clipboardPage,
@@ -222,7 +223,7 @@ Window {
                             { icon: "input-mouse", name: "Tools", page: root.toolsPage,
                               ready: true, unready: "",
                               needs: root.pageNeeds[root.toolsPage] },
-                            { icon: "preferences-system-power-management", name: "Energy", page: root.energyPage,
+                            { icon: "", name: "Energy", page: root.energyPage,
                               ready: true, unready: "",
                               needs: root.pageNeeds[root.energyPage] }
                         ]
@@ -237,15 +238,24 @@ Window {
                             radius: 8
                             color: current ? theme.selected : "transparent"
 
+                            readonly property color mark: current ? theme.accent
+                                : modelData.ready ? theme.secondaryText
+                                                  : theme.mutedText
+
                             Kirigami.Icon {
                                 anchors.centerIn: parent
+                                visible: parent.modelData.icon !== ""
                                 source: parent.modelData.icon
                                 implicitWidth: 18
                                 implicitHeight: 18
                                 isMask: true
-                                color: parent.current ? theme.accent
-                                     : parent.modelData.ready ? theme.secondaryText
-                                                              : theme.mutedText
+                                color: parent.mark
+                            }
+
+                            Bolt {
+                                anchors.centerIn: parent
+                                visible: parent.modelData.icon === ""
+                                color: parent.mark
                             }
 
                             ToolTip.visible: hover.hovered
