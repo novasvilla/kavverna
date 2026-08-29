@@ -53,8 +53,20 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed \
             git rust qt6-base qt6-declarative layer-shell-qt kirigami \
-            pipewire libpipewire clang pkgconf sqlite
+            pipewire libpipewire clang pkgconf sqlite sudo
 
       - uses: actions/checkout@v5
 
       - run: cargo build --workspace --locked
+
+      # .SRCINFO is generated from the PKGBUILD and is what the AUR reads, so a stale one hands
+      # people the wrong dependencies and the wrong version. It sat two releases behind before
+      # anyone noticed, which is what a check is for.
+      - name: The package metadata must match the package definition
+        run: |
+          set -eu
+          useradd --create-home builder
+          chown -R builder:builder .
+          cd packaging
+          sudo -u builder makepkg --printsrcinfo > /tmp/generated.SRCINFO
+          diff -u .SRCINFO /tmp/generated.SRCINFO

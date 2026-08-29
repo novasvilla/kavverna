@@ -1,7 +1,7 @@
 # Maintainer: novasvilla <https://github.com/novasvilla>
 
 pkgname=kavverna
-pkgver=0.1.5
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="One tray icon for the utilities a KDE Plasma desktop is missing"
 arch=('x86_64')
@@ -9,32 +9,44 @@ url="https://github.com/novasvilla/kavverna"
 license=('GPL-3.0-or-later')
 depends=('qt6-base' 'qt6-declarative' 'layer-shell-qt' 'kirigami' 'libpipewire' 'sqlite'
          'hicolor-icon-theme')
-makedepends=('rust' 'clang' 'pkgconf')
+makedepends=('git' 'rust' 'clang' 'pkgconf')
 # makepkg turns link time optimisation on by default, and it drops the symbols cxx-qt generates
 # to bridge Rust and C++, so the binary fails to link with the whole bridge undefined.
 options=('!lto')
 optdepends=('ydotool: synthetic paste, once a feature asks for it')
-source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('1753651c842951c58d5b33421904f0ad3aad106eb2f8011216a1f18fbc3baf1b')
+# The tag, not the tarball GitHub generates from it. A checksum for that tarball cannot exist in
+# a commit made before the tag does, so pinning one here left every tagged commit failing its own
+# verification. The tag is what identifies the source, which is why SKIP is right rather than lax.
+source=("$pkgname::git+$url.git#tag=v$pkgver")
+sha256sums=('SKIP')
+
+# `--frozen` in build() means offline, so everything has to be here before it runs. Fetching in
+# its own step is what lets the build itself touch no network at all.
+prepare() {
+  cd "$pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/^host: //p')"
+}
 
 build() {
-  cd "$pkgname-$pkgver"
+  cd "$pkgname"
   export RUSTUP_TOOLCHAIN=stable
   export CARGO_TARGET_DIR=target
-  cargo build --release --frozen --locked
+  cargo build --release --frozen
 }
 
 check() {
-  cd "$pkgname-$pkgver"
+  cd "$pkgname"
   export RUSTUP_TOOLCHAIN=stable
   # Named by exclusion, or the list rots the next time a crate arrives or leaves. Anything
   # needing a live compositor, session bus or real sensors carries `#[ignore]`, none of which a
   # build chroot has.
+  export CARGO_TARGET_DIR=target
   cargo test --frozen --release --workspace --exclude kavverna-shell
 }
 
 package() {
-  cd "$pkgname-$pkgver"
+  cd "$pkgname"
   install -Dm755 target/release/kavverna-shell "$pkgdir/usr/bin/kavverna-shell"
   install -Dm644 packaging/dev.kavverna.Kavverna.desktop \
     "$pkgdir/usr/share/applications/dev.kavverna.Kavverna.desktop"

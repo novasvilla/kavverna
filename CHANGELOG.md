@@ -3,10 +3,24 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
-## Unreleased
+## 0.2.0
 
 ### Added
 
+- **Every utility has its own switch.** A page listing all thirteen, grouped as the panel
+  groups them. One switched off disappears from the panel, the tab strip and the rest of the
+  settings, and stops running: its thread never starts. Availability sits above each feature's
+  own setting, so removing one never writes to it and putting it back restores what it was
+  configured to do. The four that are catalogued and not written yet say so instead of
+  offering a switch for nothing.
+- **A light theme, and a switch between them.** The panel follows the desktop into light or
+  dark, or can be pinned to either. The colours are Kavverna's own in both, charcoal and stone
+  one way and warm parchment the other, with torchlight amber the accent throughout.
+- **A tray menu that reaches the whole suite.** Muting every microphone, moving to the next
+  output and opening the history, alongside keep awake, and showing only what is installed.
+- **Application icons in the mixer**, drawn from the desktop entry that named the row.
+- **Muting an output and choosing an input**, both of which the backend had always accepted
+  with nothing on screen to ask for them.
 - **A built package on every release.** Each release now carries an
   `x86_64.pkg.tar.zst` beside the source tarball, so installing on Arch or CachyOS is
   `sudo pacman -U` against the attached file. It is produced by `packaging/PKGBUILD`
@@ -15,6 +29,40 @@ build that produced the binary, stamped by CI and zero for anything built by han
   keep, since that links against the libraries the machine has rather than the ones
   Arch shipped on the day of the release.
 - `kavverna-shell --version` and `--help`. Both used to open the panel in silence.
+
+### Fixed
+
+- **A program is found by the name it announces, not only by the binary it runs.** Vesktop
+  showed as lowercase vesktop with a generic mark, because it reports `electron` as its binary
+  and no desktop entry runs a program by that name. Every Electron application landed in the
+  same place. Entries are now indexed by `StartupWMClass` and by their own file name too, which
+  is what those exist for.
+- **The secret guess sees the shapes secrets actually take.** A JSON web token ran past the
+  length it worked within, a key block was rejected for containing line breaks, and a connection
+  string only tripped it when the password happened to contain a digit. All three are recognised
+  by shape now. A plain connection string with no secret in it is no longer dropped either,
+  since only http and https had counted as links.
+- **Clearing the clipboard on suspend no longer races it.** It holds a logind delay lock while
+  it works and lets go once the clipboard has actually been emptied. The lock is only taken
+  while the setting is on.
+- **The light theme is readable.** Nine buttons drew their own background and left their label
+  to the desktop's palette, so on a light panel under a dark desktop the text came out white on
+  parchment.
+- **The energy and monitoring marks mean something.** Tinting an icon to one colour keeps its
+  outline and discards everything inside it, which turned a chart in a frame into a plain square
+  and a bolt in a disc into a plain circle.
+
+### Internal
+
+- Tests no longer depend on the machine that runs them. A discovery function takes its root, so
+  the thermal test reads a tree it wrote rather than the sensors of whatever built it, which is
+  what had turned main red.
+- CI stopped selecting with `--lib`, which had been excluding six tests that pass anywhere,
+  among them the one guarding persisted feature ids against a rename that would orphan a user's
+  settings. Anything needing a live desktop carries `#[ignore]` and says what it needs.
+- Two compositor tests asserted only that nothing arrived, so a watcher that died at startup
+  passed them. Each now proves it was listening.
+- Releases no longer build without running the suite first.
 
 ## 0.1.5
 
