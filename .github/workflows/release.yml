@@ -12,11 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     container: archlinux:base-devel
     steps:
-      - name: Install the desktop it targets
+      # Only what the suite below links against. What the package needs is declared in the
+      # PKGBUILD, and makepkg installs it, so there is no second dependency list here to drift
+      # out of step with that one.
+      - name: Install what the tests link against
         run: |
           pacman -Syu --noconfirm --needed \
-            git rust qt6-base qt6-declarative layer-shell-qt kirigami \
-            pipewire libpipewire clang pkgconf sqlite sudo
+            git rust clang pkgconf sudo libpipewire sqlite
 
       - uses: actions/checkout@v5
 
@@ -43,6 +45,8 @@ jobs:
       - name: Make an unprivileged builder
         run: |
           useradd --create-home builder
+          # --syncdeps installs what the PKGBUILD declares, and installing needs pacman.
+          printf 'builder ALL=(ALL) NOPASSWD: /usr/bin/pacman\n' > /etc/sudoers.d/builder
           chown -R builder:builder .
 
       # The PKGBUILD takes its source from the tag being released, which exists by the time this
@@ -56,7 +60,7 @@ jobs:
         run: |
           set -eu
           sudo -u builder env KAVVERNA_BUILD="$KAVVERNA_BUILD" \
-            makepkg --nocheck --noconfirm
+            makepkg --syncdeps --nocheck --noconfirm
 
       - name: The package must know which build made it
         env:
