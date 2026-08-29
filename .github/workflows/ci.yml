@@ -10,8 +10,8 @@ env:
   RUSTFLAGS: -D warnings
 
 jobs:
-  # Everything except the shell, which needs Qt and a KDE session. Those crates are the ones
-  # worth gating a merge on anyway: all the logic lives in them.
+  # Everything except the shell, which needs Qt to build. The shell is built and tested by the
+  # job below, in a container that has Qt, so nothing goes untested by being excluded here.
   crates:
     runs-on: ubuntu-latest
     steps:
@@ -44,7 +44,8 @@ jobs:
       - name: Test
         run: cargo test --workspace --exclude kavverna-shell
 
-  # Proves the whole thing still builds where it is meant to run.
+  # Proves the whole thing still builds where it is meant to run, and is the only place the
+  # shell's own tests run at all.
   shell:
     runs-on: ubuntu-latest
     container: archlinux:base-devel
@@ -58,6 +59,11 @@ jobs:
       - uses: actions/checkout@v5
 
       - run: cargo build --workspace --locked
+
+      # None of these needs a display or a session bus: they are the argument parsing, the
+      # login entry and the tray icon drawing. They ran nowhere until this line existed.
+      - name: Test the shell
+        run: cargo test -p kavverna-shell --locked
 
       # .SRCINFO is generated from the PKGBUILD and is what the AUR reads, so a stale one hands
       # people the wrong dependencies and the wrong version. It sat two releases behind before
