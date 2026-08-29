@@ -39,11 +39,18 @@ System Settings beside every other shortcut. The search field takes focus, the a
 list, and Enter or Ctrl+1 to Ctrl+9 put an entry back.
 
 **Exclusions.** A copy carrying `x-kde-passwordManagerHint` is never read at all, so nothing
-sensitive reaches the process. Text shaped like a key is left out separately, and that one is a
-guess that errs toward dropping a copy too many.
+sensitive reaches the process. Text shaped like a secret is left out separately, and that one is
+a guess that errs toward dropping a copy too many. Three of its rules match a shape rather than a
+length: a JSON web token by its three dotted parts, since those run past the ceiling the general
+rule works within; a key block by its `-----BEGIN` line, since it is mostly line breaks and the
+general rule rejects anything carrying one; and a URL of any scheme holding a user name or
+password, which is what a connection string is.
 
 **Auto clear.** On a timer, on suspend through logind, and on screen lock. Independent of each
-other, working with the history switched off, and never touching a saved entry.
+other, working with the history switched off, and never touching a saved entry. The suspend one
+holds a logind delay lock while it works, so the machine waits for the clipboard to be emptied
+rather than racing it. `delay` and never `block`: refusing a suspend outright is not what this
+is for, and the lock is only taken while the setting is on.
 
 **Link cleaning.** Campaign and click parameters removed the moment a link arrives, with the
 rest of the query left byte for byte as it was. Refused outright when the copy carries anything
@@ -107,14 +114,17 @@ as SDL Application becomes the game it actually is.
 
 In order. Each is useful on its own.
 
-1. **Paste as plain text**, and pasting straight from the picker, both behind the ydotool
-   trade-off stated plainly before it is switched on.
-2. **A plugin for KRunner.**
-3. **A shelf**, anchored to a screen edge.
-4. **Text snippets**, expanded through the input method so they need no privilege at all.
-5. **A scratchpad.**
-6. **A second history for the middle-click selection.**
-7. **A rules editor for link cleaning**, so the built-in list can be added to and switched off
+1. **Turning what was copied into something else**: as plain text, as Markdown, as JSON. The
+   clipboard is already ours, so this needs no new privilege and no synthetic input. Plasma's
+   own clipboard has Actions but does none of this. This is the next one to build.
+2. **Pasting straight from the picker**, behind the ydotool trade-off stated plainly before it
+   is switched on.
+3. **A plugin for KRunner.**
+4. **A shelf**, anchored to a screen edge.
+5. **Text snippets**, expanded through the input method so they need no privilege at all.
+6. **A scratchpad.**
+7. **A second history for the middle-click selection.**
+8. **A rules editor for link cleaning**, so the built-in list can be added to and switched off
    without editing a file.
 
 ## Credit

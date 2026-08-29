@@ -19,8 +19,12 @@ On a normal machine `$XDG_DATA_HOME` is `~/.local/share` and `$XDG_CONFIG_HOME` 
 - **Anything an application marks as a secret.** A password manager offers the mime type
   `x-kde-passwordManagerHint` beside the secret. Kavverna sees that on the offer and never
   reads the content, so it does not reach the process, let alone the disk.
-- **Text shaped like a key,** while the setting for it is on: a short string with no spaces
-  mixing letters, digits and symbols, or one containing words like password or token.
+- **Text shaped like a secret,** while the setting for it is on. Five shapes: a string with no
+  spaces mixing letters, digits and symbols; one containing a word like password or token; a
+  JSON web token, recognised by its three dotted parts rather than by length, since those run
+  past what the general rule covers; a key block, recognised by its `-----BEGIN` line, since it
+  is mostly line breaks and the general rule rejects anything with one; and a URL of any scheme
+  carrying a user name or password, which is what a connection string is.
 - **Anything at all, with the history switched off.** The compositor still reports that a copy
   happened, which is what the clear timer needs, but the content is not taken. There is a test
   that copies something with reading off and fails if it arrives.

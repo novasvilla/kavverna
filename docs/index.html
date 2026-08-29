@@ -62,6 +62,15 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
   }
   @media (max-width: 620px) { .shots img { width: 44%; } }
+  /* Picture wraps the image without a box of its own, so the flex row would collapse it. */
+  .shots picture { display: contents; }
+  .themes { margin-top: 20px; }
+  .caption {
+    margin: 12px 0 0;
+    text-align: center;
+    font-size: 13px;
+    color: var(--ink-faint);
+  }
 
   section { padding: 40px 0; border-top: 1px solid var(--hairline); }
   h2 { font-size: 24px; margin: 0 0 6px; letter-spacing: -0.01em; }
@@ -74,6 +83,9 @@
   pre {
     background: var(--stone-raised); border: 1px solid var(--hairline);
     border-radius: 10px; padding: 16px; overflow-x: auto;
+    /* A release URL is longer than the column, and a sideways scrollbar under one line reads
+       as something gone wrong rather than as a long address. */
+    white-space: pre-wrap; overflow-wrap: anywhere;
     font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink);
   }
   .note {
@@ -106,11 +118,29 @@
     <a href="https://github.com/novasvilla/kavverna/releases">Releases</a>
   </div>
   <div class="shots">
-    <img src="assets/readme/sound.png" alt="Sound: every output with live volumes, and one row per application">
-    <img src="assets/readme/monitoring.png" alt="Monitoring: processor, memory, pressure and both graphics cards">
-    <img src="assets/readme/clipboard.png" alt="Clipboard history with search and quick paste shortcuts">
-    <img src="assets/readme/settings.png" alt="Settings for startup, energy and the clipboard">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/readme/dark-sound.png">
+      <img src="assets/readme/light-sound.png" alt="Sound: every output with live volumes, and one row per application">
+    </picture>
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/readme/dark-monitoring.png">
+      <img src="assets/readme/light-monitoring.png" alt="Monitoring: processor, memory, pressure and both graphics cards">
+    </picture>
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/readme/dark-clipboard.png">
+      <img src="assets/readme/light-clipboard.png" alt="Clipboard history with search and quick paste shortcuts">
+    </picture>
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/readme/dark-settings.png">
+      <img src="assets/readme/light-settings.png" alt="Settings, with every utility and its own switch">
+    </picture>
   </div>
+  <div class="shots themes">
+    <img src="assets/readme/light-energy.png" alt="The energy page in the light theme">
+    <img src="assets/readme/dark-energy.png" alt="The energy page in the dark theme">
+  </div>
+  <p class="caption">The panel follows your desktop into light or dark, and can be
+  pinned to either.</p>
 </header>
 
 <section class="wrap" id="why">
@@ -127,6 +157,17 @@
 
 <section class="wrap" id="features">
   <h2>Everything it does</h2>
+
+  <h3>The suite itself</h3>
+  <ul>
+    <li><strong>Every utility has its own switch</strong>, grouped as the panel groups them. One
+    switched off disappears from the panel and from the settings, and stops running: its thread
+    never starts. Turning it back on restores what it was configured to do.</li>
+    <li><strong>Light and dark</strong>, following the desktop or pinned to either. The colours
+    are Kavverna's own in both, so it looks like itself on any colour scheme.</li>
+    <li><strong>A tray menu that reaches the whole suite</strong>, not just keep awake: mute
+    every microphone, move to the next output, open the history.</li>
+  </ul>
 
   <h3>Sound</h3>
   <ul>
@@ -177,18 +218,28 @@
 
 <section class="wrap" id="install">
   <h2>Install</h2>
-  <p>On Arch, as a package. This installs the binary, the desktop entry and the icon the way
-  anything else on the system does, and <code>pacman -R kavverna</code> removes it again.</p>
+  <h3>On Arch, building it yourself</h3>
+  <p>Installs the binary, the desktop entry and the icon the way anything else on the system
+  does, and <code>pacman -R kavverna</code> removes it again.</p>
 <pre>git clone https://github.com/novasvilla/kavverna
 cd kavverna/packaging
 makepkg -si</pre>
-  <p>There is no AUR package yet: new AUR accounts are closed at the moment, so this is the way
-  in until they reopen. It is the same package the AUR would hand you.</p>
-  <p>Anywhere else, or to run it without installing:</p>
+  <p>This is the route to take on a machine you keep: it links against the Qt 6, PipeWire and
+  SQLite that machine actually has, so a later system update cannot leave it pointing at a
+  library that has moved.</p>
+
+  <h3>On Arch, the package attached to a release</h3>
+  <p>Every <a href="https://github.com/novasvilla/kavverna/releases">release</a> carries a built
+  package for Arch or CachyOS on x86_64, running Plasma 6 on Wayland with the Qt 6 the system
+  already has.</p>
+<pre>sudo pacman -U https://github.com/novasvilla/kavverna/releases/latest/download/kavverna-0.1.5-1-x86_64.pkg.tar.zst</pre>
+  <p>It resolves the same dependencies the source build does, since both come from the same
+  <code>PKGBUILD</code>. The trade is that this binary was linked against whatever Arch shipped
+  on the day of the release rather than against what is on your machine now.</p>
+
+  <h3>Anywhere else</h3>
 <pre>cargo build --release
 ./target/release/kavverna-shell</pre>
-  <p>A prebuilt binary is attached to every
-  <a href="https://github.com/novasvilla/kavverna/releases">release</a>.</p>
   <div class="note">
     <p>Tested on CachyOS with KDE Plasma 6.7 on Wayland and Qt 6.11. Other distributions are
     untested rather than refused: everything KDE specific is reached over D-Bus and QML imports
@@ -213,12 +264,13 @@ makepkg -si</pre>
   <h2>What is next</h2>
   <p>In roughly this order. Anything here is a good place to start if you want to help.</p>
   <ul>
+    <li><strong>Turning what was copied into something else</strong>: as plain text, as
+    Markdown, as JSON. The clipboard is already ours, so none of it needs a new privilege.</li>
     <li><strong>A panel applet</strong>, so the readings are visible without opening anything.
     The tray cannot show text, so this is the only place live numbers can live.</li>
-    <li><strong>Light and dark themes</strong> following the desktop.</li>
-    <li><strong>Application icons in the mixer.</strong></li>
-    <li><strong>Paste as plain text</strong>, and pasting straight from the picker into the
-    application you were in.</li>
+    <li><strong>Network and disk</strong> in the monitor.</li>
+    <li><strong>Pasting straight from the picker</strong> into the application you were in,
+    which needs synthetic input and is why it is not here yet.</li>
     <li><strong>A shelf</strong> for files, text and links, anchored to a screen edge.</li>
     <li><strong>Text snippets</strong>, expanded through the input method so they need no
     privilege at all.</li>
@@ -227,9 +279,15 @@ makepkg -si</pre>
     everyone already uses.</li>
     <li><strong>A second history for the middle-click selection</strong>, which macOS has no
     concept of.</li>
+    <li><strong>A shortcut guide</strong>, showing what is bound across the whole session and
+    where two things collide. KGlobalAccel knows every global shortcut, which is more than the
+    desktop surfaces anywhere today.</li>
     <li><strong>Fan control</strong>, last, with its own privileged daemon and a thermal
     watchdog.</li>
   </ul>
+  <p>Deliberately not here, because Plasma already does them well: window management and
+  tiling, another launcher, screen OCR, day and night theme switching, and file manager context
+  actions.</p>
 </section>
 
 <section class="wrap" id="contribute">

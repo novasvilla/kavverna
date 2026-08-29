@@ -31,10 +31,31 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/readme/sound.png" width="186" alt="Sound: every output with live volumes, and one row per application">
-  <img src="docs/assets/readme/monitoring.png" width="186" alt="Monitoring: processor, memory, pressure and both graphics cards">
-  <img src="docs/assets/readme/clipboard.png" width="186" alt="Clipboard history with search and quick paste shortcuts">
-  <img src="docs/assets/readme/settings.png" width="186" alt="Settings for startup, energy and the clipboard">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dark-sound.png">
+    <img src="docs/assets/readme/light-sound.png" width="186" alt="Sound: every output with live volumes, and one row per application">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dark-monitoring.png">
+    <img src="docs/assets/readme/light-monitoring.png" width="186" alt="Monitoring: processor, memory, pressure and both graphics cards">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dark-clipboard.png">
+    <img src="docs/assets/readme/light-clipboard.png" width="186" alt="Clipboard history with search and quick paste shortcuts">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dark-settings.png">
+    <img src="docs/assets/readme/light-settings.png" width="186" alt="Settings, with every utility and its own switch">
+  </picture>
+</p>
+
+<p align="center">
+  <img src="docs/assets/readme/light-energy.png" width="186" alt="The energy page in the light theme">
+  <img src="docs/assets/readme/dark-energy.png" width="186" alt="The energy page in the dark theme">
+</p>
+
+<p align="center">
+  <sub>The panel follows your desktop into light or dark, and can be pinned to either.</sub>
 </p>
 
 Per application volume, a real system monitor, clipboard history with a picker on a shortcut,
@@ -60,9 +81,11 @@ not. See [CREDITS.md](CREDITS.md).
 - **Volume per application.** One row per application rather than per stream, because a single
   application can hold several and PipeWire gives them nothing to tell apart. The row shows its
   loudest stream and a change reaches all of them.
-- **Named by what it is, not by what it was built with.** A stream calls itself SDL Application
-  or Chromium; the desktop knows it as Dota 2 or Vesktop. Steam games are matched through the
-  identity Steam hands them, so every game is covered rather than a chosen few.
+- **Named and drawn by what it is, not by what it was built with.** A stream calls itself SDL
+  Application, Chromium or electron; the desktop knows it as Dota 2 or Vesktop and carries its
+  icon. Three ways in: the identity Steam hands a game, the identity a program announces through
+  `StartupWMClass` or its own entry file, and the binary it runs. Every Steam game and every
+  Electron application is covered rather than a chosen few.
 - **Every output and input** with live volumes, mute, and switching which one is the default.
 - **Mute every microphone** in one click.
 
@@ -90,6 +113,17 @@ not. See [CREDITS.md](CREDITS.md).
   locks. Saved entries are left alone, and it works with the history switched off.
 - **Take the tracking out of copied links**, campaign and click parameters removed the moment a
   link arrives, and everything else left byte for byte as it was.
+
+### The suite itself
+
+- **Every utility has its own switch**, grouped as the panel groups them. One switched off
+  disappears from the panel and from the settings, and stops running: its thread never starts.
+  Turning it back on restores what it was configured to do, since removing one never writes to
+  its own settings.
+- **Light and dark**, following the desktop or pinned to either. The colours are Kavverna's own
+  in both, so it looks like itself on any colour scheme.
+- **A tray menu that reaches the whole suite**, not just keep awake: mute every microphone, move
+  to the next output, open the history.
 
 ### Energy and tools
 
@@ -181,12 +215,13 @@ Being straight about this up front, because these limits are not going away:
 
 In roughly this order. Anything here is a good place to start if you want to help.
 
+- **Turning what was copied into something else**: as plain text, as Markdown, as JSON. The
+  clipboard is already ours, so none of it needs a new privilege.
 - **A panel applet**, so the readings are visible without opening anything. The tray cannot
   show text, so this is the only place live numbers can live.
-- **Light and dark themes** following the desktop, and switchable by hand.
-- **Application icons in the mixer**, resolved from the desktop entry of the same name.
-- **Paste as plain text**, and pasting straight from the picker into the application you were
-  in. Both need synthetic input, which is why they are not here yet.
+- **Network and disk** in the monitor.
+- **Pasting straight from the picker** into the application you were in, which needs synthetic
+  input and is why it is not here yet.
 - **A shelf** for files, text and links, anchored to a screen edge.
 - **Text snippets**, expanded through the input method rather than by typing keystrokes, so it
   needs no privilege at all.
@@ -194,8 +229,14 @@ In roughly this order. Anything here is a good place to start if you want to hel
 - **Answering in KRunner**, so the history and the snippets are reachable from the launcher
   everyone already uses.
 - **A second history for the middle-click selection**, which macOS has no concept of.
+- **A shortcut guide**, showing what is bound across the whole session and where two things
+  collide. KGlobalAccel knows every global shortcut, which is more than the desktop surfaces
+  anywhere today.
 - **Fan control**, last, with its own privileged daemon and a thermal watchdog. A fan left
   stopped can damage hardware, so it waits until it can be done properly.
+
+Deliberately not here, because Plasma already does them well: window management and tiling,
+another launcher, screen OCR, day and night theme switching, and file manager context actions.
 
 ## Contributing
 

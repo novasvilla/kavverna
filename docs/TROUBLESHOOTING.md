@@ -9,6 +9,26 @@ the application's. Run it with the QML channel on and the reason is at the end o
 QT_LOGGING_RULES='qt.qml.*=true' kavverna-shell
 ```
 
+## A page or a whole section is missing
+
+Every utility has a switch on the settings page, and one that is off is hidden from the panel,
+from the tab strip and from the rest of the settings. Turning it back on restores whatever it
+was configured to do, since removing one never writes to its own settings. Some entries there
+say **On the way** instead of carrying a switch, which means the utility is catalogued and not
+written yet.
+
+## An application in the mixer has the wrong name or no icon
+
+Kavverna asks the desktop what a program is called rather than believing what its toolkit says,
+and it tries three ways in: the identity Steam hands a game, the identity the program announces
+through `StartupWMClass` or its own `.desktop` file name, and the binary it runs. A program with
+no desktop entry at all has nothing to be looked up in, and shows the name its toolkit reports
+with the generic icon. Check what it is announcing:
+
+```sh
+pw-dump | grep -A2 'application.name'
+```
+
 ## The clipboard never empties itself
 
 Plasma's own clipboard puts the content straight back whenever anything empties the selection,

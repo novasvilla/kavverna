@@ -14,10 +14,14 @@ Three pieces, in this order:
    entry in `describe()`. Both are exhaustive matches with no wildcard arm, so the compiler
    tells you exactly what is missing, and the settings keys come from there rather than being
    written out twice. The catalogue depends on no feature crate: naming a feature can never
-   drag its code in.
+   drag its code in. A descriptor is `Readiness::Planned` until the crate exists, which lists
+   it on the utilities page as on the way rather than offering a switch for nothing. Moving it
+   to `Built` means editing the golden list in `tests/identity.rs`, deliberately.
 3. **A section under `apps/kavverna-shell/qml/MenuPanel/`,** one file, plus a bridge object in
    `src/` that turns a snapshot into properties QML can read. A state module beside it owns the
-   thread and publishes snapshots, following `clipboard_state.rs`.
+   thread and publishes snapshots, following `clipboard_state.rs`. `main.rs` starts that thread
+   only when the feature is installed, so a utility switched off on the settings page really
+   does stop.
 
 Two rules are not negotiable. Only `apps/kavverna-shell` may depend on Qt, and
 `domain/feature-catalog` may never depend on a feature crate.
@@ -30,16 +34,21 @@ from this build: there are no pkg-config files for it and no CMake step here.
 ## Before you open a pull request
 
 ```sh
-cargo fmt
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cargo fmt --all
+cargo clippy --all-targets --workspace --exclude kavverna-shell
+cargo test --workspace --exclude kavverna-shell
+RUSTFLAGS="-D warnings" cargo build --workspace
 ```
 
-The tests under `features/*/tests` run against the live desktop rather than a fake, because
-every interesting failure in this application is in the protocol rather than in the logic. They
-take the clipboard over and put back what they found, and they run one at a time. Stop Kavverna
-before running them, or clear your history afterwards, since a running instance will save the
-tests' own copies.
+That last one matters more than it looks. CI turns warnings into errors, and the shell crate is
+the one clippy does not see there, so `cargo build` is all that stands between a dead code
+warning and a red main.
+
+Tests that need a live compositor, a live session bus or real sensors carry `#[ignore]` and say
+what they need, which is why the commands above pick up everything else. Run them with
+`cargo test --workspace --exclude kavverna-shell -- --include-ignored` on a desktop. They take
+the clipboard over and put back what they found, and they run one at a time. Stop Kavverna
+first, or a running instance saves the tests' own copies into your history.
 
 ## House style
 
@@ -51,6 +60,10 @@ tests' own copies.
 - Verify against the system, not against the application's own state. Several bugs here passed
   their unit tests while doing nothing at all.
 - English everywhere, in code, comments, commits and documentation.
+- Every colour and repeated dimension comes from `qml/Theme.qml`. The stock Switch, CheckBox and
+  Slider follow the desktop's accent rather than the panel's, so use `Toggle`, `Tick` and
+  `Level` from `qml/Shared/` instead. Icons come from the desktop theme through `Kirigami.Icon`,
+  never from a character.
 
 ## Commit messages
 
