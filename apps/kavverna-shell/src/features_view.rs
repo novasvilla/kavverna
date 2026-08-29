@@ -26,6 +26,7 @@ pub mod qobject {
         #[qproperty(QStringList, ids)]
         #[qproperty(QStringList, titles)]
         #[qproperty(QStringList, summaries)]
+        #[qproperty(QStringList, energies)]
         #[qproperty(QStringList, groups)]
         #[qproperty(QList_bool, installed)]
         #[qproperty(QList_bool, built)]
@@ -49,6 +50,7 @@ pub struct FeaturesViewRust {
     ids: QStringList,
     titles: QStringList,
     summaries: QStringList,
+    energies: QStringList,
     groups: QStringList,
     installed: QList<bool>,
     built: QList<bool>,
@@ -70,7 +72,8 @@ impl qobject::FeaturesView {
     }
 
     fn refresh(mut self: Pin<&mut Self>) {
-        let (mut ids, mut titles, mut summaries, mut groups) = (
+        let (mut ids, mut titles, mut summaries, mut energies, mut groups) = (
+            QStringList::default(),
             QStringList::default(),
             QStringList::default(),
             QStringList::default(),
@@ -83,6 +86,7 @@ impl qobject::FeaturesView {
             ids.append(QString::from(feature.id()));
             titles.append(QString::from(described.title));
             summaries.append(QString::from(described.summary));
+            energies.append(QString::from(described.energy.label()));
             groups.append(QString::from(described.group.title()));
             installed.append(settings::is_installed(feature));
             built.append(feature.is_built());
@@ -94,6 +98,7 @@ impl qobject::FeaturesView {
         self.as_mut().set_ids(ids);
         self.as_mut().set_titles(titles);
         self.as_mut().set_summaries(summaries);
+        self.as_mut().set_energies(energies);
         self.as_mut().set_groups(groups);
         self.as_mut().set_installed(installed);
         self.as_mut().set_built(built);

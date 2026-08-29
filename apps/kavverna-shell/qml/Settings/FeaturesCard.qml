@@ -77,13 +77,29 @@ ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 1
 
-                            Label {
+                            RowLayout {
                                 Layout.fillWidth: true
-                                text: card.features.titles[entry.index]
-                                font.pixelSize: card.theme.textStrong
-                                font.bold: true
-                                color: entry.built ? card.theme.primaryText : card.theme.mutedText
-                                elide: Text.ElideRight
+                                spacing: card.theme.gapSnug
+
+                                Label {
+                                    text: card.features.titles[entry.index]
+                                    font.pixelSize: card.theme.textStrong
+                                    font.bold: true
+                                    color: entry.built ? card.theme.primaryText
+                                                       : card.theme.mutedText
+                                    elide: Text.ElideRight
+                                }
+
+                                // What this utility keeps alive, so the choice to leave one on
+                                // is made against what it costs rather than against a guess.
+                                Label {
+                                    text: card.features.energies[entry.index]
+                                    font.pixelSize: card.theme.textBody
+                                    color: card.theme.mutedText
+                                    elide: Text.ElideRight
+                                }
+
+                                Item { Layout.fillWidth: true }
                             }
 
                             Label {

@@ -30,6 +30,19 @@ pub enum EnergyProfile {
     WatchesInput,
 }
 
+impl EnergyProfile {
+    /// Shown beside the utility in the settings list. Someone deciding what to leave switched on
+    /// is asking what it costs them, and the honest answer for most of these is nothing.
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Idle => "Nothing at rest",
+            Self::Periodic => "Reads on a timer",
+            Self::WatchesClipboard => "Watches the clipboard",
+            Self::WatchesInput => "Waits on a key",
+        }
+    }
+}
+
 /// Whether the feature exists yet. The catalogue is what Kavverna is for rather than what it
 /// has finished, so something on its way is listed and says so instead of being left out and
 /// forgotten about.
