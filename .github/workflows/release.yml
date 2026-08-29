@@ -87,6 +87,11 @@ jobs:
           cp README.md LICENSE CHANGELOG.md CREDITS.md "dist/$name/"
           tar -czf "dist/$name.tar.gz" -C dist "$name"
           cp packaging/*.pkg.tar.zst dist/
+          # A second copy under a name that carries no version, so
+          # releases/latest/download/kavverna-x86_64.pkg.tar.zst is a URL that never changes and
+          # the install instructions never go stale. pacman reads the version from the package
+          # rather than from the file name, so this installs as the release it came from.
+          cp packaging/*.pkg.tar.zst dist/kavverna-x86_64.pkg.tar.zst
           # Written from inside dist, or the checksum file names a path that is not there once
           # the file has been downloaded on its own.
           cd dist

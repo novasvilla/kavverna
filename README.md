@@ -157,17 +157,21 @@ Every [release](https://github.com/novasvilla/kavverna/releases) carries a built
 on Wayland, with the Qt 6 the system already has:
 
 ```sh
-version=0.2.1
-base=https://github.com/novasvilla/kavverna/releases/download/v$version
-curl -LO $base/kavverna-$version-1-x86_64.pkg.tar.zst
-curl -LO $base/kavverna-$version-1-x86_64.pkg.tar.zst.sha256
-sha256sum -c kavverna-$version-1-x86_64.pkg.tar.zst.sha256
-sudo pacman -U kavverna-$version-1-x86_64.pkg.tar.zst
+curl -LO https://github.com/novasvilla/kavverna/releases/latest/download/kavverna-x86_64.pkg.tar.zst
+sudo pacman -U kavverna-x86_64.pkg.tar.zst
 ```
 
-Downloaded first rather than handed to `pacman` as a URL, because a remote file makes pacman
-look for a signature beside it and the package is not signed. The checksum published next to it
-is what stands in for one, which is why it is worth the extra line.
+That URL always points at the newest release, and `pacman` takes the version from inside the
+package rather than from the file name. Downloaded first rather than handed to `pacman` as a
+URL, because a remote file makes pacman look for a signature beside it and the package is not
+signed.
+
+To check it against the checksum published with it, which is what stands in for a signature:
+
+```sh
+curl -LO https://github.com/novasvilla/kavverna/releases/latest/download/kavverna-x86_64.pkg.tar.zst.sha256
+sha256sum -c kavverna-x86_64.pkg.tar.zst.sha256
+```
 
 `pacman` resolves the same dependencies the source build does, since both come from the same
 `PKGBUILD`. The trade is that this binary was linked against whatever Arch shipped on the day

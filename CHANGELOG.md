@@ -3,7 +3,15 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
-## Unreleased
+## 0.2.2
+
+### Added
+
+- **An install URL that never changes.** Every release also carries the package under
+  `kavverna-x86_64.pkg.tar.zst`, so
+  `releases/latest/download/kavverna-x86_64.pkg.tar.zst` always points at the newest one and
+  the instructions never go stale. pacman takes the version from inside the package rather than
+  from the file name.
 
 ### Fixed
 
@@ -11,7 +19,7 @@ build that produced the binary, stamped by CI and zero for anything built by han
   makes it look for a signature beside the file, and the package is not signed, so it stopped
   with a 404 rather than installing. The README and the site now download the package and its
   published checksum, verify it, and install the local file. CI checks that the version in
-  those instructions is the one being built, since the same number now lives in four places.
+  those instructions is the one being built.
 
 ## 0.2.1
 

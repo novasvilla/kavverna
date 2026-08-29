@@ -30,21 +30,6 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # The install example names a version, and a stale one sends people at a file that is not
-      # there. Three places hold the version and this is the fourth, so it is checked rather
-      # than remembered.
-      - name: The documented version must be the one being built
-        run: |
-          set -eu
-          declared=$(sed -n 's/^pkgver=//p' packaging/PKGBUILD)
-          for file in README.md docs/index.html; do
-            documented=$(grep -oE 'version=[0-9]+\.[0-9]+\.[0-9]+' "$file" | head -1 | cut -d= -f2)
-            if [ "$documented" != "$declared" ]; then
-              echo "$file documents $documented and the package is $declared"
-              exit 1
-            fi
-          done
-
       - run: cargo fmt --all --check
 
       # Named by exclusion rather than one by one, or the list rots the next time a crate
