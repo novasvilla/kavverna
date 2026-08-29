@@ -232,7 +232,15 @@ makepkg -si</pre>
   <p>Every <a href="https://github.com/novasvilla/kavverna/releases">release</a> carries a built
   package for Arch or CachyOS on x86_64, running Plasma 6 on Wayland with the Qt 6 the system
   already has.</p>
-<pre>sudo pacman -U https://github.com/novasvilla/kavverna/releases/latest/download/kavverna-0.1.5-1-x86_64.pkg.tar.zst</pre>
+<pre>version=0.2.1
+base=https://github.com/novasvilla/kavverna/releases/download/v$version
+curl -LO $base/kavverna-$version-1-x86_64.pkg.tar.zst
+curl -LO $base/kavverna-$version-1-x86_64.pkg.tar.zst.sha256
+sha256sum -c kavverna-$version-1-x86_64.pkg.tar.zst.sha256
+sudo pacman -U kavverna-$version-1-x86_64.pkg.tar.zst</pre>
+  <p>Downloaded first rather than handed to <code>pacman</code> as a URL, because a remote file
+  makes pacman look for a signature beside it and the package is not signed. The checksum
+  published next to it is what stands in for one.</p>
   <p>It resolves the same dependencies the source build does, since both come from the same
   <code>PKGBUILD</code>. The trade is that this binary was linked against whatever Arch shipped
   on the day of the release rather than against what is on your machine now.</p>

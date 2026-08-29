@@ -3,6 +3,16 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## Unreleased
+
+### Fixed
+
+- **The documented way to install the published package did not work.** Handing `pacman` a URL
+  makes it look for a signature beside the file, and the package is not signed, so it stopped
+  with a 404 rather than installing. The README and the site now download the package and its
+  published checksum, verify it, and install the local file. CI checks that the version in
+  those instructions is the one being built, since the same number now lives in four places.
+
 ## 0.2.1
 
 ### Fixed

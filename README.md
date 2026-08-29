@@ -157,8 +157,17 @@ Every [release](https://github.com/novasvilla/kavverna/releases) carries a built
 on Wayland, with the Qt 6 the system already has:
 
 ```sh
-sudo pacman -U https://github.com/novasvilla/kavverna/releases/latest/download/kavverna-0.1.5-1-x86_64.pkg.tar.zst
+version=0.2.1
+base=https://github.com/novasvilla/kavverna/releases/download/v$version
+curl -LO $base/kavverna-$version-1-x86_64.pkg.tar.zst
+curl -LO $base/kavverna-$version-1-x86_64.pkg.tar.zst.sha256
+sha256sum -c kavverna-$version-1-x86_64.pkg.tar.zst.sha256
+sudo pacman -U kavverna-$version-1-x86_64.pkg.tar.zst
 ```
+
+Downloaded first rather than handed to `pacman` as a URL, because a remote file makes pacman
+look for a signature beside it and the package is not signed. The checksum published next to it
+is what stands in for one, which is why it is worth the extra line.
 
 `pacman` resolves the same dependencies the source build does, since both come from the same
 `PKGBUILD`. The trade is that this binary was linked against whatever Arch shipped on the day
