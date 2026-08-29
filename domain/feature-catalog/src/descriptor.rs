@@ -96,7 +96,7 @@ impl Feature {
             },
             Self::SystemMonitor => Descriptor {
                 title: "System monitor",
-                summary: "CPU, GPU, memory and temperatures with history graphs.",
+                summary: "CPU, GPU and memory with two minutes behind each, and temperatures.",
                 group: Group::Monitoring,
                 icon: "utilities-system-monitor",
                 energy: EnergyProfile::Periodic,

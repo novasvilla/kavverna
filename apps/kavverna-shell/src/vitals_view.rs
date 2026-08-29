@@ -22,8 +22,10 @@ pub mod qobject {
         #[qproperty(QString, cpu_load_text)]
         #[qproperty(QString, cpu_temperature_text)]
         #[qproperty(QList_f32, core_loads)]
+        #[qproperty(QList_f32, cpu_history)]
         #[qproperty(f32, memory_used)]
         #[qproperty(QString, memory_text)]
+        #[qproperty(QList_f32, memory_history)]
         #[qproperty(f32, memory_apps)]
         #[qproperty(QString, memory_apps_text)]
         #[qproperty(QString, pressure_text)]
@@ -32,6 +34,7 @@ pub mod qobject {
         #[qproperty(i32, chosen_card)]
         #[qproperty(QString, gpu_usage_text)]
         #[qproperty(f32, gpu_usage)]
+        #[qproperty(QList_f32, gpu_history)]
         #[qproperty(QString, gpu_temperature_text)]
         #[qproperty(QString, gpu_power_text)]
         #[qproperty(f32, vram_used)]
@@ -59,8 +62,10 @@ pub struct VitalsViewRust {
     cpu_load_text: QString,
     cpu_temperature_text: QString,
     core_loads: QList<f32>,
+    cpu_history: QList<f32>,
     memory_used: f32,
     memory_text: QString,
+    memory_history: QList<f32>,
     memory_apps: f32,
     memory_apps_text: QString,
     pressure_text: QString,
@@ -69,10 +74,19 @@ pub struct VitalsViewRust {
     chosen_card: i32,
     gpu_usage_text: QString,
     gpu_usage: f32,
+    gpu_history: QList<f32>,
     gpu_temperature_text: QString,
     gpu_power_text: QString,
     vram_used: f32,
     vram_text: QString,
+}
+
+fn as_list(series: &std::collections::VecDeque<f32>) -> QList<f32> {
+    let mut list = QList::<f32>::default();
+    for reading in series {
+        list.append(*reading);
+    }
+    list
 }
 
 fn gib(bytes: u64) -> f64 {
@@ -117,6 +131,10 @@ impl qobject::VitalsView {
         }
         self.as_mut().set_core_loads(cores);
 
+        let past = vitals_state::history();
+        self.as_mut().set_cpu_history(as_list(&past.cpu));
+        self.as_mut().set_memory_history(as_list(&past.memory));
+
         let memory = vitals.memory;
         self.as_mut().set_memory_used(memory.used_fraction());
         self.as_mut().set_memory_text(QString::from(&format!(
@@ -156,6 +174,9 @@ impl qobject::VitalsView {
         let card = vitals.graphics.cards.get(index).or_else(|| vitals.graphics.preferred());
 
         let reading = card.map(|card| &card.reading);
+        // Indexed the same way the cards are, so switching cards shows that card's own past
+        // rather than a line spliced from both.
+        self.as_mut().set_gpu_history(past.cards.get(index).map(as_list).unwrap_or_default());
         self.as_mut().set_gpu_usage(reading.and_then(|r| r.utilisation).unwrap_or(0.0));
         self.as_mut().set_gpu_usage_text(QString::from(
             &reading
