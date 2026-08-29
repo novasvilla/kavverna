@@ -10,6 +10,9 @@ license=('GPL-3.0-or-later')
 depends=('qt6-base' 'qt6-declarative' 'layer-shell-qt' 'kirigami' 'libpipewire' 'sqlite'
          'hicolor-icon-theme')
 makedepends=('rust' 'clang' 'pkgconf')
+# makepkg turns link time optimisation on by default, and it drops the symbols cxx-qt generates
+# to bridge Rust and C++, so the binary fails to link with the whole bridge undefined.
+options=('!lto')
 optdepends=('ydotool: synthetic paste, once a feature asks for it')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('1753651c842951c58d5b33421904f0ad3aad106eb2f8011216a1f18fbc3baf1b')

@@ -163,11 +163,7 @@ impl Default for KavvernaPanelRust {
             ),
             launch_at_login: launch_at_login::is_enabled(),
             settings_path: QString::from(&settings_location()),
-            version: QString::from(&format!(
-                "{}.{}",
-                env!("CARGO_PKG_VERSION"),
-                env!("KAVVERNA_BUILD")
-            )),
+            version: QString::from(&crate::remote::version()),
         }
     }
 }

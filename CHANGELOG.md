@@ -3,6 +3,19 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## Unreleased
+
+### Added
+
+- **A built package on every release.** Each release now carries an
+  `x86_64.pkg.tar.zst` beside the source tarball, so installing on Arch or CachyOS is
+  `sudo pacman -U` against the attached file. It is produced by `packaging/PKGBUILD`
+  from the tagged commit, so it resolves exactly the dependencies a source build does.
+  Building it yourself with `makepkg -si` stays the recommended route on a machine you
+  keep, since that links against the libraries the machine has rather than the ones
+  Arch shipped on the day of the release.
+- `kavverna-shell --version` and `--help`. Both used to open the panel in silence.
+
 ## 0.1.5
 
 ### Fixed

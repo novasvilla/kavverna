@@ -16,7 +16,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed \
             git rust qt6-base qt6-declarative layer-shell-qt kirigami \
-            pipewire libpipewire clang pkgconf sqlite
+            pipewire libpipewire clang pkgconf sqlite sudo
 
       - uses: actions/checkout@v5
 
@@ -25,31 +25,96 @@ jobs:
       - name: Test
         run: cargo test --workspace --exclude kavverna-shell --locked
 
-      # Cargo versions are three numbers and the release scheme asks for four. The fourth is
-      # the build that produced this binary, and a build made by hand reads zero.
-      - name: Build
+      # The tag names the release and the package names itself from the PKGBUILD. Catching a
+      # disagreement here beats publishing a v0.2.0 release carrying a 0.1.5 package.
+      - name: The tag and the PKGBUILD must agree
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          declared=$(sed -n 's/^pkgver=//p' packaging/PKGBUILD)
+          if [ "$declared" != "${TAG#v}" ]; then
+            echo "PKGBUILD says $declared and the tag says ${TAG#v}"
+            exit 1
+          fi
+
+      # makepkg fetches `source` from the tag, and GitHub has not generated that tarball yet, so
+      # its checksum cannot be in a commit that predates the tag. This makes the archive from the
+      # commit being released and puts it where makepkg looks, which is why the build never
+      # reaches the network and why checksums are skipped: what it is being asked to verify is
+      # this commit, not a published file.
+      - name: Take the source from the commit being released
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          git config --global --add safe.directory "$PWD"
+          git archive --prefix="kavverna-${TAG#v}/" \
+            -o "packaging/kavverna-${TAG#v}.tar.gz" HEAD
+
+      # makepkg refuses to run as root and this container is root, so the build happens as
+      # somebody else and the checkout has to be theirs to write in.
+      - name: Make an unprivileged builder
+        run: |
+          useradd --create-home builder
+          chown -R builder:builder .
+
+      # --nocheck because the suite already ran above, on this same commit, and running it a
+      # second time in one job buys nothing. The fourth version number is passed explicitly
+      # rather than through sudo's environment rules, and asserted afterwards.
+      - name: Build the package
         env:
           KAVVERNA_BUILD: ${{ github.run_number }}
-        run: cargo build --release --locked
+        working-directory: packaging
+        run: |
+          set -eu
+          sudo -u builder env KAVVERNA_BUILD="$KAVVERNA_BUILD" \
+            makepkg --nocheck --skipchecksums --noconfirm
 
-      - name: Package
+      - name: The package must know which build made it
+        env:
+          KAVVERNA_BUILD: ${{ github.run_number }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          built="packaging/src/kavverna-${TAG#v}/target/release/kavverna-shell"
+          reported=$("$built" --version)
+          if [ "$reported" != "${TAG#v}.$KAVVERNA_BUILD" ]; then
+            echo "the binary reports $reported, expected ${TAG#v}.$KAVVERNA_BUILD"
+            exit 1
+          fi
+          pacman -Qip packaging/*.pkg.tar.zst
+
+      - name: Collect what the release carries
         env:
           TAG: ${{ github.ref_name }}
         run: |
           set -eu
           name="kavverna-${TAG#v}-x86_64"
           mkdir -p "dist/$name"
-          cp target/release/kavverna-shell "dist/$name/"
+          cp "packaging/src/kavverna-${TAG#v}/target/release/kavverna-shell" "dist/$name/"
           cp README.md LICENSE CHANGELOG.md CREDITS.md "dist/$name/"
           tar -czf "dist/$name.tar.gz" -C dist "$name"
-          sha256sum "dist/$name.tar.gz" > "dist/$name.tar.gz.sha256"
+          cp packaging/*.pkg.tar.zst dist/
+          # Written from inside dist, or the checksum file names a path that is not there once
+          # the file has been downloaded on its own.
+          cd dist
+          for file in *.tar.gz *.pkg.tar.zst; do
+            sha256sum "$file" > "$file.sha256"
+          done
 
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.tar.gz
+            dist/*.pkg.tar.zst
             dist/*.sha256
           generate_release_notes: true
           body: |
             Built on Arch with Qt 6 for KDE Plasma 6 on Wayland. See CHANGELOG.md for what
             changed, and the README for what this still cannot do.
+
+            The `.pkg.tar.zst` installs with `sudo pacman -U`. Building it yourself with
+            `makepkg -si` is the better route on a machine you keep, since it links against the
+            libraries that machine has rather than the ones Arch shipped on the day of this
+            release.

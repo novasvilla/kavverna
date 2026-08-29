@@ -101,7 +101,7 @@ not. See [CREDITS.md](CREDITS.md).
 
 ## Install
 
-### On Arch, as a package
+### On Arch, building it yourself
 
 The `PKGBUILD` builds from the tagged release and installs the binary, the desktop entry and
 the icon the way anything else on the system does:
@@ -112,9 +112,24 @@ cd kavverna/packaging
 makepkg -si
 ```
 
-`pacman -R kavverna` removes it again. There is no AUR package yet: new AUR accounts are
-closed at the moment, so this is the way in until they reopen. Nothing about it is temporary
-from your side, it is the same package the AUR would hand you.
+`pacman -R kavverna` removes it again. This is the route to take on a machine you keep: it
+links against the Qt 6, PipeWire and SQLite that machine actually has, so a later system
+update cannot leave it pointing at a library that has moved.
+
+### On Arch, the package attached to a release
+
+Every [release](https://github.com/novasvilla/kavverna/releases) carries a built
+`kavverna-<version>-x86_64.pkg.tar.zst`. It is for Arch or CachyOS on x86_64, running Plasma 6
+on Wayland, with the Qt 6 the system already has:
+
+```sh
+sudo pacman -U https://github.com/novasvilla/kavverna/releases/latest/download/kavverna-0.1.5-1-x86_64.pkg.tar.zst
+```
+
+`pacman` resolves the same dependencies the source build does, since both come from the same
+`PKGBUILD`. The trade is that this binary was linked against whatever Arch shipped on the day
+of the release rather than against what is on your machine now, which is why building it
+yourself is the recommended route.
 
 ### Anywhere else
 

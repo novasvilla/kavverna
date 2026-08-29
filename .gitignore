@@ -8,3 +8,9 @@
 
 # Editor state with machine-local paths in it.
 .qmlls.ini
+
+# What makepkg leaves in packaging/ when the package is built there.
+/packaging/src/
+/packaging/pkg/
+/packaging/*.tar.gz
+/packaging/*.pkg.tar.zst

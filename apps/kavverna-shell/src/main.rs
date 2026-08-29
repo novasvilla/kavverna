@@ -28,6 +28,13 @@ use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
 use feature_catalog::Feature;
 
 fn main() {
+    // Asked and answered without a bus, a window or a tray icon.
+    match remote::Wanted::from_arguments(std::env::args()) {
+        remote::Wanted::Version => return println!("{}", remote::version()),
+        remote::Wanted::Usage => return print!("{}", remote::USAGE),
+        _ => {}
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(
             |_| {
@@ -56,9 +63,9 @@ fn main() {
             return;
         }
         Ok(remote::Claim::Ours) => match &wanted {
-            remote::Wanted::Panel => {}
             remote::Wanted::Settings => panel::request(panel::Requested::Settings),
             remote::Wanted::Page(name) => panel::request(panel::Requested::Page(name.clone())),
+            _ => {}
         },
         Err(err) => tracing::warn!(%err, "running without a remote interface: {}", err),
     }

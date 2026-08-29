@@ -142,6 +142,10 @@ pub enum Wanted {
     Panel,
     Page(String),
     Settings,
+    /// Answered here and now rather than by a running instance. Both used to open the panel in
+    /// silence, which on Linux is the opposite of what anyone expects.
+    Version,
+    Usage,
 }
 
 impl Wanted {
@@ -150,10 +154,33 @@ impl Wanted {
         match arguments.next().as_deref() {
             Some("--settings") => Self::Settings,
             Some("--page") => arguments.next().map_or(Self::Panel, Self::Page),
+            Some("--version" | "-V") => Self::Version,
+            Some("--help" | "-h") => Self::Usage,
             _ => Self::Panel,
         }
     }
 }
+
+/// The release scheme is four numbers. The first three are the release and the fourth is the
+/// build that produced this binary, stamped by CI and zero for anything built by hand.
+pub fn version() -> String {
+    format!("{}.{}", env!("CARGO_PKG_VERSION"), env!("KAVVERNA_BUILD"))
+}
+
+pub const USAGE: &str = "\
+Kavverna, one tray icon for the utilities a KDE Plasma desktop is missing.
+
+Usage: kavverna-shell [OPTION]
+
+  --page <name>   Open the panel on a page: sound, monitoring, clipboard, tools, energy
+  --settings      Open the settings page
+  -V, --version   Print the version and exit
+  -h, --help      Print this and exit
+
+With no option it opens the panel, or raises the instance already running.
+
+Everything the panel does is also on the session bus, at dev.kavverna.Shell.
+";
 
 async fn raise_running_instance(wanted: &Wanted) {
     let Ok(connection) = zbus::Connection::session().await else {
@@ -161,6 +188,8 @@ async fn raise_running_instance(wanted: &Wanted) {
     };
 
     let call = match wanted {
+        // Answered before the bus is reached, so a running instance never sees them.
+        Wanted::Version | Wanted::Usage => return,
         Wanted::Panel => {
             connection.call_method(Some(SERVICE), PATH, Some(INTERFACE), "Activate", &()).await
         }
@@ -191,6 +220,25 @@ mod tests {
     fn a_plain_launch_asks_for_the_panel() {
         assert_eq!(wanted(&[]), Wanted::Panel);
         assert_eq!(wanted(&["--nonsense"]), Wanted::Panel);
+    }
+
+    #[test]
+    fn a_question_is_recognised_by_either_spelling() {
+        assert_eq!(wanted(&["--version"]), Wanted::Version);
+        assert_eq!(wanted(&["-V"]), Wanted::Version);
+        assert_eq!(wanted(&["--help"]), Wanted::Usage);
+        assert_eq!(wanted(&["-h"]), Wanted::Usage);
+    }
+
+    /// The fourth number is the build, and a package reporting zero would mean CI never handed
+    /// it one.
+    #[test]
+    fn the_version_carries_four_numbers() {
+        let printed = version();
+        let parts: Vec<&str> = printed.split('.').collect();
+
+        assert_eq!(parts.len(), 4, "version was {printed}");
+        assert!(parts.iter().all(|part| part.parse::<u32>().is_ok()), "version was {printed}");
     }
 
     #[test]
