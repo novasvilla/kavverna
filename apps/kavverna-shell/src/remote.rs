@@ -137,15 +137,21 @@ pub async fn claim(wanted: &Wanted) -> zbus::Result<Claim> {
 
 /// What a launch asks the running instance to show. The desktop entry's actions are these, so
 /// a right click on the icon in a launcher reaches the same places the panel does.
+pub const PAGES: [&str; 5] = ["energy", "sound", "monitoring", "clipboard", "tools"];
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Wanted {
     Panel,
     Page(String),
     Settings,
-    /// Answered here and now rather than by a running instance. Both used to open the panel in
+    /// Answered here and now rather than by a running instance. These used to open the panel in
     /// silence, which on Linux is the opposite of what anyone expects.
     Version,
     Usage,
+    Selftest,
+    /// Said back with a non-zero exit rather than swallowed. A typo that opens the panel looks
+    /// exactly like the flag having worked.
+    Unknown(String),
 }
 
 impl Wanted {
@@ -153,10 +159,16 @@ impl Wanted {
         let mut arguments = arguments.skip(1);
         match arguments.next().as_deref() {
             Some("--settings") => Self::Settings,
-            Some("--page") => arguments.next().map_or(Self::Panel, Self::Page),
+            Some("--page") => match arguments.next() {
+                Some(name) if PAGES.contains(&name.as_str()) => Self::Page(name),
+                Some(name) => Self::Unknown(format!("--page {name}")),
+                None => Self::Unknown("--page, with no page named".into()),
+            },
             Some("--version" | "-V") => Self::Version,
             Some("--help" | "-h") => Self::Usage,
-            _ => Self::Panel,
+            Some("--selftest") => Self::Selftest,
+            Some(other) => Self::Unknown(other.to_owned()),
+            None => Self::Panel,
         }
     }
 }
@@ -174,6 +186,7 @@ Usage: kavverna-shell [OPTION]
 
   --page <name>   Open the panel on a page: sound, monitoring, clipboard, tools, energy
   --settings      Open the settings page
+  --selftest      Report what this machine offers of what Kavverna relies on, and exit
   -V, --version   Print the version and exit
   -h, --help      Print this and exit
 
@@ -189,7 +202,7 @@ async fn raise_running_instance(wanted: &Wanted) {
 
     let call = match wanted {
         // Answered before the bus is reached, so a running instance never sees them.
-        Wanted::Version | Wanted::Usage => return,
+        Wanted::Version | Wanted::Usage | Wanted::Selftest | Wanted::Unknown(_) => return,
         Wanted::Panel => {
             connection.call_method(Some(SERVICE), PATH, Some(INTERFACE), "Activate", &()).await
         }
@@ -219,7 +232,27 @@ mod tests {
     #[test]
     fn a_plain_launch_asks_for_the_panel() {
         assert_eq!(wanted(&[]), Wanted::Panel);
-        assert_eq!(wanted(&["--nonsense"]), Wanted::Panel);
+    }
+
+    /// A typo that opened the panel looked exactly like the flag having worked, which is how
+    /// --selftest could be mistyped for months without anyone noticing it did nothing.
+    #[test]
+    fn what_is_not_understood_is_said_back() {
+        assert_eq!(wanted(&["--nonsense"]), Wanted::Unknown("--nonsense".into()));
+        assert_eq!(wanted(&["--page", "banana"]), Wanted::Unknown("--page banana".into()));
+        assert_eq!(wanted(&["--page"]), Wanted::Unknown("--page, with no page named".into()));
+    }
+
+    #[test]
+    fn every_page_the_panel_has_is_reachable() {
+        for page in PAGES {
+            assert_eq!(wanted(&["--page", page]), Wanted::Page(page.into()));
+        }
+    }
+
+    #[test]
+    fn the_selftest_is_understood() {
+        assert_eq!(wanted(&["--selftest"]), Wanted::Selftest);
     }
 
     #[test]

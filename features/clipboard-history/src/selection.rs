@@ -691,3 +691,18 @@ mod tests {
         assert_eq!(offered_types(&Payload::Files(vec![])).first(), Some(&URI_LIST));
     }
 }
+
+/// Every interface the compositor advertises, for the self test. Its own connection, so it can
+/// answer while a watcher runs or when none does.
+pub fn advertised_globals() -> Vec<String> {
+    let Ok(conn) = Connection::connect_to_env() else {
+        return Vec::new();
+    };
+    let Ok((globals, _queue)) = registry_queue_init::<Watcher>(&conn) else {
+        return Vec::new();
+    };
+
+    globals
+        .contents()
+        .with_list(|list| list.iter().map(|global| global.interface.clone()).collect())
+}

@@ -728,3 +728,12 @@ mod tests {
         );
     }
 }
+
+/// Whether the system SQLite was compiled with FTS5, which search depends on. Asked of a
+/// throwaway in-memory database rather than of compile options, since trying is the only
+/// answer that cannot be wrong.
+pub fn fts5_available() -> bool {
+    rusqlite::Connection::open_in_memory()
+        .and_then(|db| db.execute_batch("CREATE VIRTUAL TABLE probe USING fts5(content)"))
+        .is_ok()
+}

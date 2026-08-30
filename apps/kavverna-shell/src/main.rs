@@ -18,6 +18,7 @@ mod mixer_state;
 mod mixer_view;
 mod panel;
 mod remote;
+mod selftest;
 mod settings;
 mod shortcuts;
 mod tray;
@@ -28,10 +29,16 @@ use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
 use feature_catalog::Feature;
 
 fn main() {
-    // Asked and answered without a bus, a window or a tray icon.
+    // Asked and answered without a window or a tray icon.
     match remote::Wanted::from_arguments(std::env::args()) {
         remote::Wanted::Version => return println!("{}", remote::version()),
         remote::Wanted::Usage => return print!("{}", remote::USAGE),
+        remote::Wanted::Selftest => std::process::exit(selftest::run()),
+        remote::Wanted::Unknown(what) => {
+            eprintln!("not understood: {what}");
+            eprint!("{}", remote::USAGE);
+            std::process::exit(2);
+        }
         _ => {}
     }
 
