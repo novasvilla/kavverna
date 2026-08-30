@@ -90,6 +90,18 @@ struct Tracked {
     client_of: BTreeMap<u32, u32>,
     default_sink: Option<String>,
     default_source: Option<String>,
+    /// Where each device node's volume actually lives: the card it belongs to, and which route
+    /// on that card. A stream, or a virtual sink with no hardware behind it, has no entry.
+    route_of_node: BTreeMap<u32, (u32, i32)>,
+    /// The routes each card currently exposes. `index` and `device` together are how one route
+    /// is addressed in a write.
+    routes: BTreeMap<u32, Vec<CardRoute>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CardRoute {
+    index: i32,
+    device: i32,
 }
 
 /// Steam hands each game its own identity, and the entry Steam writes for that game names its
@@ -247,6 +259,7 @@ fn run(
     let tracked = Rc::new(RefCell::new(Tracked::default()));
     let nodes: Rc<RefCell<BTreeMap<u32, (pipewire::node::Node, pipewire::node::NodeListener)>>> =
         Rc::new(RefCell::new(BTreeMap::new()));
+    let cards: Rc<RefCell<Cards>> = Rc::new(RefCell::new(BTreeMap::new()));
     let extras: Rc<RefCell<Vec<Box<dyn std::any::Any>>>> = Rc::new(RefCell::new(Vec::new()));
     let defaults: Rc<RefCell<Option<pipewire::metadata::Metadata>>> = Rc::new(RefCell::new(None));
 
@@ -262,6 +275,7 @@ fn run(
         let on_global = {
             let tracked = Rc::clone(&tracked);
             let nodes = Rc::clone(&nodes);
+            let cards = Rc::clone(&cards);
             let extras = Rc::clone(&extras);
             let defaults = Rc::clone(&defaults);
             let registry = registry.clone();
@@ -270,6 +284,7 @@ fn run(
             move |global: &pipewire::registry::GlobalObject<&DictRef>| {
                 match global.type_ {
                     ObjectType::Node => adopt_node(&registry, global, &tracked, &nodes, &publish),
+                    ObjectType::Device => adopt_card(&registry, global, &tracked, &cards, &publish),
                     ObjectType::Client => {
                         let props = properties_of(global.props);
                         let mut state = tracked.borrow_mut();
@@ -293,16 +308,20 @@ fn run(
         let on_remove = {
             let tracked = Rc::clone(&tracked);
             let nodes = Rc::clone(&nodes);
+            let cards = Rc::clone(&cards);
             let publish = publish.clone();
 
             move |id: u32| {
                 nodes.borrow_mut().remove(&id);
+                cards.borrow_mut().remove(&id);
                 let mut state = tracked.borrow_mut();
                 state.streams.remove(&id);
                 state.devices.remove(&id);
                 state.clients.remove(&id);
                 state.client_of.remove(&id);
                 state.stream_props.remove(&id);
+                state.route_of_node.remove(&id);
+                state.routes.remove(&id);
                 drop(state);
                 publish();
             }
@@ -312,7 +331,9 @@ fn run(
     };
 
     let _receiver = {
+        let tracked = Rc::clone(&tracked);
         let nodes = Rc::clone(&nodes);
+        let cards = Rc::clone(&cards);
         let defaults = Rc::clone(&defaults);
         let weak_loop = main_loop.downgrade();
 
@@ -323,10 +344,12 @@ fn run(
                 }
             }
             MixerCommand::SetVolume { node_id, volume } => {
-                apply(&nodes, node_id, volume_property(volume));
+                route_or_node(&tracked, &cards, &nodes, node_id, volume_property(volume));
             }
             MixerCommand::SetMute { node_id, muted } => {
-                apply(
+                route_or_node(
+                    &tracked,
+                    &cards,
                     &nodes,
                     node_id,
                     Property::new(libspa::sys::SPA_PROP_mute, Value::Bool(muted)),
@@ -368,6 +391,72 @@ fn volume_property(volume: Volume) -> Property {
         libspa::sys::SPA_PROP_channelVolumes,
         Value::ValueArray(ValueArray::Float(vec![volume.amplitude(); 2])),
     )
+}
+
+type Cards = BTreeMap<u32, (pipewire::device::Device, pipewire::device::DeviceListener)>;
+
+/// A stream's volume lives on its node. A device's lives on its card's route, and writing the
+/// node's Props instead changes a value nothing plays through: the graph reported the write,
+/// every readback of our own agreed, and the loudspeaker stayed exactly as loud as before. A
+/// device with no route, such as a virtual sink, really is controlled through its node.
+fn route_or_node(
+    tracked: &Rc<RefCell<Tracked>>,
+    cards: &Rc<RefCell<Cards>>,
+    nodes: &Rc<RefCell<BTreeMap<u32, (pipewire::node::Node, pipewire::node::NodeListener)>>>,
+    node_id: u32,
+    property: Property,
+) {
+    let target = {
+        let state = tracked.borrow();
+        state.route_of_node.get(&node_id).copied().and_then(|(card, wanted)| {
+            let route = state.routes.get(&card)?.iter().find(|route| route.device == wanted)?;
+            Some((card, *route))
+        })
+    };
+
+    match target {
+        Some((card, route)) => write_route(cards, card, route, property),
+        None => apply(nodes, node_id, property),
+    }
+}
+
+fn write_route(cards: &Rc<RefCell<Cards>>, card: u32, route: CardRoute, property: Property) {
+    let cards = cards.borrow();
+    let Some((device, _)) = cards.get(&card) else {
+        tracing::warn!(card, "the card went away before the change reached it");
+        return;
+    };
+
+    let object = Value::Object(Object {
+        type_: libspa::sys::SPA_TYPE_OBJECT_ParamRoute,
+        id: libspa::sys::SPA_PARAM_Route,
+        properties: vec![
+            Property::new(libspa::sys::SPA_PARAM_ROUTE_index, Value::Int(route.index)),
+            Property::new(libspa::sys::SPA_PARAM_ROUTE_device, Value::Int(route.device)),
+            Property::new(
+                libspa::sys::SPA_PARAM_ROUTE_props,
+                Value::Object(Object {
+                    type_: libspa::sys::SPA_TYPE_OBJECT_Props,
+                    id: libspa::sys::SPA_PARAM_Route,
+                    properties: vec![property],
+                }),
+            ),
+            // Into the card's stored state as well, so the level survives a replug the way a
+            // change made from anywhere else does.
+            Property::new(libspa::sys::SPA_PARAM_ROUTE_save, Value::Bool(true)),
+        ],
+    });
+
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    if PodSerializer::serialize(&mut bytes, &object).is_err() {
+        tracing::error!(card, "could not encode the route change");
+        return;
+    }
+
+    let bytes = bytes.into_inner();
+    if let Some(pod) = libspa::pod::Pod::from_bytes(&bytes) {
+        device.set_param(ParamType::Route, 0, pod);
+    }
 }
 
 fn apply(
@@ -450,6 +539,15 @@ fn adopt_node(
             }
             Some(role) => {
                 let name = props.get("node.name").cloned().unwrap_or_default();
+                // A hardware device carries the card it belongs to and which route on it, and
+                // that route is where its volume lives. A virtual sink carries neither.
+                let place = props
+                    .get("device.id")
+                    .and_then(|value| value.parse().ok())
+                    .zip(props.get("card.profile.device").and_then(|value| value.parse().ok()));
+                if let Some(place) = place {
+                    state.route_of_node.insert(id, place);
+                }
                 state.devices.insert(
                     id,
                     AudioDevice {
@@ -484,6 +582,17 @@ fn adopt_node(
                 if state.streams.contains_key(&id) {
                     state.stream_props.insert(id, full);
                     state.reidentify_node(id);
+                } else if state.devices.contains_key(&id) {
+                    // Here rather than at adoption: the registry hands out fewer properties
+                    // than the bound object's info event does, and the card this node belongs
+                    // to only arrives with the full set.
+                    let place = full
+                        .get("device.id")
+                        .and_then(|value| value.parse().ok())
+                        .zip(full.get("card.profile.device").and_then(|value| value.parse().ok()));
+                    if let Some(place) = place {
+                        state.route_of_node.insert(id, place);
+                    }
                 }
                 drop(state);
                 publish();
@@ -507,12 +616,16 @@ fn adopt_node(
                     if let Some(muted) = muted {
                         stream.muted = muted;
                     }
-                } else if let Some(device) = state.devices.get_mut(&id) {
-                    if let Some(volume) = volume {
-                        device.volume = volume;
-                    }
-                    if let Some(muted) = muted {
-                        device.muted = muted;
+                } else if !state.route_of_node.contains_key(&id) {
+                    // Only a device with no route reads from its node. One with a route gets
+                    // its truth from the card, and the node's Props can disagree with it.
+                    if let Some(device) = state.devices.get_mut(&id) {
+                        if let Some(volume) = volume {
+                            device.volume = volume;
+                        }
+                        if let Some(muted) = muted {
+                            device.muted = muted;
+                        }
                     }
                 }
                 drop(state);
@@ -523,6 +636,108 @@ fn adopt_node(
 
     node.subscribe_params(&[ParamType::Props]);
     nodes.borrow_mut().insert(id, (node, listener));
+}
+
+/// Follows a card's routes, which are where a device's volume and mute actually live. The
+/// subscription also replays the current routes on arrival, so a card is readable before
+/// anybody touches it.
+fn adopt_card(
+    registry: &pipewire::registry::RegistryRc,
+    global: &pipewire::registry::GlobalObject<&DictRef>,
+    tracked: &Rc<RefCell<Tracked>>,
+    cards: &Rc<RefCell<Cards>>,
+    publish: &(impl Fn() + Clone + 'static),
+) {
+    let props = properties_of(global.props);
+    if props.get("media.class").map(String::as_str) != Some("Audio/Device") {
+        return;
+    }
+
+    let Ok(device) = registry.bind::<pipewire::device::Device, _>(global) else {
+        return;
+    };
+
+    let card = global.id;
+    let listener = {
+        let tracked = Rc::clone(tracked);
+        let publish = publish.clone();
+
+        device
+            .add_listener_local()
+            .param(move |_, param_type, _, _, pod| {
+                if param_type != ParamType::Route {
+                    return;
+                }
+                let Some(pod) = pod else { return };
+                let Some(route) = read_route(pod.as_bytes()) else { return };
+
+                let mut state = tracked.borrow_mut();
+                let known = state.routes.entry(card).or_default();
+                known.retain(|existing| existing.device != route.at.device);
+                known.push(route.at);
+
+                // The route is the authority on a device's level, so what it reports wins over
+                // whatever the node's own Props said.
+                let node = state
+                    .route_of_node
+                    .iter()
+                    .find(|(_, place)| **place == (card, route.at.device))
+                    .map(|(node, _)| *node);
+                if let Some(device) = node.and_then(|node| state.devices.get_mut(&node)) {
+                    if let Some(volume) = route.volume {
+                        device.volume = volume;
+                    }
+                    if let Some(muted) = route.muted {
+                        device.muted = muted;
+                    }
+                }
+                drop(state);
+                publish();
+            })
+            .register()
+    };
+
+    device.subscribe_params(&[ParamType::Route]);
+    cards.borrow_mut().insert(card, (device, listener));
+}
+
+struct RouteReading {
+    at: CardRoute,
+    volume: Option<Volume>,
+    muted: Option<bool>,
+}
+
+fn read_route(bytes: &[u8]) -> Option<RouteReading> {
+    let (_, value) = PodDeserializer::deserialize_any_from(bytes).ok()?;
+    let Value::Object(object) = value else { return None };
+
+    let (mut index, mut device, mut volume, mut muted) = (None, None, None, None);
+
+    for property in object.properties {
+        match (property.key, property.value) {
+            (libspa::sys::SPA_PARAM_ROUTE_index, Value::Int(value)) => index = Some(value),
+            (libspa::sys::SPA_PARAM_ROUTE_device, Value::Int(value)) => device = Some(value),
+            (libspa::sys::SPA_PARAM_ROUTE_props, Value::Object(inner)) => {
+                for inner in inner.properties {
+                    match (inner.key, inner.value) {
+                        (
+                            libspa::sys::SPA_PROP_channelVolumes,
+                            Value::ValueArray(ValueArray::Float(levels)),
+                        ) => {
+                            if let Some(level) = levels.first() {
+                                volume = Some(Volume::from_amplitude(*level));
+                            }
+                        }
+                        (libspa::sys::SPA_PROP_mute, Value::Bool(value)) => muted = Some(value),
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Some(RouteReading { at: CardRoute { index: index?, device: device? }, volume, muted })
 }
 
 /// Reads the two fields the mixer cares about, ignoring everything else in the object.
