@@ -22,6 +22,7 @@ pub enum Feature {
     MouseJiggle,
     FanControl,
     Themes,
+    Shelf,
 }
 
 impl Feature {
@@ -42,6 +43,7 @@ impl Feature {
             Self::MouseJiggle => "mouse-jiggle",
             Self::FanControl => "fan-control",
             Self::Themes => "themes",
+            Self::Shelf => "shelf",
         }
     }
 

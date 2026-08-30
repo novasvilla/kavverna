@@ -48,13 +48,26 @@ impl Default for Settings {
 pub enum Command {
     Search(String),
     PutBack(i64),
-    Pin { id: i64, pinned: bool },
-    Move { id: i64, towards_top: bool },
-    Rewrite { id: i64, text: String },
+    Pin {
+        id: i64,
+        pinned: bool,
+    },
+    Move {
+        id: i64,
+        towards_top: bool,
+    },
+    Rewrite {
+        id: i64,
+        text: String,
+    },
     Forget(i64),
     ClearUnpinned,
     ClearClipboard,
-    Transform(crate::transform::Transformation),
+    /// Works the transformation out and shows the result; the clipboard is not touched.
+    PreviewTransform(crate::transform::Transformation),
+    /// Puts the last previewed result on the clipboard.
+    ApplyTransform,
+    DiscardTransform,
     AdoptKlipperHistory,
     Apply(Settings),
     Stop,
@@ -68,6 +81,9 @@ pub struct Snapshot {
     pub recent: usize,
     /// What the last transformation had to say, cleared by the next copy.
     pub notice: String,
+    /// The previewed result, elided for the panel: a copied novel should not travel to the
+    /// interface whole. Empty when nothing is staged.
+    pub preview: String,
     /// Whether the selection right now offers text, and whether it offers html, so the buttons
     /// can say why they are off instead of doing nothing.
     pub can_transform: bool,
@@ -183,9 +199,12 @@ fn run(
     let mut settings = settings;
     let mut query = String::new();
     let mut notice = String::new();
+    // The previewed transformation, waiting for Use it. A new copy discards it: the thing it
+    // was made from is gone.
+    let mut staged: Option<String> = None;
     let mut clearing = AutoClear::default();
     clearing.set_delay(settings.clear_after);
-    publish(&store, &watcher, &query, &notice, &snapshots);
+    publish(&store, &watcher, &query, &notice, staged.as_deref(), &snapshots);
 
     loop {
         let changed = match events_in.recv_timeout(TICK) {
@@ -197,6 +216,7 @@ fn run(
                 clearing.noticed_copy(Instant::now());
                 let payload = tidy(&watcher, payload, plain_only, settings);
                 notice.clear();
+                staged = None;
                 save(&mut store, payload, settings) || settings.keep_history
             }
             Ok(Event::Copied(SelectionEvent::Changed(Selection::Clipboard))) => {
@@ -215,8 +235,23 @@ fn run(
                 empty(&watcher, &mut clearing);
                 false
             }
-            Ok(Event::Asked(Command::Transform(wanted))) => {
-                notice = transform(&watcher, wanted);
+            Ok(Event::Asked(Command::PreviewTransform(wanted))) => {
+                (staged, notice) = preview(&watcher, wanted);
+                true
+            }
+            Ok(Event::Asked(Command::ApplyTransform)) => {
+                match staged.take() {
+                    Some(text) => {
+                        watcher.offer(Selection::Clipboard, Payload::Text(text));
+                        notice = "On the clipboard; the next paste is the result.".into();
+                    }
+                    None => notice.clear(),
+                }
+                true
+            }
+            Ok(Event::Asked(Command::DiscardTransform)) => {
+                staged = None;
+                notice.clear();
                 true
             }
             Ok(Event::Asked(command)) => {
@@ -235,7 +270,7 @@ fn run(
         };
 
         if changed {
-            publish(&store, &watcher, &query, &notice, &snapshots);
+            publish(&store, &watcher, &query, &notice, staged.as_deref(), &snapshots);
         }
     }
 }
@@ -297,7 +332,10 @@ fn act(
         Command::Rewrite { id, text } => store.rewrite(id, &text).map(|_| ()),
         Command::Forget(id) => store.forget(id),
         Command::ClearUnpinned => store.clear_unpinned(),
-        Command::ClearClipboard | Command::Transform(_) => return false,
+        Command::ClearClipboard
+        | Command::PreviewTransform(_)
+        | Command::ApplyTransform
+        | Command::DiscardTransform => return false,
         Command::AdoptKlipperHistory => crate::klipper::import_into(store).map(|_| ()),
         Command::Apply(wanted) => {
             *settings = wanted;
@@ -414,6 +452,7 @@ fn publish(
     watcher: &SelectionWatcher,
     query: &str,
     notice: &str,
+    staged: Option<&str>,
     snapshots: &Sender<Snapshot>,
 ) {
     let rows = match store.search(query) {
@@ -431,15 +470,46 @@ fn publish(
         pinned,
         recent,
         notice: notice.to_string(),
+        preview: staged.map(elided_for_panel).unwrap_or_default(),
         can_transform: crate::selection::preferred_text(&offered).is_some(),
         can_markdown: offered.iter().any(|mime| mime == "text/html"),
     });
 }
 
-/// Reads the selection as it stands, turns it into what was asked for, and puts the result
-/// back. The answer is a sentence for the panel either way, because a button that quietly does
-/// nothing looks dead rather than refused.
-fn transform(watcher: &SelectionWatcher, wanted: crate::transform::Transformation) -> String {
+/// Enough to judge the result by; the full text only ever moves on Use it.
+fn elided_for_panel(text: &str) -> String {
+    const SHOWN: usize = 1200;
+    let mut shown: String = text.chars().take(SHOWN).collect();
+    if shown.len() < text.len() {
+        shown.push('…');
+    }
+    shown
+}
+
+/// One sentence saying what is ready, with a measure of it, so the panel reports what would
+/// change rather than only that something would.
+fn ready_sentence(wanted: crate::transform::Transformation, result: &str) -> String {
+    use crate::transform::Transformation;
+    match wanted {
+        Transformation::Plain => {
+            format!("Ready: the text alone, {} characters.", result.chars().count())
+        }
+        Transformation::Json => {
+            format!("Ready: JSON laid out over {} lines.", result.lines().count())
+        }
+        Transformation::Markdown => {
+            format!("Ready: Markdown, {} characters from this copy's HTML.", result.chars().count())
+        }
+    }
+}
+
+/// Reads the selection as it stands and works the transformation out, touching nothing: the
+/// result waits for Use it. The answer is a sentence for the panel either way, because a
+/// button that quietly does nothing looks dead rather than refused.
+fn preview(
+    watcher: &SelectionWatcher,
+    wanted: crate::transform::Transformation,
+) -> (Option<String>, String) {
     use crate::transform::Transformation;
 
     let current_text = || {
@@ -450,39 +520,57 @@ fn transform(watcher: &SelectionWatcher, wanted: crate::transform::Transformatio
         (!text.is_empty()).then_some(text)
     };
 
-    match wanted {
+    let made = match wanted {
         Transformation::Plain => match current_text() {
-            None => "Nothing on the clipboard to make plain.".into(),
-            Some(text) => {
-                watcher.offer(Selection::Clipboard, Payload::Text(text));
-                "The next paste is plain text.".into()
-            }
+            None => return (None, "Nothing on the clipboard to make plain.".into()),
+            Some(text) => text,
         },
         Transformation::Json => match current_text() {
-            None => "Nothing on the clipboard to lay out.".into(),
+            None => return (None, "Nothing on the clipboard to lay out.".into()),
             Some(text) => match crate::transform::pretty_json(&text) {
-                Ok(json) => {
-                    watcher.offer(Selection::Clipboard, Payload::Text(json));
-                    "The next paste is laid out JSON.".into()
-                }
-                Err(refusal) => format!("Left alone: {refusal}."),
+                Ok(json) => json,
+                Err(refusal) => return (None, format!("Left alone: {refusal}.")),
             },
         },
         Transformation::Markdown => match watcher.ask_current(Some("text/html")).content {
-            None => "This copy offers no HTML to turn into Markdown.".into(),
-            Some(bytes) => {
-                let markdown =
-                    crate::transform::markdown_from_html(&String::from_utf8_lossy(&bytes));
-                watcher.offer(Selection::Clipboard, Payload::Text(markdown));
-                "The next paste is Markdown.".into()
-            }
+            None => return (None, "This copy offers no HTML to turn into Markdown.".into()),
+            Some(bytes) => crate::transform::markdown_from_html(&String::from_utf8_lossy(&bytes)),
         },
-    }
+    };
+
+    let said = ready_sentence(wanted, &made);
+    (Some(made), said)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_ready_sentence_measures_what_it_offers() {
+        use crate::transform::Transformation;
+        assert_eq!(
+            ready_sentence(Transformation::Plain, "hello"),
+            "Ready: the text alone, 5 characters."
+        );
+        assert_eq!(
+            ready_sentence(Transformation::Json, "{\n  \"a\": 1\n}"),
+            "Ready: JSON laid out over 3 lines."
+        );
+        assert_eq!(
+            ready_sentence(Transformation::Markdown, "# hi"),
+            "Ready: Markdown, 4 characters from this copy's HTML."
+        );
+    }
+
+    #[test]
+    fn a_novel_is_elided_for_the_panel_and_a_note_is_not() {
+        let long = "x".repeat(5000);
+        let shown = elided_for_panel(&long);
+        assert!(shown.chars().count() == 1201 && shown.ends_with('…'));
+
+        assert_eq!(elided_for_panel("short"), "short");
+    }
 
     #[test]
     fn a_secret_shaped_copy_is_not_kept_unless_the_setting_is_off() {

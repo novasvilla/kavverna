@@ -37,6 +37,10 @@ pub const PLAYBACK_ROUTES: &str = "volume-mixer.routes";
 /// The same shape for where each application records from.
 pub const RECORDING_ROUTES: &str = "microphone-tools.routes";
 pub const APPEARANCE: &str = "appearance";
+/// The thin landing strip on the screen edge, the one thing the shelf does at rest.
+pub const SHELF_EDGE_STRIP: &str = enable_key(Feature::Shelf);
+pub const SHELF_KEEP_ACROSS_RESTARTS: &str = "shelf.keep-across-restarts";
+pub const SHELF_REMOVE_AFTER_DROP: &str = "shelf.remove-after-drop";
 /// Which palette dresses the panel. Doubles as the themes feature's enable key: removing the
 /// feature applies the torch and leaves the choice waiting here.
 pub const THEME: &str = enable_key(Feature::Themes);
@@ -85,6 +89,12 @@ pub const APPEARANCE_DEFAULT: i64 = 0;
 
 /// The torch is the look Kavverna has always had, so an absent key changes nothing.
 pub const THEME_DEFAULT: &str = "torch";
+
+pub const SHELF_EDGE_STRIP_DEFAULT: bool = true;
+/// Parked items are deliberate; a shelf that forgot them at logout would defeat the parking.
+pub const SHELF_KEEP_ACROSS_RESTARTS_DEFAULT: bool = true;
+/// A drag something accepted took the item along, so it leaves; a cancelled drag keeps it.
+pub const SHELF_REMOVE_AFTER_DROP_DEFAULT: bool = true;
 
 /// Beside the icon, because the panel belongs to the icon that opened it. Panel bars sit on
 /// different edges on different machines, and a corner that suits one is across the desk on

@@ -8,6 +8,7 @@ members = [
     "features/clipboard-history",
     "features/keep-awake",
     "features/link-cleaner",
+    "features/shelf",
     "features/sound-mixer",
     "features/system-monitor",
 ]
@@ -78,5 +79,6 @@ kde-bridge = { path = "desktop/kde-bridge" }
 link-cleaner = { path = "features/link-cleaner" }
 keep-awake = { path = "features/keep-awake" }
 preferences = { path = "domain/preferences" }
+shelf = { path = "features/shelf" }
 sound-mixer = { path = "features/sound-mixer" }
 system-monitor = { path = "features/system-monitor" }

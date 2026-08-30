@@ -10,6 +10,7 @@ const SHOW_CLIPBOARD: &str = "show-clipboard";
 const TOGGLE_AWAKE: &str = "toggle-awake";
 const MUTE_EVERY_INPUT: &str = "mute-every-input";
 const NEXT_OUTPUT: &str = "next-output";
+const SHOW_SHELF: &str = "show-shelf";
 
 /// Ctrl+Alt and a letter throughout, rather than the reference app's four-key combinations: it
 /// is the shape a Linux user already reaches for, and Plasma leaves that row free. The key here
@@ -30,6 +31,9 @@ const KEYS: &[(&str, Option<Feature>, &str, i32)] = &[
         CONTROL | ALT | b'M' as i32,
     ),
     (NEXT_OUTPUT, Some(Feature::OutputSwitcher), "Next sound output", CONTROL | ALT | b'O' as i32),
+    // Fires even mid-drag: KWin's drag filter eats only Escape, so this is the way to summon
+    // the shelf with a file already in hand.
+    (SHOW_SHELF, Some(Feature::Shelf), "Show the shelf", CONTROL | ALT | b'S' as i32),
 ];
 
 /// A utility that was switched off registers nothing, so System Settings never lists a Kavverna
@@ -66,6 +70,7 @@ pub fn serve(runtime: tokio::runtime::Handle) {
                 NEXT_OUTPUT => {
                     mixer_state::cycle_output();
                 }
+                SHOW_SHELF => crate::shelf_view::toggle(),
                 other => tracing::warn!(action = other, "a shortcut fired that nothing answers"),
             }
         }
@@ -80,7 +85,8 @@ mod tests {
     /// which is worse than not registering it, because System Settings then shows it.
     #[test]
     fn every_declared_shortcut_has_somewhere_to_go() {
-        let handled = [SHOW_PANEL, SHOW_CLIPBOARD, TOGGLE_AWAKE, MUTE_EVERY_INPUT, NEXT_OUTPUT];
+        let handled =
+            [SHOW_PANEL, SHOW_CLIPBOARD, TOGGLE_AWAKE, MUTE_EVERY_INPUT, NEXT_OUTPUT, SHOW_SHELF];
 
         for (action, _, _, _) in KEYS {
             assert!(handled.contains(action), "{action} is registered and never answered");

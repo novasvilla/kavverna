@@ -40,6 +40,7 @@ pub mod qobject {
         #[qproperty(bool, clear_on_screen_lock)]
         #[qproperty(bool, clean_links)]
         #[qproperty(QString, transform_notice)]
+        #[qproperty(QString, transform_preview)]
         #[qproperty(bool, can_transform)]
         #[qproperty(bool, can_markdown)]
         type ClipboardView = super::ClipboardViewRust;
@@ -74,6 +75,10 @@ pub mod qobject {
         fn adopt_klipper_history(self: Pin<&mut ClipboardView>);
         #[qinvokable]
         fn transform(self: Pin<&mut ClipboardView>, wanted: i32);
+        #[qinvokable]
+        fn use_transform(self: Pin<&mut ClipboardView>);
+        #[qinvokable]
+        fn discard_transform(self: Pin<&mut ClipboardView>);
         #[qinvokable]
         fn choose_clear_after(self: Pin<&mut ClipboardView>, seconds: i32);
         #[qinvokable]
@@ -110,6 +115,7 @@ pub struct ClipboardViewRust {
     clear_on_screen_lock: bool,
     clean_links: bool,
     transform_notice: QString,
+    transform_preview: QString,
     can_transform: bool,
     can_markdown: bool,
 }
@@ -197,7 +203,8 @@ impl qobject::ClipboardView {
         self.as_mut().set_klipper_waiting(0);
     }
 
-    /// Numbered the way the buttons are laid out, left to right.
+    /// Numbered the way the buttons are laid out, left to right. Only previews: the
+    /// clipboard is written by use_transform, never by looking.
     fn transform(self: Pin<&mut Self>, wanted: i32) {
         let wanted = match wanted {
             0 => Transformation::Plain,
@@ -205,7 +212,15 @@ impl qobject::ClipboardView {
             2 => Transformation::Markdown,
             _ => return,
         };
-        clipboard_state::send(Command::Transform(wanted));
+        clipboard_state::send(Command::PreviewTransform(wanted));
+    }
+
+    fn use_transform(self: Pin<&mut Self>) {
+        clipboard_state::send(Command::ApplyTransform);
+    }
+
+    fn discard_transform(self: Pin<&mut Self>) {
+        clipboard_state::send(Command::DiscardTransform);
     }
 
     fn apply(mut self: Pin<&mut Self>, snapshot: Snapshot) {
@@ -235,6 +250,7 @@ impl qobject::ClipboardView {
         self.as_mut().set_row_pinned(pinned);
         self.as_mut().set_row_times(times);
         self.as_mut().set_transform_notice(QString::from(&snapshot.notice));
+        self.as_mut().set_transform_preview(QString::from(&snapshot.preview));
         self.as_mut().set_can_transform(snapshot.can_transform);
         self.as_mut().set_can_markdown(snapshot.can_markdown);
         self.as_mut().set_pinned_count(snapshot.pinned as i32);

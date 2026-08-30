@@ -48,6 +48,9 @@ pub mod qobject {
         #[qproperty(i32, margin_top)]
         #[qproperty(i32, margin_right)]
         #[qproperty(i32, margin_bottom)]
+        #[qproperty(bool, ghost_visible)]
+        #[qproperty(i32, ghost_left)]
+        #[qproperty(i32, ghost_top)]
         type KavvernaPanel = super::KavvernaPanelRust;
     }
 
@@ -99,9 +102,11 @@ pub mod qobject {
         #[qinvokable]
         fn choose_placement(self: Pin<&mut KavvernaPanel>, mode: i32, width: i32, height: i32);
         #[qinvokable]
-        fn nudge_panel(self: Pin<&mut KavvernaPanel>, dx: i32, dy: i32, width: i32, height: i32);
+        fn drag_begun(self: Pin<&mut KavvernaPanel>, width: i32, height: i32);
         #[qinvokable]
-        fn drag_done(self: Pin<&mut KavvernaPanel>, width: i32, height: i32);
+        fn drag_preview(self: Pin<&mut KavvernaPanel>, dx: i32, dy: i32, width: i32, height: i32);
+        #[qinvokable]
+        fn drag_commit(self: Pin<&mut KavvernaPanel>, width: i32, height: i32);
     }
 }
 
@@ -153,6 +158,9 @@ pub struct KavvernaPanelRust {
     margin_top: i32,
     margin_right: i32,
     margin_bottom: i32,
+    ghost_visible: bool,
+    ghost_left: i32,
+    ghost_top: i32,
 }
 
 impl Default for KavvernaPanelRust {
@@ -220,9 +228,16 @@ impl Default for KavvernaPanelRust {
             margin_top: 0,
             margin_right: gap(),
             margin_bottom: gap(),
+            ghost_visible: false,
+            ghost_left: 0,
+            ghost_top: 0,
         }
     }
 }
+
+/// Where a drag started from, in the screen's local coordinates. One drag at a time, on the
+/// Qt thread only; the mutex is for the static.
+static DRAG_FROM: Mutex<Option<(i32, i32)>> = Mutex::new(None);
 
 fn as_i32(value: i64, fallback: i32) -> i32 {
     i32::try_from(value).unwrap_or(fallback)
@@ -400,11 +415,32 @@ impl qobject::KavvernaPanel {
         }
     }
 
-    /// Applies a drag's outstanding translation. Pointer coordinates are surface local, so
-    /// once the surface moves the next event carries only what is still unapplied; feeding
-    /// the whole translation back each time corrects itself.
-    fn nudge_panel(mut self: Pin<&mut Self>, dx: i32, dy: i32, width: i32, height: i32) {
-        if dx == 0 && dy == 0 {
+    /// A drag never moves the panel while the button is down: moving the surface under the
+    /// pointer shifts the pointer's surface-local reading by exactly the move, and the
+    /// compositor replays that shift on its own schedule, which fed back as a panel that
+    /// jittered off at random. The panel holds still, a ghost outline tracks the gesture in
+    /// clean press-relative coordinates, and release places the panel where the ghost is.
+    fn drag_begun(mut self: Pin<&mut Self>, width: i32, height: i32) {
+        let screens = screens();
+        let name = self.panel_screen().to_string();
+        let Some(screen) = screens.iter().find(|s| s.name == name).or_else(|| screens.first())
+        else {
+            return;
+        };
+        let from = panel_anchor::position_of(&self.read_placement(), screen, (width, height));
+        if let Ok(mut held) = DRAG_FROM.lock() {
+            *held = Some(from);
+        }
+        self.as_mut().set_ghost_left(from.0);
+        self.as_mut().set_ghost_top(from.1);
+    }
+
+    fn drag_preview(mut self: Pin<&mut Self>, dx: i32, dy: i32, width: i32, height: i32) {
+        let Some((x, y)) = DRAG_FROM.lock().ok().and_then(|held| *held) else {
+            return;
+        };
+        // A click is not a drag; the ghost only appears once the hand has clearly moved.
+        if !*self.ghost_visible() && dx.abs() + dy.abs() < 8 {
             return;
         }
         let screens = screens();
@@ -413,14 +449,35 @@ impl qobject::KavvernaPanel {
         else {
             return;
         };
-        let current = self.read_placement();
-        let (x, y) = panel_anchor::position_of(&current, screen, (width, height));
-        let moved = panel_anchor::pinned((x + dx, y + dy), screen, (width, height), gap());
-        let name = screen.name.clone();
-        apply_placement(&mut self, moved, &name);
+        let at = panel_anchor::pinned((x + dx, y + dy), screen, (width, height), gap());
+        self.as_mut().set_ghost_left(at.left);
+        self.as_mut().set_ghost_top(at.top);
+        self.as_mut().set_ghost_visible(true);
     }
 
-    fn drag_done(self: Pin<&mut Self>, width: i32, height: i32) {
+    fn drag_commit(mut self: Pin<&mut Self>, width: i32, height: i32) {
+        let began = DRAG_FROM.lock().ok().and_then(|mut held| held.take());
+        if began.is_none() || !*self.ghost_visible() {
+            self.as_mut().set_ghost_visible(false);
+            return;
+        }
+        self.as_mut().set_ghost_visible(false);
+
+        let screens = screens();
+        let name = self.panel_screen().to_string();
+        let Some(screen) = screens.iter().find(|s| s.name == name).or_else(|| screens.first())
+        else {
+            return;
+        };
+        let landed = panel_anchor::pinned(
+            (*self.ghost_left(), *self.ghost_top()),
+            screen,
+            (width, height),
+            gap(),
+        );
+        let name = screen.name.clone();
+        apply_placement(&mut self, landed, &name);
+
         if settings::integer_at(settings::PLACEMENT, settings::PLACEMENT_DEFAULT) == 1 {
             self.remember_position(width, height);
         }

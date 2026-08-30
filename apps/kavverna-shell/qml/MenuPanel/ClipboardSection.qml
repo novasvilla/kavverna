@@ -106,11 +106,56 @@ ColumnLayout {
             Layout.fillWidth: true
             text: section.clipboard.transform_notice.length > 0
                   ? section.clipboard.transform_notice
-                  : "Rewrites what is on the clipboard, so the next paste is the result."
+                  : "Shows the result first; the clipboard changes only on Use it, and the "
+                    + "original stays in the history."
             font.pixelSize: section.theme.textSmall
             color: section.clipboard.transform_notice.length > 0
                    ? section.theme.primaryText : section.theme.secondaryText
             wrapMode: Text.WordWrap
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            visible: section.clipboard.transform_preview.length > 0
+            implicitHeight: Math.min(previewText.implicitHeight + 12, 150)
+            radius: section.theme.radiusSmall
+            color: section.theme.sunken
+            clip: true
+
+            Label {
+                id: previewText
+                anchors.fill: parent
+                anchors.margins: 6
+                text: section.clipboard.transform_preview
+                // A previewed result is text, never markup to render or fetch through.
+                textFormat: Text.PlainText
+                font.family: "monospace"
+                font.pixelSize: section.theme.textSmall
+                color: section.theme.primaryText
+                wrapMode: Text.WrapAnywhere
+                maximumLineCount: 9
+                elide: Text.ElideRight
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            visible: section.clipboard.transform_preview.length > 0
+            spacing: section.theme.gapSnug
+
+            PillButton {
+                theme: section.theme
+                Layout.fillWidth: true
+                text: "Use it"
+                onClicked: section.clipboard.use_transform()
+            }
+
+            PillButton {
+                theme: section.theme
+                Layout.fillWidth: true
+                text: "Cancel"
+                onClicked: section.clipboard.discard_transform()
+            }
         }
     }
 

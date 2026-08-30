@@ -18,6 +18,7 @@ kde-bridge.workspace = true
 keep-awake.workspace = true
 notify-rust.workspace = true
 preferences.workspace = true
+shelf.workspace = true
 sound-mixer.workspace = true
 strum.workspace = true
 system-monitor.workspace = true

@@ -22,6 +22,8 @@ mod remote;
 mod routes;
 mod selftest;
 mod settings;
+mod shelf_state;
+mod shelf_view;
 mod shortcuts;
 mod tray;
 mod vitals_state;
@@ -113,6 +115,9 @@ fn main() {
         std::thread::spawn(|| {
             vitals_state::run(std::time::Duration::from_secs(2), vitals_view::publish)
         });
+    }
+    if settings::is_installed(Feature::Shelf) {
+        shelf_state::prepare();
     }
 
     let mut app = QGuiApplication::new();

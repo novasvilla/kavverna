@@ -206,6 +206,18 @@ impl Tray for StatusIcon {
             );
         }
 
+        if settings::is_installed(Feature::Shelf) {
+            items.push(
+                StandardItem {
+                    label: "Shelf".into(),
+                    icon_name: "mail-attachment".into(),
+                    activate: Box::new(|_| crate::shelf_view::toggle()),
+                    ..Default::default()
+                }
+                .into(),
+            );
+        }
+
         items.push(MenuItem::Separator);
         items.push(
             StandardItem {

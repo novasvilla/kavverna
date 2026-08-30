@@ -7,6 +7,7 @@ import dev.kavverna.shell
 import "MenuPanel"
 import "Shared"
 import "Settings"
+import "Shelf"
 
 Window {
     id: root
@@ -157,6 +158,54 @@ Window {
         onInstalledChanged: root.landOnSomethingVisible()
     }
 
+    ShelfView {
+        id: shelfBridge
+        Component.onCompleted: attach()
+    }
+
+    ShelfWindow {
+        id: shelfWindow
+        theme: theme
+        shelf: shelfBridge
+        shows: root.shows
+    }
+
+    EdgeStrip {
+        theme: theme
+        shelf: shelfBridge
+        shows: root.shows
+        home: shelfWindow
+    }
+
+    // The outline that follows a header drag. The real panel cannot move under the pointer
+    // without poisoning the pointer's own readings, so this ghost does the moving and the
+    // panel jumps to it on release. Transparent to input, or it would sit under the cursor
+    // and swallow the very drag it is drawing.
+    Window {
+        width: hub.panel_width
+        height: root.height
+        visible: hub.ghost_visible
+        color: "transparent"
+        transientParent: null
+        flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput
+
+        LayerShell.Window.anchors: LayerShell.Window.AnchorTop | LayerShell.Window.AnchorLeft
+        LayerShell.Window.layer: LayerShell.Window.LayerOverlay
+        LayerShell.Window.margins: Qt.rect(hub.ghost_left, hub.ghost_top, 0, 0)
+        LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
+        LayerShell.Window.scope: "kavverna-panel-ghost"
+        LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 6
+            radius: 14
+            color: theme.glow
+            border.width: 2
+            border.color: theme.accent
+        }
+    }
+
     Rectangle {
         anchors.fill: parent
         anchors.margins: 6
@@ -164,6 +213,35 @@ Window {
         color: theme.surface
         border.width: 1
         border.color: theme.hairline
+
+        // The header strip is the panel's handle. A MouseArea rather than a DragHandler
+        // because the handler never activates on this layer surface under KWin. The panel
+        // itself holds still for the whole gesture, so these readings stay clean
+        // press-relative offsets; the ghost outline is what follows the hand, and the
+        // release places the panel where the ghost is.
+        MouseArea {
+            id: mover
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 56
+            property real pressX: 0
+            property real pressY: 0
+
+            onPressed: (mouse) => {
+                pressX = mouse.x
+                pressY = mouse.y
+                hub.drag_begun(root.width, root.height)
+            }
+            onPositionChanged: (mouse) => {
+                if (!pressed) {
+                    return
+                }
+                hub.drag_preview(Math.round(mouse.x - pressX), Math.round(mouse.y - pressY),
+                                 root.width, root.height)
+            }
+            onReleased: hub.drag_commit(root.width, root.height)
+        }
 
         ColumnLayout {
             id: body
@@ -174,22 +252,6 @@ Window {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 10
-
-                // The header is the panel's handle. A drag slides the layer margins, so the
-                // surface follows the pointer and each event's translation is only what is
-                // still unapplied; in the modes that anchor somewhere, the anchor simply
-                // reasserts itself on the next open.
-                DragHandler {
-                    target: null
-                    onActiveTranslationChanged: if (active) {
-                        hub.nudge_panel(Math.round(activeTranslation.x),
-                                        Math.round(activeTranslation.y),
-                                        root.width, root.height)
-                    }
-                    onActiveChanged: if (!active) {
-                        hub.drag_done(root.width, root.height)
-                    }
-                }
 
                 Rectangle {
                     implicitWidth: 38
@@ -218,6 +280,7 @@ Window {
                     }
 
                     Rectangle {
+                        Layout.alignment: Qt.AlignLeft
                         implicitWidth: pill.implicitWidth + 18
                         implicitHeight: 21
                         radius: theme.radius
@@ -243,6 +306,16 @@ Window {
                             }
                         }
                     }
+                }
+
+                IconButton {
+                    theme: theme
+                    source: "mail-attachment"
+                    visible: root.shows("shelf")
+                    Layout.alignment: Qt.AlignTop
+                    ToolTip.visible: hovered
+                    ToolTip.text: "Shelf"
+                    onClicked: shelfBridge.set_open(!shelfBridge.shelf_open)
                 }
             }
 
@@ -390,6 +463,7 @@ Window {
                     clipboard: clipboard
                     features: features
                     mixer: mixer
+                    shelf: shelfBridge
                     shows: root.shows
                     visible: hub.showing_settings
                 }

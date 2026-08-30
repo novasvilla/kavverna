@@ -184,6 +184,17 @@ impl Feature {
                 readiness: Readiness::Planned,
                 enable_keys: &["fan-control.enabled"],
             },
+            Self::Shelf => Descriptor {
+                title: "Shelf",
+                summary: "Hold files, text and links at the screen edge until they move on.",
+                group: Group::Tools,
+                icon: "mail-attachment",
+                energy: EnergyProfile::Idle,
+                readiness: Readiness::Built,
+                // The strip is the one thing the shelf does at rest; installed already
+                // covers everything else.
+                enable_keys: &["shelf.edge-strip"],
+            },
             Self::Themes => Descriptor {
                 title: "Themes",
                 summary: "Dress the panel in another palette, applied the moment it is picked.",

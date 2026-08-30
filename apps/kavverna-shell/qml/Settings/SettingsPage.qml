@@ -11,6 +11,7 @@ ColumnLayout {
     required property var clipboard
     required property var features
     required property var mixer
+    required property var shelf
     /// A row for a utility that was removed would offer settings for something not
     /// running, so each one answers for the utility that owns it.
     required property var shows
@@ -165,32 +166,6 @@ ColumnLayout {
 
     SectionLabel {
         theme: page.theme
-        text: "STARTUP"
-    }
-
-    Card {
-        theme: page.theme
-        spacing: 12
-
-        SettingRow {
-            theme: page.theme
-            title: "Start with the system"
-            detail: "Adds a desktop entry to the session autostart folder."
-            on: page.hub.launch_at_login
-            onToggled: (value) => page.hub.choose_launch_at_login(value)
-        }
-
-        SettingRow {
-            theme: page.theme
-            title: "Restore keep awake on start"
-            detail: "Puts back the hold that was running when Kavverna last closed, minus the time that passed."
-            on: page.hub.restore_on_start
-            onToggled: (value) => page.hub.choose_restore_on_start(value)
-        }
-    }
-
-    SectionLabel {
-        theme: page.theme
         text: "SOUND"
         visible: page.shows("microphone-tools") || page.shows("output-switcher")
     }
@@ -278,50 +253,6 @@ ColumnLayout {
                         page.mixer.output_ids[index], checked)
                 }
             }
-        }
-    }
-
-    SectionLabel {
-        theme: page.theme
-        text: "ENERGY"
-        visible: page.shows("keep-awake")
-    }
-
-    Card {
-        theme: page.theme
-        spacing: 14
-        visible: page.shows("keep-awake")
-
-        SettingRow {
-            theme: page.theme
-            title: "Let displays sleep"
-            detail: "Blocks automatic suspend only, so screens still turn off and a deliberate suspend still works."
-            on: page.hub.allow_display_sleep
-            onToggled: (value) => page.hub.choose_display_sleep(value)
-        }
-
-        SettingRow {
-            theme: page.theme
-            title: "Middle click toggles"
-            detail: "Middle click the tray icon to switch keep awake on and off. The right button belongs to the menu."
-            on: page.hub.middle_click_toggle
-            onToggled: (value) => page.hub.choose_middle_click_toggle(value)
-        }
-
-        ChoiceRow {
-            theme: page.theme
-            title: "Default duration"
-            detail: "What the switch and the tray menu start when they are not told how long for."
-            current: page.hub.default_minutes
-            choices: [
-                { label: "\u221e", value: 0 },
-                { label: "15m", value: 15 },
-                { label: "30m", value: 30 },
-                { label: "1h", value: 60 },
-                { label: "2h", value: 120 },
-                { label: "4h", value: 240 }
-            ]
-            onPicked: (value) => page.hub.choose_default_minutes(value)
         }
     }
 
@@ -466,6 +397,178 @@ ColumnLayout {
                 text: "Adopt " + page.clipboard.klipper_waiting + " entries"
                 onClicked: page.clipboard.adopt_klipper_history()
             }
+        }
+    }
+
+    SectionLabel {
+        theme: page.theme
+        text: "SHELF"
+        visible: page.shows("shelf")
+    }
+
+    Card {
+        theme: page.theme
+        spacing: 12
+        visible: page.shows("shelf")
+
+        SettingRow {
+            theme: page.theme
+            title: "Keep a strip on the screen edge"
+            detail: "A thin landing zone on the right edge. Dragging onto it opens the shelf, and so does clicking it."
+            on: page.shelf.edge_strip
+            onToggled: (value) => page.shelf.choose_edge_strip(value)
+        }
+
+        SettingRow {
+            theme: page.theme
+            title: "Keep the shelf across restarts"
+            detail: "What was shelved is still there next time. Off, the shelf starts empty and its staged copies are removed."
+            on: page.shelf.keep_across_restarts
+            onToggled: (value) => page.shelf.choose_keep_across_restarts(value)
+        }
+
+        SettingRow {
+            theme: page.theme
+            title: "Remove items after a drop lands"
+            detail: "A drag something accepted takes the item off the shelf. A cancelled drag always keeps it."
+            on: page.shelf.remove_after_drop
+            onToggled: (value) => page.shelf.choose_remove_after_drop(value)
+        }
+    }
+
+    SectionLabel {
+        theme: page.theme
+        text: "ENERGY"
+        visible: page.shows("keep-awake")
+    }
+
+    Card {
+        theme: page.theme
+        spacing: 14
+        visible: page.shows("keep-awake")
+
+        SettingRow {
+            theme: page.theme
+            title: "Let displays sleep"
+            detail: "Blocks automatic suspend only, so screens still turn off and a deliberate suspend still works."
+            on: page.hub.allow_display_sleep
+            onToggled: (value) => page.hub.choose_display_sleep(value)
+        }
+
+        SettingRow {
+            theme: page.theme
+            title: "Middle click toggles"
+            detail: "Middle click the tray icon to switch keep awake on and off. The right button belongs to the menu."
+            on: page.hub.middle_click_toggle
+            onToggled: (value) => page.hub.choose_middle_click_toggle(value)
+        }
+
+        ChoiceRow {
+            theme: page.theme
+            title: "Default duration"
+            detail: "What the switch and the tray menu start when they are not told how long for."
+            current: page.hub.default_minutes
+            choices: [
+                { label: "∞", value: 0 },
+                { label: "15m", value: 15 },
+                { label: "30m", value: 30 },
+                { label: "1h", value: 60 },
+                { label: "2h", value: 120 },
+                { label: "4h", value: 240 }
+            ]
+            onPicked: (value) => page.hub.choose_default_minutes(value)
+        }
+    }
+
+    SectionLabel {
+        theme: page.theme
+        text: "TOOLS"
+        visible: page.shows("mouse-jiggle")
+    }
+
+    Card {
+        theme: page.theme
+        spacing: 12
+        visible: page.shows("mouse-jiggle")
+
+        ChoiceRow {
+            theme: page.theme
+            title: "Nudge no sooner than"
+            current: page.hub.jiggle_shortest
+            choices: [
+                { label: "1m", value: 1 },
+                { label: "2m", value: 2 },
+                { label: "5m", value: 5 },
+                { label: "10m", value: 10 },
+                { label: "15m", value: 15 }
+            ]
+            onPicked: (value) => page.hub.choose_jiggle_shortest(value)
+        }
+
+        ChoiceRow {
+            theme: page.theme
+            title: "And no later than"
+            detail: "The wait is drawn afresh between the two, so it does not look like a timer."
+            current: page.hub.jiggle_longest
+            choices: [
+                { label: "2m", value: 2 },
+                { label: "5m", value: 5 },
+                { label: "10m", value: 10 },
+                { label: "15m", value: 15 },
+                { label: "30m", value: 30 }
+            ]
+            onPicked: (value) => page.hub.choose_jiggle_longest(value)
+        }
+
+        ChoiceRow {
+            theme: page.theme
+            title: "What a nudge does"
+            current: page.hub.jiggle_activity
+            choices: [
+                { label: "Pointer", value: 0 },
+                { label: "Key", value: 1 },
+                { label: "Both", value: 2 }
+            ]
+            onPicked: (value) => page.hub.choose_jiggle_activity(value)
+        }
+
+        ChoiceRow {
+            theme: page.theme
+            title: "Which key"
+            detail: "For the watchers that count keys rather than pointer movement."
+            visible: page.hub.jiggle_activity !== 0
+            current: page.hub.jiggle_keystroke
+            choices: [
+                { label: "Shift", value: 0 },
+                { label: "Up and down", value: 1 }
+            ]
+            onPicked: (value) => page.hub.choose_jiggle_keystroke(value)
+        }
+    }
+
+    SectionLabel {
+        theme: page.theme
+        text: "STARTUP"
+    }
+
+    Card {
+        theme: page.theme
+        spacing: 12
+
+        SettingRow {
+            theme: page.theme
+            title: "Start with the system"
+            detail: "Adds a desktop entry to the session autostart folder."
+            on: page.hub.launch_at_login
+            onToggled: (value) => page.hub.choose_launch_at_login(value)
+        }
+
+        SettingRow {
+            theme: page.theme
+            title: "Restore keep awake on start"
+            detail: "Puts back the hold that was running when Kavverna last closed, minus the time that passed."
+            on: page.hub.restore_on_start
+            onToggled: (value) => page.hub.choose_restore_on_start(value)
         }
     }
 

@@ -113,14 +113,36 @@ ColumnLayout {
                     }
 
                     Toggle {
+                        id: entrySwitch
                         theme: card.theme
                         visible: entry.built
                         checked: card.features.installed[entry.index]
                         onToggled: card.features.choose_installed(entry.id, checked)
-                        // An inside joke, reproduced verbatim. Leave it exactly as it is.
                         hoverEnabled: true
-                        ToolTip.visible: entry.id === "themes" && hovered
-                        ToolTip.text: "Ian P. Mode ;-)"
+
+                        // An inside joke, reproduced verbatim; leave the text exactly as it
+                        // is. Drawn in the window rather than as a ToolTip popup, which does
+                        // not reliably appear over a layer surface.
+                        Rectangle {
+                            visible: entry.id === "themes" && entrySwitch.hovered
+                            anchors.bottom: parent.top
+                            anchors.bottomMargin: 6
+                            anchors.right: parent.right
+                            width: quip.implicitWidth + 16
+                            height: quip.implicitHeight + 10
+                            radius: card.theme.radiusSmall
+                            color: card.theme.surface
+                            border.width: 1
+                            border.color: card.theme.hairline
+
+                            Label {
+                                id: quip
+                                anchors.centerIn: parent
+                                text: "Ian P. Mode ;-)"
+                                font.pixelSize: card.theme.textSmall
+                                color: card.theme.primaryText
+                            }
+                        }
                     }
                 }
             }
