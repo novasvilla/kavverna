@@ -7,6 +7,7 @@ pub mod klipper;
 pub mod selection;
 pub mod sensitivity;
 pub mod store;
+pub mod transform;
 
 pub use auto_clear::AutoClear;
 pub use entry::{Entry, Kind, StoredImage};
@@ -16,3 +17,4 @@ pub use selection::{
 };
 pub use sensitivity::looks_sensitive;
 pub use store::{Captured, Store, StoreError, Summary};
+pub use transform::Transformation;

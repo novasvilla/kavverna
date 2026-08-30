@@ -278,3 +278,57 @@ fn with_reading_off_the_content_is_never_taken() {
         Err(_) => panic!("the copy went unnoticed"),
     }
 }
+
+/// The whole point of reading on demand: the html was never stored, and the Markdown still
+/// comes out of it. The copy is made by another client and the result is read back with
+/// wl-paste, so nothing here trusts the watcher about the watcher.
+#[test]
+#[ignore = "needs a live compositor offering ext-data-control"]
+fn markdown_comes_from_the_live_selection_not_the_store() {
+    let _guard = one_at_a_time();
+    let _restore = RestoredClipboard::save();
+
+    let (watcher, events) = watching();
+
+    let status =
+        detached("wl-copy").args(["-t", "text/html", "--", "some <b>bold</b> text"]).status();
+    assert!(matches!(status, Ok(code) if code.success()), "wl-copy failed");
+
+    // The capture keeps plain text only, which is exactly why the html has to be readable live.
+    assert!(matches!(next_copy(&events), Payload::Text(_)));
+
+    let answer = watcher.ask_current(Some("text/html"));
+    assert!(
+        answer.types.iter().any(|mime| mime == "text/html"),
+        "the current offer does not list html: {:?}",
+        answer.types
+    );
+    let html = String::from_utf8_lossy(&answer.content.expect("no html arrived")).to_string();
+
+    let markdown = clipboard_history::transform::markdown_from_html(&html);
+    assert_eq!(markdown, "some **bold** text");
+
+    watcher.offer(Selection::Clipboard, Payload::Text(markdown.clone()));
+    std::thread::sleep(Duration::from_millis(400));
+
+    assert_eq!(paste().as_deref(), Some(markdown.as_str()), "the result is not what pastes");
+}
+
+/// Our own offer must answer an ask as well, or transforming twice in a row hangs on the
+/// second: reading it through the compositor would wait on the thread that has to serve it.
+#[test]
+#[ignore = "needs a live compositor offering ext-data-control"]
+fn our_own_offer_can_be_asked_for_its_text() {
+    let _guard = one_at_a_time();
+    let _restore = RestoredClipboard::save();
+
+    let (watcher, events) = watching();
+
+    watcher.offer(Selection::Clipboard, Payload::Text("ours".into()));
+    // The compositor reports our own selection back before it is askable.
+    let _ = events.recv_timeout(PATIENCE);
+    std::thread::sleep(Duration::from_millis(400));
+
+    let answer = watcher.ask_current(Some("text/plain;charset=utf-8"));
+    assert_eq!(answer.content.as_deref(), Some("ours".as_bytes()), "our own offer did not answer");
+}

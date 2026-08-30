@@ -12,6 +12,8 @@ image.workspace = true
 link-cleaner.workspace = true
 nix = { workspace = true, features = ["fs", "poll"] }
 rusqlite.workspace = true
+serde_json.workspace = true
+htmd.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

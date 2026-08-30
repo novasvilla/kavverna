@@ -127,9 +127,26 @@ pub enum WatchError {
 }
 
 enum Request {
-    Offer { selection: Selection, payload: Payload },
+    Offer {
+        selection: Selection,
+        payload: Payload,
+    },
     Clear(Selection),
+    /// What the clipboard offers right now, and one of its types read on demand. This is what
+    /// lets a transformation reach the `text/html` of a rich copy without the history ever
+    /// storing it.
+    AskCurrent {
+        mime: Option<String>,
+        reply: SyncSender<CurrentAnswer>,
+    },
     Stop,
+}
+
+/// The current offer's types, and the bytes of the one type asked for, when one was.
+#[derive(Debug, Default)]
+pub struct CurrentAnswer {
+    pub types: Vec<String>,
+    pub content: Option<Vec<u8>>,
 }
 
 /// Dropping this unbinds the device, which is how the feature is switched off.
@@ -171,6 +188,14 @@ impl SelectionWatcher {
         self.send(Request::Clear(selection));
     }
 
+    /// Asks the thread rather than caching, so the answer is about the selection as it is at
+    /// this moment. A dead thread answers with nothing rather than hanging the caller.
+    pub fn ask_current(&self, mime: Option<&str>) -> CurrentAnswer {
+        let (reply, answer) = sync_channel(1);
+        self.send(Request::AskCurrent { mime: mime.map(str::to_owned), reply });
+        answer.recv_timeout(std::time::Duration::from_secs(2)).unwrap_or_default()
+    }
+
     fn send(&self, request: Request) {
         match self.requests.send(request) {
             Ok(()) => {
@@ -203,6 +228,9 @@ struct Watcher {
     /// The compositor replays whatever is already on a selection the moment the device is
     /// bound. Switching history on is not a copy, so the first report of each is dropped.
     replayed: Vec<Selection>,
+    /// The clipboard's offer as it stands, kept alive so a transformation can read a type of
+    /// it on demand. Holding it reads nothing; only an explicit ask does.
+    current: Option<(ExtDataControlOfferV1, Vec<String>)>,
     stopped: bool,
 }
 
@@ -232,6 +260,7 @@ fn run(
         primary_source: None,
         served: HashMap::new(),
         replayed: Vec::new(),
+        current: None,
         stopped: false,
     };
     let qh = queue.handle();
@@ -267,7 +296,7 @@ fn run(
 
         loop {
             match requests.try_recv() {
-                Ok(request) => watcher.handle(request, &manager, &device, &qh),
+                Ok(request) => watcher.handle(request, &manager, &device, &qh, &conn),
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
                     watcher.stopped = true;
@@ -310,9 +339,36 @@ impl Watcher {
         manager: &ExtDataControlManagerV1,
         device: &ExtDataControlDeviceV1,
         qh: &QueueHandle<Self>,
+        conn: &Connection,
     ) {
         match request {
             Request::Stop => self.stopped = true,
+            Request::AskCurrent { mime, reply } => {
+                let answer = match &self.current {
+                    None => CurrentAnswer::default(),
+                    Some((offer, types)) => CurrentAnswer {
+                        types: types.clone(),
+                        content: mime
+                            .filter(|wanted| types.iter().any(|offered| offered == wanted))
+                            .and_then(|wanted| {
+                                // Our own offer is answered from memory. Reading it through the
+                                // compositor would wait on this same thread to serve it, and
+                                // the wait would win.
+                                if types.iter().any(|offered| offered == OWN_MARKER) {
+                                    self.clipboard_source
+                                        .as_ref()
+                                        .and_then(|source| {
+                                            self.served.get(&source.id().protocol_id())
+                                        })
+                                        .cloned()
+                                } else {
+                                    receive(offer, &wanted, MAX_TEXT_BYTES, conn)
+                                }
+                            }),
+                    },
+                };
+                let _ = reply.send(answer);
+            }
             Request::Clear(selection) => {
                 self.forget_source(selection);
                 match selection {
@@ -366,35 +422,41 @@ impl Watcher {
         }
 
         let Some(offer) = offer else {
+            self.done_with(selection, None);
             if !replay {
                 (self.report)(SelectionEvent::Emptied(selection));
             }
             return;
         };
 
+        let types = self.offered.remove(&offer.id().protocol_id()).unwrap_or_default();
+
         if replay {
-            self.offered.remove(&offer.id().protocol_id());
-            offer.destroy();
+            // Not a copy, but it is what the clipboard holds, so a transformation asked for
+            // right after starting still has something to work on.
+            self.done_with(selection, Some((offer, types)));
             return;
         }
 
-        let types = self.offered.remove(&offer.id().protocol_id()).unwrap_or_default();
-
         if types.iter().any(|mime| mime == OWN_MARKER || mime == PLASMA_REPLACED_EMPTY) {
-            offer.destroy();
+            self.done_with(selection, Some((offer, types)));
             return;
         }
         // Left unread, but still reported: a password is the last thing that should sit on the
-        // clipboard until something else replaces it, so the clear timer has to start.
+        // clipboard until something else replaces it, so the clear timer has to start. Not kept
+        // for transformation either: what was deliberately never read stays that way.
         if types.iter().any(|mime| mime == CONCEALED_HINT) {
+            self.done_with(selection, None);
             offer.destroy();
             tracing::debug!("a copy marked as a secret was left unread");
             (self.report)(SelectionEvent::Changed(selection));
             return;
         }
 
+        // With reading off the content is still kept reachable: holding the offer reads
+        // nothing, and a transformation is the user asking for this copy by hand.
         if !self.policy.read_content.load(Ordering::Relaxed) {
-            offer.destroy();
+            self.done_with(selection, Some((offer, types)));
             (self.report)(SelectionEvent::Changed(selection));
             return;
         }
@@ -409,7 +471,29 @@ impl Watcher {
             }
             None => tracing::debug!(?types, "nothing worth keeping in this selection"),
         }
-        offer.destroy();
+        self.done_with(selection, Some((offer, types)));
+    }
+
+    /// The clipboard's offer stays alive for reading on demand, replacing whatever was kept
+    /// before. The primary selection's is let go: only the clipboard is transformed.
+    fn done_with(
+        &mut self,
+        selection: Selection,
+        keep: Option<(ExtDataControlOfferV1, Vec<String>)>,
+    ) {
+        match selection {
+            Selection::Clipboard => {
+                if let Some((old, _)) = self.current.take() {
+                    old.destroy();
+                }
+                self.current = keep;
+            }
+            Selection::Primary => {
+                if let Some((offer, _)) = keep {
+                    offer.destroy();
+                }
+            }
+        }
     }
 
     /// Files and images win over text, which they also offer as a fallback.
@@ -503,6 +587,11 @@ fn offered_types(payload: &Payload) -> Vec<&'static str> {
         Payload::Image(_) => vec![PNG],
         Payload::Files(_) => vec![URI_LIST, UTF8_TEXT, "text/plain"],
     }
+}
+
+/// The text type worth asking a mixed offer for, in the order the capture itself prefers.
+pub fn preferred_text(types: &[String]) -> Option<&'static str> {
+    TEXT_TYPES.iter().find(|wanted| types.iter().any(|mime| mime == *wanted)).copied()
 }
 
 fn encode(payload: &Payload) -> Vec<u8> {

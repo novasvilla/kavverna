@@ -35,7 +35,7 @@ Window {
         ["keep-awake"],
         ["volume-mixer", "output-switcher", "microphone-tools"],
         ["system-monitor"],
-        ["clipboard-history", "clipboard-auto-clear", "clean-url"],
+        ["clipboard-history", "clipboard-auto-clear", "clean-url", "clipboard-transform"],
         ["mouse-jiggle"]
     ]
 

@@ -148,14 +148,14 @@ impl Feature {
                 readiness: Readiness::Built,
                 enable_keys: &["clean-url.enabled"],
             },
-            Self::PlainTextPaste => Descriptor {
-                title: "Paste as plain text",
-                summary: "Paste without fonts, colours or links.",
+            Self::ClipboardTransform => Descriptor {
+                title: "Transform the clipboard",
+                summary: "Make what was copied plain, laid out JSON or Markdown before pasting.",
                 group: Group::Clipboard,
                 icon: "edit-paste-style",
-                energy: EnergyProfile::WatchesInput,
-                readiness: Readiness::Planned,
-                enable_keys: &["plain-text-paste.enabled"],
+                energy: EnergyProfile::Idle,
+                readiness: Readiness::Built,
+                enable_keys: &["clipboard-transform.enabled"],
             },
             Self::KeepAwake => Descriptor {
                 title: "Keep awake",

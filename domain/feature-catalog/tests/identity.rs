@@ -17,7 +17,7 @@ fn ids_match_the_released_set() {
         "mouse-jiggle",
         "network-monitor",
         "output-switcher",
-        "plain-text-paste",
+        "clipboard-transform",
         "system-monitor",
         "volume-mixer",
     ];
@@ -56,6 +56,7 @@ fn only_what_is_written_is_offered_as_built() {
         "clean-url",
         "clipboard-auto-clear",
         "clipboard-history",
+        "clipboard-transform",
         "keep-awake",
         "microphone-tools",
         "mouse-jiggle",

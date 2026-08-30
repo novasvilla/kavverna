@@ -60,11 +60,76 @@ ColumnLayout {
 
     SectionLabel {
         theme: section.theme
-        text: "CLIPBOARD"
+        text: "TRANSFORM"
+        visible: section.shows("clipboard-transform")
     }
 
     Card {
         theme: section.theme
+        visible: section.shows("clipboard-transform")
+        implicitHeight: transforms.implicitHeight + section.theme.pad * 2
+
+        ColumnLayout {
+            id: transforms
+            anchors.fill: parent
+            anchors.margins: section.theme.pad
+            spacing: section.theme.gapSnug
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: section.theme.gapSnug
+
+                PillButton {
+                    theme: section.theme
+                    Layout.fillWidth: true
+                    text: "Plain"
+                    enabled: section.clipboard.can_transform
+                    onClicked: section.clipboard.transform(0)
+                }
+
+                PillButton {
+                    theme: section.theme
+                    Layout.fillWidth: true
+                    text: "JSON"
+                    enabled: section.clipboard.can_transform
+                    onClicked: section.clipboard.transform(1)
+                }
+
+                // Markdown needs the html of the copy itself, so it follows what the current
+                // one offers rather than staying clickable and failing.
+                PillButton {
+                    theme: section.theme
+                    Layout.fillWidth: true
+                    text: "Markdown"
+                    enabled: section.clipboard.can_markdown
+                    ToolTip.visible: hovered && !section.clipboard.can_markdown
+                    ToolTip.text: "This copy offers no HTML to convert"
+                    onClicked: section.clipboard.transform(2)
+                }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: section.clipboard.transform_notice.length > 0
+                      ? section.clipboard.transform_notice
+                      : "Rewrites what is on the clipboard, so the next paste is the result."
+                font.pixelSize: 10
+                color: section.clipboard.transform_notice.length > 0
+                       ? section.theme.primaryText : section.theme.secondaryText
+                wrapMode: Text.WordWrap
+            }
+        }
+    }
+
+    SectionLabel {
+        theme: section.theme
+        text: "CLIPBOARD"
+        visible: section.shows("clipboard-history")
+    }
+
+    Card {
+        theme: section.theme
+        visible: section.shows("clipboard-history")
         implicitHeight: controls.implicitHeight + section.theme.pad * 2
 
         ColumnLayout {
@@ -150,7 +215,7 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        visible: section.clipboard.enabled
+        visible: section.shows("clipboard-history") && section.clipboard.enabled
         implicitHeight: section.clipboard.row_ids.length > 0
                         ? Math.min(entries.implicitHeight + 24, 284)
                         : 72
@@ -336,7 +401,7 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
-        visible: section.clipboard.enabled
+        visible: section.shows("clipboard-history") && section.clipboard.enabled
         spacing: 6
 
         Label {

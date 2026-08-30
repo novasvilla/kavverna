@@ -54,6 +54,7 @@ pub enum Command {
     Forget(i64),
     ClearUnpinned,
     ClearClipboard,
+    Transform(crate::transform::Transformation),
     AdoptKlipperHistory,
     Apply(Settings),
     Stop,
@@ -65,6 +66,12 @@ pub struct Snapshot {
     pub query: String,
     pub pinned: usize,
     pub recent: usize,
+    /// What the last transformation had to say, cleared by the next copy.
+    pub notice: String,
+    /// Whether the selection right now offers text, and whether it offers html, so the buttons
+    /// can say why they are off instead of doing nothing.
+    pub can_transform: bool,
+    pub can_markdown: bool,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -175,9 +182,10 @@ fn run(
 
     let mut settings = settings;
     let mut query = String::new();
+    let mut notice = String::new();
     let mut clearing = AutoClear::default();
     clearing.set_delay(settings.clear_after);
-    publish(&store, &query, &snapshots);
+    publish(&store, &watcher, &query, &notice, &snapshots);
 
     loop {
         let changed = match events_in.recv_timeout(TICK) {
@@ -188,7 +196,8 @@ fn run(
             })) => {
                 clearing.noticed_copy(Instant::now());
                 let payload = tidy(&watcher, payload, plain_only, settings);
-                save(&mut store, payload, settings)
+                notice.clear();
+                save(&mut store, payload, settings) || settings.keep_history
             }
             Ok(Event::Copied(SelectionEvent::Changed(Selection::Clipboard))) => {
                 clearing.noticed_copy(Instant::now());
@@ -206,6 +215,10 @@ fn run(
                 empty(&watcher, &mut clearing);
                 false
             }
+            Ok(Event::Asked(Command::Transform(wanted))) => {
+                notice = transform(&watcher, wanted);
+                true
+            }
             Ok(Event::Asked(command)) => {
                 let changed = act(&mut store, &watcher, &mut settings, &mut query, command);
                 clearing.set_delay(settings.clear_after);
@@ -222,7 +235,7 @@ fn run(
         };
 
         if changed {
-            publish(&store, &query, &snapshots);
+            publish(&store, &watcher, &query, &notice, &snapshots);
         }
     }
 }
@@ -284,7 +297,7 @@ fn act(
         Command::Rewrite { id, text } => store.rewrite(id, &text).map(|_| ()),
         Command::Forget(id) => store.forget(id),
         Command::ClearUnpinned => store.clear_unpinned(),
-        Command::ClearClipboard => return false,
+        Command::ClearClipboard | Command::Transform(_) => return false,
         Command::AdoptKlipperHistory => crate::klipper::import_into(store).map(|_| ()),
         Command::Apply(wanted) => {
             *settings = wanted;
@@ -396,7 +409,13 @@ fn measure(png: &[u8]) -> Option<(u32, u32)> {
     image::ImageReader::new(Cursor::new(png)).with_guessed_format().ok()?.into_dimensions().ok()
 }
 
-fn publish(store: &Store, query: &str, snapshots: &Sender<Snapshot>) {
+fn publish(
+    store: &Store,
+    watcher: &SelectionWatcher,
+    query: &str,
+    notice: &str,
+    snapshots: &Sender<Snapshot>,
+) {
     let rows = match store.search(query) {
         Ok(rows) => rows,
         Err(err) => {
@@ -405,7 +424,60 @@ fn publish(store: &Store, query: &str, snapshots: &Sender<Snapshot>) {
         }
     };
     let (pinned, recent) = store.counts().unwrap_or_default();
-    let _ = snapshots.send(Snapshot { rows, query: query.to_string(), pinned, recent });
+    let offered = watcher.ask_current(None).types;
+    let _ = snapshots.send(Snapshot {
+        rows,
+        query: query.to_string(),
+        pinned,
+        recent,
+        notice: notice.to_string(),
+        can_transform: crate::selection::preferred_text(&offered).is_some(),
+        can_markdown: offered.iter().any(|mime| mime == "text/html"),
+    });
+}
+
+/// Reads the selection as it stands, turns it into what was asked for, and puts the result
+/// back. The answer is a sentence for the panel either way, because a button that quietly does
+/// nothing looks dead rather than refused.
+fn transform(watcher: &SelectionWatcher, wanted: crate::transform::Transformation) -> String {
+    use crate::transform::Transformation;
+
+    let current_text = || {
+        let offered = watcher.ask_current(None).types;
+        let mime = crate::selection::preferred_text(&offered)?;
+        let bytes = watcher.ask_current(Some(mime)).content?;
+        let text = String::from_utf8_lossy(&bytes).to_string();
+        (!text.is_empty()).then_some(text)
+    };
+
+    match wanted {
+        Transformation::Plain => match current_text() {
+            None => "Nothing on the clipboard to make plain.".into(),
+            Some(text) => {
+                watcher.offer(Selection::Clipboard, Payload::Text(text));
+                "The next paste is plain text.".into()
+            }
+        },
+        Transformation::Json => match current_text() {
+            None => "Nothing on the clipboard to lay out.".into(),
+            Some(text) => match crate::transform::pretty_json(&text) {
+                Ok(json) => {
+                    watcher.offer(Selection::Clipboard, Payload::Text(json));
+                    "The next paste is laid out JSON.".into()
+                }
+                Err(refusal) => format!("Left alone: {refusal}."),
+            },
+        },
+        Transformation::Markdown => match watcher.ask_current(Some("text/html")).content {
+            None => "This copy offers no HTML to turn into Markdown.".into(),
+            Some(bytes) => {
+                let markdown =
+                    crate::transform::markdown_from_html(&String::from_utf8_lossy(&bytes));
+                watcher.offer(Selection::Clipboard, Payload::Text(markdown));
+                "The next paste is Markdown.".into()
+            }
+        },
+    }
 }
 
 #[cfg(test)]

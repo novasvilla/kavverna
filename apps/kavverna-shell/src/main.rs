@@ -81,7 +81,12 @@ fn main() {
 
     // A utility removed in the features list never starts, which is what makes that switch
     // mean something rather than only hiding a page.
-    let clipboard = [Feature::ClipboardHistory, Feature::ClipboardAutoClear, Feature::CleanUrl];
+    let clipboard = [
+        Feature::ClipboardHistory,
+        Feature::ClipboardAutoClear,
+        Feature::CleanUrl,
+        Feature::ClipboardTransform,
+    ];
     let sound = [Feature::VolumeMixer, Feature::OutputSwitcher, Feature::MicrophoneTools];
 
     // Not gated on any one utility, unlike everything below it: showing the panel is a shortcut

@@ -1,5 +1,5 @@
 use crate::{clipboard_state, settings};
-use clipboard_history::{Command, Snapshot};
+use clipboard_history::{Command, Snapshot, Transformation};
 use cxx_qt::Threading;
 use cxx_qt_lib::{QList, QString, QStringList};
 use std::sync::Mutex;
@@ -39,6 +39,9 @@ pub mod qobject {
         #[qproperty(bool, clear_on_suspend)]
         #[qproperty(bool, clear_on_screen_lock)]
         #[qproperty(bool, clean_links)]
+        #[qproperty(QString, transform_notice)]
+        #[qproperty(bool, can_transform)]
+        #[qproperty(bool, can_markdown)]
         type ClipboardView = super::ClipboardViewRust;
     }
 
@@ -69,6 +72,8 @@ pub mod qobject {
         fn choose_skip_sensitive(self: Pin<&mut ClipboardView>, on: bool);
         #[qinvokable]
         fn adopt_klipper_history(self: Pin<&mut ClipboardView>);
+        #[qinvokable]
+        fn transform(self: Pin<&mut ClipboardView>, wanted: i32);
         #[qinvokable]
         fn choose_clear_after(self: Pin<&mut ClipboardView>, seconds: i32);
         #[qinvokable]
@@ -104,6 +109,9 @@ pub struct ClipboardViewRust {
     clear_on_suspend: bool,
     clear_on_screen_lock: bool,
     clean_links: bool,
+    transform_notice: QString,
+    can_transform: bool,
+    can_markdown: bool,
 }
 
 impl qobject::ClipboardView {
@@ -189,6 +197,17 @@ impl qobject::ClipboardView {
         self.as_mut().set_klipper_waiting(0);
     }
 
+    /// Numbered the way the buttons are laid out, left to right.
+    fn transform(self: Pin<&mut Self>, wanted: i32) {
+        let wanted = match wanted {
+            0 => Transformation::Plain,
+            1 => Transformation::Json,
+            2 => Transformation::Markdown,
+            _ => return,
+        };
+        clipboard_state::send(Command::Transform(wanted));
+    }
+
     fn apply(mut self: Pin<&mut Self>, snapshot: Snapshot) {
         let mut ids = QList::<i32>::default();
         let mut previews = QStringList::default();
@@ -215,6 +234,9 @@ impl qobject::ClipboardView {
         self.as_mut().set_row_kinds(kinds);
         self.as_mut().set_row_pinned(pinned);
         self.as_mut().set_row_times(times);
+        self.as_mut().set_transform_notice(QString::from(&snapshot.notice));
+        self.as_mut().set_can_transform(snapshot.can_transform);
+        self.as_mut().set_can_markdown(snapshot.can_markdown);
         self.as_mut().set_pinned_count(snapshot.pinned as i32);
         self.as_mut().set_recent_count(snapshot.recent as i32);
         self.as_mut().set_available(clipboard_state::is_running());
