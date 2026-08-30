@@ -616,16 +616,16 @@ fn adopt_node(
                     if let Some(muted) = muted {
                         stream.muted = muted;
                     }
-                } else if !state.route_of_node.contains_key(&id) {
-                    // Only a device with no route reads from its node. One with a route gets
-                    // its truth from the card, and the node's Props can disagree with it.
-                    if let Some(device) = state.devices.get_mut(&id) {
-                        if let Some(volume) = volume {
-                            device.volume = volume;
-                        }
-                        if let Some(muted) = muted {
-                            device.muted = muted;
-                        }
+                } else if let Some(device) = state.devices.get_mut(&id) {
+                    // WirePlumber keeps a routed device's node Props in step with its route,
+                    // so the node is a sound reading for every device, and the one source for
+                    // a device with no route at all, like the analog input here whose card
+                    // publishes no route for it. Route reports still land afterwards and win.
+                    if let Some(volume) = volume {
+                        device.volume = volume;
+                    }
+                    if let Some(muted) = muted {
+                        device.muted = muted;
                     }
                 }
                 drop(state);
@@ -683,6 +683,15 @@ fn adopt_card(
                     .iter()
                     .find(|(_, place)| **place == (card, route.at.device))
                     .map(|(node, _)| *node);
+                tracing::debug!(
+                    card,
+                    index = route.at.index,
+                    device = route.at.device,
+                    volume = ?route.volume.map(Volume::percent),
+                    muted = ?route.muted,
+                    node = ?node,
+                    "route reported"
+                );
                 if let Some(device) = node.and_then(|node| state.devices.get_mut(&node)) {
                     if let Some(volume) = route.volume {
                         device.volume = volume;
