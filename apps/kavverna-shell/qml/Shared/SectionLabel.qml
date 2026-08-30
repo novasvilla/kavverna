@@ -4,7 +4,7 @@ import QtQuick.Controls
 Label {
     required property var theme
 
-    font.pixelSize: 10
+    font.pixelSize: theme.textSmall
     font.bold: true
     font.letterSpacing: 1.2
     color: theme.secondaryText

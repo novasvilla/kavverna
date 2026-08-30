@@ -415,7 +415,7 @@ ColumnLayout {
         Label {
             Layout.fillWidth: true
             text: "GPL-3.0-or-later. Settings at " + page.hub.settings_path
-            font.pixelSize: 10
+            font.pixelSize: page.theme.textSmall
             color: page.theme.mutedText
             wrapMode: Text.WrapAnywhere
         }

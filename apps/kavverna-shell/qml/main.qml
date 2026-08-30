@@ -170,8 +170,8 @@ Window {
                     Rectangle {
                         implicitWidth: pill.implicitWidth + 18
                         implicitHeight: 21
-                        radius: 10
-                        color: hub.awake ? Qt.alpha(theme.accent, 0.18) : theme.sunken
+                        radius: theme.radius
+                        color: hub.awake ? theme.glow : theme.sunken
 
                         RowLayout {
                             id: pill
@@ -199,7 +199,7 @@ Window {
             Rectangle {
                 Layout.fillWidth: true
                 implicitHeight: 42
-                radius: 10
+                radius: theme.radius
                 visible: !hub.showing_settings
                 color: theme.sunken
 

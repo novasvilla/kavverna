@@ -45,7 +45,7 @@ ColumnLayout {
 
                     Label {
                         text: outputRow.isDefault ? "\u25cf" : "\u25cb"
-                        font.pixelSize: 10
+                        font.pixelSize: section.theme.textSmall
                         color: outputRow.isDefault ? section.theme.accent
                                                    : section.theme.secondaryText
                     }
@@ -220,7 +220,7 @@ ColumnLayout {
 
                 Label {
                     text: inputRow.isDefault ? "\u25cf" : "\u25cb"
-                    font.pixelSize: 10
+                    font.pixelSize: section.theme.textSmall
                     color: inputRow.isDefault ? section.theme.accent
                                               : section.theme.secondaryText
                 }

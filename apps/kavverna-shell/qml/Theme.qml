@@ -32,6 +32,8 @@ QtObject {
     readonly property color controlDown: dark ? Qt.rgba(1, 1, 1, 0.16)
                                               : Qt.rgba(0.30, 0.24, 0.15, 0.28)
     readonly property color selected: Qt.alpha(accent, dark ? 0.26 : 0.22)
+    /// The fainter wash behind something running, a step below a selection.
+    readonly property color glow: Qt.alpha(accent, 0.18)
 
     readonly property color primaryText: dark ? Qt.rgba(1, 1, 1, 0.95)
                                               : Qt.rgba(0.13, 0.10, 0.07, 0.95)
@@ -52,6 +54,8 @@ QtObject {
     readonly property int radiusSmall: 6
     readonly property int radius: 10
 
+    readonly property int textFine: 9
+    readonly property int textSmall: 10
     readonly property int textBody: 11
     readonly property int textStrong: 13
     readonly property int textTitle: 16

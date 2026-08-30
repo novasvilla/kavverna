@@ -11,7 +11,7 @@ import QtQuick.Shapes
 Item {
     id: bolt
 
-    property color color: "white"
+    required property color color
     property int size: 18
 
     implicitWidth: size

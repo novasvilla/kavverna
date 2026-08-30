@@ -107,7 +107,7 @@ ColumnLayout {
             text: section.clipboard.transform_notice.length > 0
                   ? section.clipboard.transform_notice
                   : "Rewrites what is on the clipboard, so the next paste is the result."
-            font.pixelSize: 10
+            font.pixelSize: section.theme.textSmall
             color: section.clipboard.transform_notice.length > 0
                    ? section.theme.primaryText : section.theme.secondaryText
             wrapMode: Text.WordWrap
@@ -137,7 +137,7 @@ ColumnLayout {
             text: section.clipboard.enabled
                   ? "Everything stays on this machine and can be cleared at any time."
                   : "Turn this on to start saving what you copy."
-            font.pixelSize: 10
+            font.pixelSize: section.theme.textSmall
             color: section.theme.secondaryText
             wrapMode: Text.WordWrap
         }
@@ -216,7 +216,7 @@ ColumnLayout {
                 anchors.centerIn: parent
                 visible: section.clipboard.row_ids.length === 0
                 text: section.clipboard.query.length > 0 ? "No results" : "Nothing copied yet"
-                font.pixelSize: 10
+                font.pixelSize: section.theme.textSmall
                 color: section.theme.mutedText
             }
 
@@ -267,14 +267,14 @@ ColumnLayout {
                                 Label {
                                     visible: row.pinned
                                     text: "◆"
-                                    font.pixelSize: 9
+                                    font.pixelSize: section.theme.textFine
                                     color: section.theme.accent
                                 }
 
                                 Label {
                                     text: row.kind === "image" ? "▣"
                                         : row.kind === "files" ? "▫" : "≡"
-                                    font.pixelSize: 10
+                                    font.pixelSize: section.theme.textSmall
                                     color: section.theme.mutedText
                                 }
 
@@ -285,7 +285,7 @@ ColumnLayout {
                                     // that looks like markup would be rendered, and anything it
                                     // pointed at would be fetched.
                                     textFormat: Text.PlainText
-                                    font.pixelSize: 10
+                                    font.pixelSize: section.theme.textSmall
                                     color: section.theme.primaryText
                                     wrapMode: Text.Wrap
                                     maximumLineCount: 3
@@ -370,7 +370,7 @@ ColumnLayout {
                                 Label {
                                     visible: row.index < 9
                                     text: "Ctrl+" + (row.index + 1)
-                                    font.pixelSize: 9
+                                    font.pixelSize: section.theme.textFine
                                     color: section.theme.mutedText
                                 }
 
@@ -379,7 +379,7 @@ ColumnLayout {
                                 Label {
                                     text: new Date(section.clipboard.row_times[row.index])
                                           .toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
-                                    font.pixelSize: 9
+                                    font.pixelSize: section.theme.textFine
                                     color: section.theme.mutedText
                                 }
                             }
@@ -398,7 +398,7 @@ ColumnLayout {
         Label {
             text: section.clipboard.pinned_count + " pinned  ·  "
                   + section.clipboard.recent_count + " recent"
-            font.pixelSize: 10
+            font.pixelSize: section.theme.textSmall
             color: section.theme.mutedText
         }
 
@@ -407,7 +407,7 @@ ColumnLayout {
         Label {
             visible: !section.clipboard.available
             text: "not watching"
-            font.pixelSize: 10
+            font.pixelSize: section.theme.textSmall
             color: section.theme.mutedText
         }
     }

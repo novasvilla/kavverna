@@ -26,7 +26,7 @@ CheckBox {
             anchors.centerIn: parent
             visible: tick.checked
             text: "✓"
-            font.pixelSize: 13
+            font.pixelSize: tick.theme.textStrong
             font.bold: true
             color: tick.theme.surface
         }
