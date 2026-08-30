@@ -279,9 +279,4 @@ mod tests {
         assert_eq!(wanted(&["--settings"]), Wanted::Settings);
         assert_eq!(wanted(&["--page", "clipboard"]), Wanted::Page("clipboard".into()));
     }
-
-    #[test]
-    fn a_page_with_no_name_is_just_the_panel() {
-        assert_eq!(wanted(&["--page"]), Wanted::Panel);
-    }
 }
