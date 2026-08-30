@@ -19,6 +19,37 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: 12
 
+    SectionLabel {
+        theme: page.theme
+        text: "PANEL"
+    }
+
+    Card {
+        theme: page.theme
+        spacing: 12
+
+        ChoiceRow {
+            theme: page.theme
+            title: "Where the panel opens"
+            detail: "By the icon follows the tray, wherever its bar lives. Where I left it "
+                    + "keeps the spot the panel was dragged to, one per screen."
+            choices: [
+                { label: "By the tray icon", value: 0 },
+                { label: "Where I left it", value: 1 },
+                { label: "Bottom right", value: 2 }
+            ]
+            current: page.hub.placement
+            onPicked: (value) => page.hub.choose_placement(value, Window.width, Window.height)
+        }
+
+        Label {
+            Layout.fillWidth: true
+            text: "Drag the panel by its header to move it."
+            font.pixelSize: page.theme.textBody
+            color: page.theme.secondaryText
+        }
+    }
+
     FeaturesCard {
         theme: page.theme
         features: page.features

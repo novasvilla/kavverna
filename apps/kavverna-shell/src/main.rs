@@ -17,6 +17,7 @@ mod launch_at_login;
 mod mixer_state;
 mod mixer_view;
 mod panel;
+mod panel_anchor;
 mod remote;
 mod selftest;
 mod settings;

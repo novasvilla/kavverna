@@ -166,8 +166,10 @@ impl Tray for StatusIcon {
         awake_state::toggle();
     }
 
-    fn activate(&mut self, _x: i32, _y: i32) {
-        panel::toggle();
+    /// The host passes where the icon was clicked, and on Plasma those are real screen
+    /// coordinates: the only way a Wayland client ever learns where its own icon is.
+    fn activate(&mut self, x: i32, y: i32) {
+        panel::toggle_at(x, y);
     }
 
     fn menu(&self) -> Vec<MenuItem<Self>> {

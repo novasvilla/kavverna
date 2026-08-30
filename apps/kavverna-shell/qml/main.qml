@@ -57,7 +57,7 @@ Window {
         }
     }
 
-    width: 360
+    width: hub.panel_width
     // A panel the length of the screen is one nobody reads, so every page keeps to the height
     // the rest of them use.
     readonly property int tallest: Math.min(720, Screen.desktopAvailableHeight - 24)
@@ -67,17 +67,39 @@ Window {
     visible: hub.panel_open
     color: "transparent"
 
-    // Anchored rather than positioned: a Wayland client cannot place its own window, so the
-    // panel hangs off the screen edge nearest the tray instead.
-    LayerShell.Window.anchors: LayerShell.Window.AnchorBottom | LayerShell.Window.AnchorRight
+    // A Wayland client cannot place an ordinary window, but a layer surface is placed by its
+    // anchors and margins, and those are ours. The numbers come from Rust, worked out per
+    // open: beside the tray icon, at a remembered spot, or the old bottom right corner.
+    LayerShell.Window.anchors: (hub.at_bottom ? LayerShell.Window.AnchorBottom
+                                              : LayerShell.Window.AnchorTop)
+                             | (hub.at_right ? LayerShell.Window.AnchorRight
+                                             : LayerShell.Window.AnchorLeft)
     LayerShell.Window.layer: LayerShell.Window.LayerOverlay
-    LayerShell.Window.margins: Qt.rect(0, 0, 12, 12)
+    LayerShell.Window.margins: Qt.rect(hub.margin_left, hub.margin_top,
+                                       hub.margin_right, hub.margin_bottom)
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityOnDemand
     LayerShell.Window.scope: "kavverna-panel"
-    // Pinned to the window's own screen, which is the primary one, rather than letting the
-    // compositor pick: the active screen follows focus and would drag the panel into a
-    // fullscreen game on the other monitor.
+    // Pinned to the window's own screen rather than letting the compositor pick: the active
+    // screen follows focus and would drag the panel into a fullscreen game on the other
+    // monitor. Placement names a screen when it knows one, and the window follows it.
     LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
+
+    // Falls back to the first screen rather than to root.screen: a value that read the
+    // property it feeds would be a binding loop.
+    function screenNamed(name) {
+        const all = Qt.application.screens
+        for (let i = 0; i < all.length; i += 1) {
+            if (all[i].name === name) {
+                return all[i]
+            }
+        }
+        return all[0]
+    }
+
+    Binding on screen {
+        when: hub.panel_screen.length > 0
+        value: root.screenNamed(hub.panel_screen)
+    }
 
     // Closing on lost focus reads well until anything else takes focus on its own: a
     // fullscreen window reclaiming it would shut the panel a moment after it opened. The
@@ -97,8 +119,18 @@ Window {
     KavvernaPanel {
         id: hub
         Component.onCompleted: {
-            attach()
+            // Screens first: attach() may open the panel at once for a launch argument, and
+            // placing it needs to know what is connected.
+            const lines = []
+            const all = Qt.application.screens
+            for (let i = 0; i < all.length; i += 1) {
+                const s = all[i]
+                lines.push(s.name + "\t" + s.virtualX + "\t" + s.virtualY
+                           + "\t" + s.width + "\t" + s.height)
+            }
+            report_screens(lines.join("\n"))
             report_screen(Screen.desktopAvailableWidth, Screen.desktopAvailableHeight)
+            attach()
         }
     }
 
@@ -140,6 +172,22 @@ Window {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 10
+
+                // The header is the panel's handle. A drag slides the layer margins, so the
+                // surface follows the pointer and each event's translation is only what is
+                // still unapplied; in the modes that anchor somewhere, the anchor simply
+                // reasserts itself on the next open.
+                DragHandler {
+                    target: null
+                    onActiveTranslationChanged: if (active) {
+                        hub.nudge_panel(Math.round(activeTranslation.x),
+                                        Math.round(activeTranslation.y),
+                                        root.width, root.height)
+                    }
+                    onActiveChanged: if (!active) {
+                        hub.drag_done(root.width, root.height)
+                    }
+                }
 
                 Rectangle {
                     implicitWidth: 38

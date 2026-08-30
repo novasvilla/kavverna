@@ -32,6 +32,16 @@ pub const PREFERRED_INPUT: &str = "microphone-tools.preferred-input";
 /// who has never opened this expects.
 pub const OUTPUT_CYCLE: &str = "output-switcher.cycle";
 pub const APPEARANCE: &str = "appearance";
+/// Where the panel opens: 0 beside the tray icon, 1 where it was left, 2 the bottom right
+/// corner the panel has always used.
+pub const PLACEMENT: &str = "placement";
+/// The gap between the panel and whatever it hangs off, in logical pixels. Config file only.
+pub const PLACEMENT_GAP: &str = "placement.gap";
+/// The last tray click that carried real coordinates, so a shortcut or a script opens the
+/// panel where the icon was last seen. "screen name<TAB>x<TAB>y".
+pub const PLACEMENT_ANCHOR: &str = "placement.anchor";
+/// Where the panel was left, one entry per screen, most recent last. Same shape as the anchor.
+pub const PLACEMENT_REMEMBERED: &str = "placement.remembered";
 pub const HOLD_UNTIL: &str = "keep-awake.hold-until";
 
 pub const ALLOW_DISPLAY_SLEEP_DEFAULT: bool = true;
@@ -64,6 +74,14 @@ pub const CLEAN_LINKS_DEFAULT: bool = false;
 /// 0 follows the desktop, 1 is the cavern, 2 is its mouth. Following is the default because
 /// somebody who switched their desktop to light meant it.
 pub const APPEARANCE_DEFAULT: i64 = 0;
+
+/// Beside the icon, because the panel belongs to the icon that opened it. Panel bars sit on
+/// different edges on different machines, and a corner that suits one is across the desk on
+/// another.
+pub const PLACEMENT_DEFAULT: i64 = 0;
+/// Twelve is the margin the panel kept before placement existed, so the corner mode is the
+/// old behaviour exactly.
+pub const PLACEMENT_GAP_DEFAULT: i64 = 12;
 
 /// What was being held when Kavverna last had a say. Zero for nothing, negative for a hold with
 /// no end, and otherwise the wall clock second the hold runs out at. Wall clock rather than the
