@@ -19,6 +19,7 @@ mod mixer_view;
 mod panel;
 mod panel_anchor;
 mod remote;
+mod routes;
 mod selftest;
 mod settings;
 mod shortcuts;

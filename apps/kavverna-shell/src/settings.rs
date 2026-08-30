@@ -31,6 +31,11 @@ pub const PREFERRED_INPUT: &str = "microphone-tools.preferred-input";
 /// The outputs the switcher moves between. Absent means every output, which is what somebody
 /// who has never opened this expects.
 pub const OUTPUT_CYCLE: &str = "output-switcher.cycle";
+/// Where each application plays: "app key<TAB>device node.name<TAB>description", one entry per
+/// routed application. Absent from the list means follow the default.
+pub const PLAYBACK_ROUTES: &str = "volume-mixer.routes";
+/// The same shape for where each application records from.
+pub const RECORDING_ROUTES: &str = "microphone-tools.routes";
 pub const APPEARANCE: &str = "appearance";
 /// Which palette dresses the panel. Doubles as the themes feature's enable key: removing the
 /// feature applies the torch and leaves the choice waiting here.

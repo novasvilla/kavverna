@@ -2,7 +2,7 @@ use crate::app_identity::{
     Properties, app_key, cmdline_of_process, display_name, is_generic, presentable,
     refine_from_cmdline,
 };
-use crate::model::{AudioDevice, AudioStream, DeviceRole, MixerSnapshot};
+use crate::model::{Anchor, AudioDevice, AudioStream, DeviceRole, MixerSnapshot};
 use crate::volume::Volume;
 use libspa::param::ParamType;
 use libspa::pod::deserialize::PodDeserializer;
@@ -34,7 +34,21 @@ pub enum MixerCommand {
     /// `node.name` of the device, which is what survives a restart.
     MakeDefaultOutput(String),
     MakeDefaultInput(String),
+    /// Points one stream at a device, or back at the default, through the session's `default`
+    /// metadata: the same write pactl performs and WirePlumber's own store persists.
+    MoveStream {
+        node_id: u32,
+        to: StreamTarget,
+    },
     Stop,
+}
+
+#[derive(Debug, Clone)]
+pub enum StreamTarget {
+    /// `node.name` of the device; the session resolves it to the device's `object.serial`,
+    /// the only numeric form WirePlumber matches a target against.
+    Device(String),
+    FollowDefault,
 }
 
 /// Separate from the snapshot receiver so it can be shared: a receiver is not `Sync`, and
@@ -197,6 +211,10 @@ impl Tracked {
             stream.key = key;
             stream.name = name;
             stream.icon = icon;
+            // The info event carries properties the registry global lacked, and the anchors
+            // can be among them.
+            stream.anchored = anchor_of(&props);
+            stream.taps_playback = taps_playback(&props);
         }
     }
 
@@ -359,6 +377,9 @@ fn run(
             MixerCommand::MakeDefaultInput(name) => {
                 choose_default(&defaults, "default.configured.audio.source", &name);
             }
+            MixerCommand::MoveStream { node_id, to } => {
+                move_stream(&tracked, &defaults, node_id, to);
+            }
         })
     };
 
@@ -382,6 +403,56 @@ fn choose_default(
     let value = format!("{{\"name\":\"{name}\"}}");
     metadata.set_property(0, key, Some("Spa:String:JSON"), Some(&value));
     tracing::info!(key, name, "default device changed");
+}
+
+/// The numeric value must be the target's `object.serial`: WirePlumber matches numbers only
+/// against serials, and a node id written here falls through silently to the default target,
+/// which is what sank the first attempt at this feature. "-1" means follow the default, the
+/// same convention pactl leaves behind.
+fn move_stream(
+    tracked: &Rc<RefCell<Tracked>>,
+    defaults: &Rc<RefCell<Option<pipewire::metadata::Metadata>>>,
+    node_id: u32,
+    to: StreamTarget,
+) {
+    let value = match &to {
+        StreamTarget::FollowDefault => "-1".to_owned(),
+        StreamTarget::Device(name) => {
+            let state = tracked.borrow();
+            match state.devices.values().find(|device| &device.name == name) {
+                Some(device) if device.serial > 0 => device.serial.to_string(),
+                _ => {
+                    tracing::warn!(node_id, name = name.as_str(), "move target is not here");
+                    return;
+                }
+            }
+        }
+    };
+
+    let defaults = defaults.borrow();
+    let Some(metadata) = defaults.as_ref() else {
+        tracing::warn!("no default metadata yet, cannot move the stream");
+        return;
+    };
+
+    metadata.set_property(node_id, "target.object", Some("Spa:Id"), Some(&value));
+    tracing::info!(node_id, value, "stream target changed");
+}
+
+/// Reads the two properties that make a stream refuse routing. Pure so it can be tested.
+fn anchor_of(props: &Properties) -> Option<Anchor> {
+    let set = |key: &str| props.get(key).map(String::as_str) == Some("true");
+    if set("node.dont-move") {
+        Some(Anchor::RefusesToMove)
+    } else if set("node.dont-reconnect") {
+        Some(Anchor::RefusesToReconnect)
+    } else {
+        None
+    }
+}
+
+fn taps_playback(props: &Properties) -> bool {
+    props.get("stream.capture.sink").map(String::as_str) == Some("true")
 }
 
 fn volume_property(volume: Volume) -> Property {
@@ -496,10 +567,16 @@ fn adopt_node(
     let props = properties_of(global.props);
     let class = props.get("media.class").map(String::as_str).unwrap_or_default();
 
-    let role = match class {
-        "Stream/Output/Audio" => None,
-        "Audio/Sink" => Some(DeviceRole::Output),
-        "Audio/Source" => Some(DeviceRole::Input),
+    enum Adopt {
+        Stream(DeviceRole),
+        Device(DeviceRole),
+    }
+
+    let adopt = match class {
+        "Stream/Output/Audio" => Adopt::Stream(DeviceRole::Output),
+        "Stream/Input/Audio" => Adopt::Stream(DeviceRole::Input),
+        "Audio/Sink" => Adopt::Device(DeviceRole::Output),
+        "Audio/Source" => Adopt::Device(DeviceRole::Input),
         _ => return,
     };
 
@@ -510,8 +587,8 @@ fn adopt_node(
     let id = global.id;
     {
         let mut state = tracked.borrow_mut();
-        match role {
-            None => {
+        match adopt {
+            Adopt::Stream(role) => {
                 let client = props
                     .get("client.id")
                     .and_then(|value| value.parse::<u32>().ok())
@@ -529,13 +606,16 @@ fn adopt_node(
                         name: display_name(&props, client.as_ref()),
                         // Filled in by reidentify_node, which runs once the client is known.
                         icon: None,
+                        role,
+                        taps_playback: taps_playback(&props),
+                        anchored: anchor_of(&props),
                         volume: Volume::default(),
                         muted: false,
                         target: props.get("target.object").cloned(),
                     },
                 );
             }
-            Some(role) => {
+            Adopt::Device(role) => {
                 let name = props.get("node.name").cloned().unwrap_or_default();
                 // A hardware device carries the card it belongs to and which route on it, and
                 // that route is where its volume lives. A virtual sink carries neither.
@@ -556,6 +636,10 @@ fn adopt_node(
                             .cloned()
                             .unwrap_or_else(|| name.clone()),
                         name,
+                        serial: props
+                            .get("object.serial")
+                            .and_then(|value| value.parse().ok())
+                            .unwrap_or(0),
                         volume: Volume::default(),
                         muted: false,
                         is_default: false,
@@ -590,6 +674,11 @@ fn adopt_node(
                         .zip(full.get("card.profile.device").and_then(|value| value.parse().ok()));
                     if let Some(place) = place {
                         state.route_of_node.insert(id, place);
+                    }
+                    if let Some(serial) = full.get("object.serial").and_then(|v| v.parse().ok()) {
+                        if let Some(device) = state.devices.get_mut(&id) {
+                            device.serial = serial;
+                        }
                     }
                 }
                 drop(state);
@@ -823,7 +912,27 @@ fn parse_default_name(value: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_default_name;
+    use super::{Anchor, Properties, anchor_of, parse_default_name, taps_playback};
+
+    #[test]
+    fn dont_move_and_dont_reconnect_read_as_anchors() {
+        let held: Properties = [("node.dont-move".to_owned(), "true".to_owned())].into();
+        assert_eq!(anchor_of(&held), Some(Anchor::RefusesToMove));
+
+        let tied: Properties = [("node.dont-reconnect".to_owned(), "true".to_owned())].into();
+        assert_eq!(anchor_of(&tied), Some(Anchor::RefusesToReconnect));
+
+        let free: Properties = [("node.dont-move".to_owned(), "false".to_owned())].into();
+        assert_eq!(anchor_of(&free), None);
+        assert_eq!(anchor_of(&Properties::default()), None);
+    }
+
+    #[test]
+    fn a_monitor_tap_is_recognised() {
+        let tap: Properties = [("stream.capture.sink".to_owned(), "true".to_owned())].into();
+        assert!(taps_playback(&tap));
+        assert!(!taps_playback(&Properties::default()));
+    }
 
     #[test]
     fn the_default_device_name_is_read_out_of_the_metadata_json() {

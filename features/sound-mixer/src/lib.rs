@@ -11,6 +11,9 @@ pub use app_identity::{
     display_name, is_generic, presentable, refine_from_cmdline, steam_icon_of_process,
 };
 pub use desktop_entry::Entry as DesktopEntry;
-pub use model::{AudioApplication, AudioDevice, AudioStream, DeviceRole, MixerSnapshot};
-pub use session::{MixerCommand, MixerCommands, start};
+pub use model::{
+    Anchor, AudioApplication, AudioDevice, AudioStream, ChosenDevice, DeviceRole, MixerSnapshot,
+    RouteState,
+};
+pub use session::{MixerCommand, MixerCommands, StreamTarget, start};
 pub use volume::{MAX_PERCENT, UNITY_PERCENT, Volume};

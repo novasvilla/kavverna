@@ -118,6 +118,24 @@ ColumnLayout {
                 id: streamRow
                 required property int index
                 readonly property int percent: section.mixer.stream_volumes[index]
+                readonly property string anchorReason: section.mixer.stream_anchors[index]
+                readonly property int routedTo: section.mixer.stream_route_device_ids[index]
+                property bool routeOpen: false
+
+                /// Follow the default first, every output after, and the unplugged choice
+                /// last so it stays visible instead of snapping back to Default.
+                function routeChoices() {
+                    const rows = [{ label: "Follow system default", value: -1 }]
+                    for (let at = 0; at < section.mixer.output_names.length; at += 1) {
+                        rows.push({ label: section.mixer.output_names[at],
+                                    value: section.mixer.output_ids[at] })
+                    }
+                    if (streamRow.routedTo === -2) {
+                        rows.push({ label: section.mixer.stream_route_labels[streamRow.index]
+                                           + " (unplugged)", value: -2 })
+                    }
+                    return rows
+                }
 
                 Layout.fillWidth: true
                 spacing: 2
@@ -169,6 +187,52 @@ ColumnLayout {
                         onClicked: section.mixer.mute_stream(
                             section.mixer.stream_ids[streamRow.index],
                             !section.mixer.stream_muted[streamRow.index])
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: streamRow.anchorReason !== ""
+                    text: streamRow.anchorReason
+                    font.pixelSize: section.theme.textSmall
+                    color: section.theme.mutedText
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: streamRow.anchorReason === ""
+                    text: "▸ " + section.mixer.stream_route_labels[streamRow.index]
+                    font.pixelSize: section.theme.textSmall
+                    color: streamRow.routeOpen ? section.theme.primaryText
+                                               : section.theme.secondaryText
+                    elide: Text.ElideRight
+
+                    TapHandler {
+                        onTapped: streamRow.routeOpen = !streamRow.routeOpen
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: streamRow.anchorReason === "" && streamRow.routedTo === -2
+                    text: "Using default until this device returns."
+                    font.pixelSize: section.theme.textFine
+                    color: section.theme.mutedText
+                }
+
+                ChoiceList {
+                    visible: streamRow.routeOpen
+                    theme: section.theme
+                    choices: streamRow.routeChoices()
+                    current: streamRow.routedTo
+                    onPicked: (value) => {
+                        const id = section.mixer.stream_ids[streamRow.index]
+                        if (value === -1) {
+                            section.mixer.route_stream_to_default(id)
+                        } else {
+                            section.mixer.route_stream(id, value)
+                        }
+                        streamRow.routeOpen = false
                     }
                 }
             }
@@ -236,6 +300,108 @@ ColumnLayout {
                     TapHandler {
                         onTapped: section.mixer.make_default_input(
                             section.mixer.input_ids[inputRow.index])
+                    }
+                }
+            }
+        }
+
+        Label {
+            visible: section.mixer.recorder_names.length > 0
+            Layout.topMargin: section.theme.gapTight
+            text: "Recording"
+            font.pixelSize: section.theme.textStrong
+            font.bold: true
+            color: section.theme.primaryText
+        }
+
+        Repeater {
+            model: section.mixer.recorder_names.length
+
+            delegate: ColumnLayout {
+                id: recorderRow
+                required property int index
+                readonly property string anchorReason: section.mixer.recorder_anchors[index]
+                readonly property int routedTo: section.mixer.recorder_route_device_ids[index]
+                property bool routeOpen: false
+
+                function sourceChoices() {
+                    const rows = [{ label: "Follow system default", value: -1 }]
+                    for (let at = 0; at < section.mixer.input_names.length; at += 1) {
+                        rows.push({ label: section.mixer.input_names[at],
+                                    value: section.mixer.input_ids[at] })
+                    }
+                    if (recorderRow.routedTo === -2) {
+                        rows.push({ label: section.mixer.recorder_route_labels[recorderRow.index]
+                                           + " (unplugged)", value: -2 })
+                    }
+                    return rows
+                }
+
+                Layout.fillWidth: true
+                spacing: 2
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Kirigami.Icon {
+                        source: section.mixer.recorder_icons[recorderRow.index]
+                        implicitWidth: 16
+                        implicitHeight: 16
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: section.mixer.recorder_names[recorderRow.index]
+                        font.pixelSize: section.theme.textBody
+                        color: section.theme.primaryText
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: recorderRow.anchorReason !== ""
+                    text: recorderRow.anchorReason
+                    font.pixelSize: section.theme.textSmall
+                    color: section.theme.mutedText
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: recorderRow.anchorReason === ""
+                    text: "▸ " + section.mixer.recorder_route_labels[recorderRow.index]
+                    font.pixelSize: section.theme.textSmall
+                    color: recorderRow.routeOpen ? section.theme.primaryText
+                                                 : section.theme.secondaryText
+                    elide: Text.ElideRight
+
+                    TapHandler {
+                        onTapped: recorderRow.routeOpen = !recorderRow.routeOpen
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: recorderRow.anchorReason === "" && recorderRow.routedTo === -2
+                    text: "Using default until this device returns."
+                    font.pixelSize: section.theme.textFine
+                    color: section.theme.mutedText
+                }
+
+                ChoiceList {
+                    visible: recorderRow.routeOpen
+                    theme: section.theme
+                    choices: recorderRow.sourceChoices()
+                    current: recorderRow.routedTo
+                    onPicked: (value) => {
+                        const id = section.mixer.recorder_ids[recorderRow.index]
+                        if (value === -1) {
+                            section.mixer.route_recorder_to_default(id)
+                        } else {
+                            section.mixer.route_recorder(id, value)
+                        }
+                        recorderRow.routeOpen = false
                     }
                 }
             }

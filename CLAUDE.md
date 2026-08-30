@@ -145,19 +145,24 @@ skipping the audio server's own bridges: a stream arriving through the PulseAudi
 reports the bridge rather than the application.
 
 Working and verified against the live system: reading every device and stream, writing
-volume, switching the default output and input through the session's `default` metadata, and
-cycling outputs.
+volume (a stream's on its node, a device's on its card route, with `save`), switching the
+default output and input through the session's `default` metadata, cycling outputs, and
+moving streams between devices.
 
-Two open questions, both found by checking the system rather than trusting our own state:
+Two contracts that were each learned the hard way, both by checking the system rather than
+trusting our own state:
 
-- **Per application routing does not work by setting a property.** Neither `target.object`
-  nor `target.node` moves a stream that is already playing, confirmed by watching the Link
-  objects rather than the metadata write. `pactl move-sink-input` does move it, so a live
-  move needs the links rebuilt.
-- **Muting a USB headset microphone reports success but `pactl` still shows it unmuted.**
-  The likely cause is that a node's mute and a device route's mute are different layers, and
-  each tool reads a different one. Not confirmed. Until it is, do not claim mute-all covers
-  every input.
+- **Moving a stream is a metadata write, and the number must be the serial.** Write key
+  `target.object` on the `default` metadata with subject = the stream's node id and value =
+  the target's `object.serial` (or its `node.name` as a string); `"-1"` means follow the
+  default. WirePlumber matches a numeric value only against serials, so a node id written
+  there fails silently to the default target, which is why the first attempt concluded that
+  the property "does not work". Capture streams move by the identical write. `node.dont-move`
+  streams ignore it entirely, and the row says so instead of hiding.
+- **A device's volume and mute live on its card's route, not on its node's Props.** Writing
+  the node changed a value nothing played through while every self-readback agreed; the USB
+  microphone mute defect was the same wrong object. Every mixer write is verified with
+  `pactl`, never with our own snapshot, and `tests/writes_to_pipewire.rs` keeps it that way.
 
 ## Hazards
 

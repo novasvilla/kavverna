@@ -1,5 +1,5 @@
-use crate::settings;
-use sound_mixer::{MixerCommand, MixerCommands, MixerSnapshot};
+use crate::{routes, settings};
+use sound_mixer::{DeviceRole, MixerCommand, MixerCommands, MixerSnapshot, StreamTarget};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 static SNAPSHOT: Mutex<Option<MixerSnapshot>> = Mutex::new(None);
@@ -74,20 +74,61 @@ pub fn run(on_change: impl Fn()) {
     }
 
     let mut inputs_before: Vec<String> = Vec::new();
+    let mut outputs_before: Vec<String> = Vec::new();
+    let mut stream_ids_before: Vec<u32> = Vec::new();
 
     while let Ok(snapshot) = changes.recv() {
         let inputs_now: Vec<String> =
             snapshot.inputs.iter().map(|device| device.name.clone()).collect();
+        let outputs_now: Vec<String> =
+            snapshot.outputs.iter().map(|device| device.name.clone()).collect();
+        let stream_ids_now: Vec<u32> =
+            snapshot.streams.iter().map(|stream| stream.node_id).collect();
         let already_default =
             snapshot.inputs.iter().any(|device| device.is_default && device.name == preferred());
 
+        // The half WirePlumber's own store does not do: pin a stream back when its chosen
+        // device returns, and pin a newcomer whose identity only our key recognises.
+        let due = {
+            let side = |role, devices_before: &[String], devices_now: &[String], key| {
+                let at: Vec<routes::StreamAt> = snapshot
+                    .streams
+                    .iter()
+                    .filter(|s| s.role == role && !s.taps_playback)
+                    .map(|s| routes::StreamAt {
+                        node_id: s.node_id,
+                        app: s.key.as_str().to_owned(),
+                        movable: s.anchored.is_none(),
+                    })
+                    .collect();
+                let entries = settings::texts_at(key).unwrap_or_default();
+                routes::moves_due(&entries, &at, &stream_ids_before, devices_before, devices_now)
+            };
+            let mut due =
+                side(DeviceRole::Output, &outputs_before, &outputs_now, settings::PLAYBACK_ROUTES);
+            due.extend(side(
+                DeviceRole::Input,
+                &inputs_before,
+                &inputs_now,
+                settings::RECORDING_ROUTES,
+            ));
+            due
+        };
+
         *lock() = Some(snapshot);
+
+        for (node_id, device) in due {
+            tracing::info!(node_id, device = %device, "re-applying a stored route");
+            send(MixerCommand::MoveStream { node_id, to: StreamTarget::Device(device) });
+        }
 
         if !already_default && has_just_arrived(&preferred(), &inputs_before, &inputs_now) {
             tracing::info!(input = %preferred(), "the preferred input is back, making it default");
             send(MixerCommand::MakeDefaultInput(preferred()));
         }
         inputs_before = inputs_now;
+        outputs_before = outputs_now;
+        stream_ids_before = stream_ids_now;
 
         on_change();
     }
