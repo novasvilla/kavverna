@@ -77,100 +77,93 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        implicitHeight: system.implicitHeight + section.theme.pad * 2
+        spacing: 10
 
-        ColumnLayout {
-            id: system
-            anchors.fill: parent
-            anchors.margins: section.theme.pad
-            spacing: 10
+        Meter {
+            theme: section.theme
+            label: "CPU  ·  " + section.vitals.cpu_temperature_text
+            value: section.vitals.cpu_load_text
+            fraction: section.vitals.cpu_load
+            past: section.vitals.cpu_history
+            tint: section.vitals.cpu_load > 0.9 ? section.theme.ember
+                : section.vitals.cpu_load > 0.7 ? section.theme.warm
+                                                : section.theme.accent
+        }
 
-            Meter {
-                theme: section.theme
-                label: "CPU  ·  " + section.vitals.cpu_temperature_text
-                value: section.vitals.cpu_load_text
-                fraction: section.vitals.cpu_load
-                past: section.vitals.cpu_history
-                tint: section.vitals.cpu_load > 0.9 ? section.theme.ember
-                    : section.vitals.cpu_load > 0.7 ? section.theme.warm
-                                                    : section.theme.accent
-            }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 2
+            visible: section.vitals.core_loads.length > 0
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 2
-                visible: section.vitals.core_loads.length > 0
+            Repeater {
+                model: section.vitals.core_loads.length
 
-                Repeater {
-                    model: section.vitals.core_loads.length
+                delegate: Rectangle {
+                    required property int index
 
-                    delegate: Rectangle {
-                        required property int index
+                    Layout.fillWidth: true
+                    implicitHeight: 16
+                    radius: 2
+                    color: section.theme.control
 
-                        Layout.fillWidth: true
-                        implicitHeight: 16
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        width: parent.width
+                        height: parent.height * section.vitals.core_loads[parent.index]
                         radius: 2
-                        color: section.theme.control
-
-                        Rectangle {
-                            anchors.bottom: parent.bottom
-                            width: parent.width
-                            height: parent.height * section.vitals.core_loads[parent.index]
-                            radius: 2
-                            color: section.theme.accent
-                        }
+                        color: section.theme.accent
                     }
                 }
             }
+        }
 
-            Meter {
-                theme: section.theme
-                label: "Memory"
-                value: section.vitals.memory_text
-                fraction: section.vitals.memory_used
-                past: section.vitals.memory_history
-            }
+        Meter {
+            theme: section.theme
+            label: "Memory"
+            value: section.vitals.memory_text
+            fraction: section.vitals.memory_used
+            past: section.vitals.memory_history
+        }
 
-            Meter {
-                theme: section.theme
-                label: "Held by applications"
-                value: section.vitals.memory_apps_text
-                fraction: section.vitals.memory_apps
-                tint: section.theme.secondaryText
-            }
+        Meter {
+            theme: section.theme
+            label: "Held by applications"
+            value: section.vitals.memory_apps_text
+            fraction: section.vitals.memory_apps
+            tint: section.theme.secondaryText
+        }
 
-            RowLayout {
+        RowLayout {
+            Layout.fillWidth: true
+
+            Label {
                 Layout.fillWidth: true
-
-                Label {
-                    Layout.fillWidth: true
-                    text: "Pressure"
-                    font.pixelSize: section.theme.textBody
-                    color: section.theme.secondaryText
-                }
-
-                Label {
-                    text: section.vitals.pressure_text
-                    font.pixelSize: section.theme.textBody
-                    color: section.theme.primaryText
-                }
+                text: "Pressure"
+                font.pixelSize: section.theme.textBody
+                color: section.theme.secondaryText
             }
 
-            RowLayout {
+            Label {
+                text: section.vitals.pressure_text
+                font.pixelSize: section.theme.textBody
+                color: section.theme.primaryText
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+
+            Label {
                 Layout.fillWidth: true
+                text: "Compressed swap"
+                font.pixelSize: section.theme.textBody
+                color: section.theme.secondaryText
+            }
 
-                Label {
-                    Layout.fillWidth: true
-                    text: "Compressed swap"
-                    font.pixelSize: section.theme.textBody
-                    color: section.theme.secondaryText
-                }
-
-                Label {
-                    text: section.vitals.swap_text
-                    font.pixelSize: section.theme.textBody
-                    color: section.theme.primaryText
-                }
+            Label {
+                text: section.vitals.swap_text
+                font.pixelSize: section.theme.textBody
+                color: section.theme.primaryText
             }
         }
     }
@@ -182,52 +175,45 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        implicitHeight: graphics.implicitHeight + section.theme.pad * 2
+        spacing: 10
 
-        ColumnLayout {
-            id: graphics
-            anchors.fill: parent
-            anchors.margins: section.theme.pad
-            spacing: 10
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 4
+            visible: section.vitals.card_names.length > 1
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 4
-                visible: section.vitals.card_names.length > 1
+            Repeater {
+                model: section.vitals.card_names
 
-                Repeater {
-                    model: section.vitals.card_names
+                delegate: PillButton {
+                    required property int index
+                    required property string modelData
 
-                    delegate: PillButton {
-                        required property int index
-                        required property string modelData
-
-                        theme: section.theme
-                        active: section.vitals.chosen_card === index
-                        Layout.fillWidth: true
-                        implicitHeight: 24
-                        text: modelData
-                        onClicked: section.vitals.choose_card(index)
-                    }
+                    theme: section.theme
+                    active: section.vitals.chosen_card === index
+                    Layout.fillWidth: true
+                    implicitHeight: 24
+                    text: modelData
+                    onClicked: section.vitals.choose_card(index)
                 }
             }
+        }
 
-            Meter {
-                theme: section.theme
-                label: "GPU  ·  " + section.vitals.gpu_temperature_text
-                       + "  ·  " + section.vitals.gpu_power_text
-                value: section.vitals.gpu_usage_text
-                fraction: section.vitals.gpu_usage
-                past: section.vitals.gpu_history
-            }
+        Meter {
+            theme: section.theme
+            label: "GPU  ·  " + section.vitals.gpu_temperature_text
+                   + "  ·  " + section.vitals.gpu_power_text
+            value: section.vitals.gpu_usage_text
+            fraction: section.vitals.gpu_usage
+            past: section.vitals.gpu_history
+        }
 
-            Meter {
-                theme: section.theme
-                label: "VRAM"
-                value: section.vitals.vram_text
-                fraction: section.vitals.vram_used
-                tint: section.vitals.vram_used > 0.9 ? section.theme.ember : section.theme.warm
-            }
+        Meter {
+            theme: section.theme
+            label: "VRAM"
+            value: section.vitals.vram_text
+            fraction: section.vitals.vram_used
+            tint: section.vitals.vram_used > 0.9 ? section.theme.ember : section.theme.warm
         }
     }
 }

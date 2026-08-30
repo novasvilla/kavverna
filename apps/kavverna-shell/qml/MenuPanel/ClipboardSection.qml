@@ -67,57 +67,50 @@ ColumnLayout {
     Card {
         theme: section.theme
         visible: section.shows("clipboard-transform")
-        implicitHeight: transforms.implicitHeight + section.theme.pad * 2
+        spacing: section.theme.gapSnug
 
-        ColumnLayout {
-            id: transforms
-            anchors.fill: parent
-            anchors.margins: section.theme.pad
+        RowLayout {
+            Layout.fillWidth: true
             spacing: section.theme.gapSnug
 
-            RowLayout {
+            PillButton {
+                theme: section.theme
                 Layout.fillWidth: true
-                spacing: section.theme.gapSnug
-
-                PillButton {
-                    theme: section.theme
-                    Layout.fillWidth: true
-                    text: "Plain"
-                    enabled: section.clipboard.can_transform
-                    onClicked: section.clipboard.transform(0)
-                }
-
-                PillButton {
-                    theme: section.theme
-                    Layout.fillWidth: true
-                    text: "JSON"
-                    enabled: section.clipboard.can_transform
-                    onClicked: section.clipboard.transform(1)
-                }
-
-                // Markdown needs the html of the copy itself, so it follows what the current
-                // one offers rather than staying clickable and failing.
-                PillButton {
-                    theme: section.theme
-                    Layout.fillWidth: true
-                    text: "Markdown"
-                    enabled: section.clipboard.can_markdown
-                    ToolTip.visible: hovered && !section.clipboard.can_markdown
-                    ToolTip.text: "This copy offers no HTML to convert"
-                    onClicked: section.clipboard.transform(2)
-                }
+                text: "Plain"
+                enabled: section.clipboard.can_transform
+                onClicked: section.clipboard.transform(0)
             }
 
-            Label {
+            PillButton {
+                theme: section.theme
                 Layout.fillWidth: true
-                text: section.clipboard.transform_notice.length > 0
-                      ? section.clipboard.transform_notice
-                      : "Rewrites what is on the clipboard, so the next paste is the result."
-                font.pixelSize: 10
-                color: section.clipboard.transform_notice.length > 0
-                       ? section.theme.primaryText : section.theme.secondaryText
-                wrapMode: Text.WordWrap
+                text: "JSON"
+                enabled: section.clipboard.can_transform
+                onClicked: section.clipboard.transform(1)
             }
+
+            // Markdown needs the html of the copy itself, so it follows what the current
+            // one offers rather than staying clickable and failing.
+            PillButton {
+                theme: section.theme
+                Layout.fillWidth: true
+                text: "Markdown"
+                enabled: section.clipboard.can_markdown
+                ToolTip.visible: hovered && !section.clipboard.can_markdown
+                ToolTip.text: "This copy offers no HTML to convert"
+                onClicked: section.clipboard.transform(2)
+            }
+        }
+
+        Label {
+            Layout.fillWidth: true
+            text: section.clipboard.transform_notice.length > 0
+                  ? section.clipboard.transform_notice
+                  : "Rewrites what is on the clipboard, so the next paste is the result."
+            font.pixelSize: 10
+            color: section.clipboard.transform_notice.length > 0
+                   ? section.theme.primaryText : section.theme.secondaryText
+            wrapMode: Text.WordWrap
         }
     }
 
@@ -130,85 +123,78 @@ ColumnLayout {
     Card {
         theme: section.theme
         visible: section.shows("clipboard-history")
-        implicitHeight: controls.implicitHeight + section.theme.pad * 2
+        spacing: 8
 
-        ColumnLayout {
-            id: controls
-            anchors.fill: parent
-            anchors.margins: section.theme.pad
-            spacing: 8
+        Tick {
+            theme: section.theme
+            text: "Save clipboard history"
+            checked: section.clipboard.enabled
+            onToggled: section.clipboard.enable(checked)
+        }
 
-            Tick {
+        Label {
+            Layout.fillWidth: true
+            text: section.clipboard.enabled
+                  ? "Everything stays on this machine and can be cleared at any time."
+                  : "Turn this on to start saving what you copy."
+            font.pixelSize: 10
+            color: section.theme.secondaryText
+            wrapMode: Text.WordWrap
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            visible: section.clipboard.enabled
+
+            TextField {
+                id: search
+                Layout.fillWidth: true
+                placeholderText: "Search copied text"
+                placeholderTextColor: section.theme.mutedText
+                font.pixelSize: section.theme.textBody
+                color: section.theme.primaryText
+                selectionColor: section.theme.selected
+                selectedTextColor: section.theme.primaryText
+                enabled: section.clipboard.row_ids.length > 0
+                         || section.clipboard.query.length > 0
+                onTextEdited: section.clipboard.search(text)
+                // Opened by the shortcut, the first thing anyone does is type.
+                onVisibleChanged: if (visible) forceActiveFocus()
+
+                background: Rectangle {
+                    radius: section.theme.radiusSmall
+                    color: section.theme.sunken
+                    border.width: search.activeFocus ? 1 : 0
+                    border.color: section.theme.accent
+                }
+            }
+
+            IconButton {
                 theme: section.theme
-                text: "Save clipboard history"
-                checked: section.clipboard.enabled
-                onToggled: section.clipboard.enable(checked)
+                source: "edit-clear"
+                size: 12
+                implicitWidth: 26
+                implicitHeight: 26
+                visible: section.clipboard.query.length > 0
+                ToolTip.visible: hovered
+                ToolTip.text: "Clear the search"
+                onClicked: {
+                    search.text = "";
+                    section.clipboard.search("");
+                }
             }
 
-            Label {
-                Layout.fillWidth: true
-                text: section.clipboard.enabled
-                      ? "Everything stays on this machine and can be cleared at any time."
-                      : "Turn this on to start saving what you copy."
-                font.pixelSize: 10
-                color: section.theme.secondaryText
-                wrapMode: Text.WordWrap
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 6
-                visible: section.clipboard.enabled
-
-                TextField {
-                    id: search
-                    Layout.fillWidth: true
-                    placeholderText: "Search copied text"
-                    placeholderTextColor: section.theme.mutedText
-                    font.pixelSize: section.theme.textBody
-                    color: section.theme.primaryText
-                    selectionColor: section.theme.selected
-                    selectedTextColor: section.theme.primaryText
-                    enabled: section.clipboard.row_ids.length > 0
-                             || section.clipboard.query.length > 0
-                    onTextEdited: section.clipboard.search(text)
-                    // Opened by the shortcut, the first thing anyone does is type.
-                    onVisibleChanged: if (visible) forceActiveFocus()
-
-                    background: Rectangle {
-                        radius: section.theme.radiusSmall
-                        color: section.theme.sunken
-                        border.width: search.activeFocus ? 1 : 0
-                        border.color: section.theme.accent
-                    }
-                }
-
-                IconButton {
-                    theme: section.theme
-                    source: "edit-clear"
-                    size: 12
-                    implicitWidth: 26
-                    implicitHeight: 26
-                    visible: section.clipboard.query.length > 0
-                    ToolTip.visible: hovered
-                    ToolTip.text: "Clear the search"
-                    onClicked: {
-                        search.text = "";
-                        section.clipboard.search("");
-                    }
-                }
-
-                IconButton {
-                    theme: section.theme
-                    source: "edit-delete"
-                    size: 12
-                    implicitWidth: 26
-                    implicitHeight: 26
-                    enabled: section.clipboard.recent_count > 0
-                    ToolTip.visible: hovered
-                    ToolTip.text: "Clear everything not pinned"
-                    onClicked: section.clipboard.clear_unpinned()
-                }
+            IconButton {
+                theme: section.theme
+                source: "edit-delete"
+                size: 12
+                implicitWidth: 26
+                implicitHeight: 26
+                enabled: section.clipboard.recent_count > 0
+                ToolTip.visible: hovered
+                ToolTip.text: "Clear everything not pinned"
+                onClicked: section.clipboard.clear_unpinned()
             }
         }
     }
@@ -220,19 +206,24 @@ ColumnLayout {
                         ? Math.min(entries.implicitHeight + 24, 284)
                         : 72
 
-        Label {
-            anchors.centerIn: parent
-            visible: section.clipboard.row_ids.length === 0
-            text: section.clipboard.query.length > 0 ? "No results" : "Nothing copied yet"
-            font.pixelSize: 10
-            color: section.theme.mutedText
-        }
+        // An Item so the empty state can centre and the list can fill: the card lays its
+        // children out in a padded column, and anchors need a plain parent.
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
 
-        ScrollView {
-            anchors.fill: parent
-            anchors.margins: section.theme.pad
-            visible: section.clipboard.row_ids.length > 0
-            clip: true
+            Label {
+                anchors.centerIn: parent
+                visible: section.clipboard.row_ids.length === 0
+                text: section.clipboard.query.length > 0 ? "No results" : "Nothing copied yet"
+                font.pixelSize: 10
+                color: section.theme.mutedText
+            }
+
+            ScrollView {
+                anchors.fill: parent
+                visible: section.clipboard.row_ids.length > 0
+                clip: true
 
             ColumnLayout {
                 id: entries
@@ -397,8 +388,8 @@ ColumnLayout {
                 }
             }
         }
+        }
     }
-
     RowLayout {
         Layout.fillWidth: true
         visible: section.shows("clipboard-history") && section.clipboard.enabled

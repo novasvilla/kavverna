@@ -87,12 +87,20 @@ not. See [CREDITS.md](CREDITS.md).
   `StartupWMClass` or its own entry file, and the binary it runs. Every Steam game and every
   Electron application is covered rather than a chosen few.
 - **Every output and input** with live volumes, mute, and switching which one is the default.
-- **Mute every microphone** in one click.
+  Device volume is written where it actually lives, on the card's route, so the slider moves
+  what you hear.
+- **Mute every microphone** in one click, or from a shortcut.
+- **Come back to a preferred microphone**: pin one and it is made the default again whenever it
+  is plugged back in.
+- **Step through the outputs you choose** from a shortcut or the tray, not through every
+  output there is.
 
 ### Monitoring
 
 - **Processor** load overall and a bar per thread, with temperature read from the chip by name
   rather than by index, since those move between boots.
+- **The last two minutes behind each reading**, drawn as a trace, so the spike that was over
+  before the panel opened is still there to see.
 - **Memory** with the page cache excluded, what applications actually hold, and pressure from
   the kernel's own PSI rather than a guess.
 - **Compressed swap** priced by what it really costs in RAM, not by what `free` reports.
@@ -113,6 +121,9 @@ not. See [CREDITS.md](CREDITS.md).
   locks. Saved entries are left alone, and it works with the history switched off.
 - **Take the tracking out of copied links**, campaign and click parameters removed the moment a
   link arrives, and everything else left byte for byte as it was.
+- **Turn what was copied into something else**: plain text, laid out JSON, or Markdown made
+  from the copy's own HTML, read at the moment you ask rather than stored. The next paste is
+  the result.
 
 ### The suite itself
 
@@ -124,6 +135,13 @@ not. See [CREDITS.md](CREDITS.md).
   in both, so it looks like itself on any colour scheme.
 - **A tray menu that reaches the whole suite**, not just keep awake: mute every microphone, move
   to the next output, open the history.
+- **A shortcut for every utility worth reaching blind**: the panel, the clipboard, keep awake,
+  mute every microphone, the next output. Registered through the desktop, so System Settings
+  lists them beside every other shortcut and rebinding is done there.
+- **Each utility says what it costs**: nothing at rest, reads on a timer, watches the
+  clipboard. The label sits beside the switch, so the choice is made against a fact.
+- **`--selftest`** reports what the machine offers of everything Kavverna relies on, one line
+  each, so a report from an untested distribution arrives as data.
 
 ### Energy and tools
 
@@ -215,8 +233,8 @@ Being straight about this up front, because these limits are not going away:
 - **Which application copied something cannot be known.** A selection carries no client
   identity and KWin exposes no foreign toplevel protocol. So there is no source column, and
   exclusions work by the mime type a password manager sets rather than by application.
-- **The tray icon cannot show text.** A StatusNotifierItem carries an icon and nothing else, so
-  live readings need a panel applet, which is on the way.
+- **The tray icon cannot show text.** A StatusNotifierItem carries an icon and nothing else,
+  so the live numbers live in the panel, one click away.
 - **A window cannot place itself.** The panel anchors to a screen edge rather than appearing
   under the pointer.
 - **Emptying the clipboard fights Plasma.** Klipper puts the content straight back unless its
@@ -228,11 +246,9 @@ Being straight about this up front, because these limits are not going away:
 
 In roughly this order. Anything here is a good place to start if you want to help.
 
-- **Turning what was copied into something else**: as plain text, as Markdown, as JSON. The
-  clipboard is already ours, so none of it needs a new privilege.
-- **A panel applet**, so the readings are visible without opening anything. The tray cannot
-  show text, so this is the only place live numbers can live.
 - **Network and disk** in the monitor.
+- **Quick toggles**: dark mode, lock, screens off, night colour, eject removable disks. Nearly
+  all one call each, and the tools page has room.
 - **Pasting straight from the picker** into the application you were in, which needs synthetic
   input and is why it is not here yet.
 - **A shelf** for files, text and links, anchored to a screen edge.
@@ -249,7 +265,9 @@ In roughly this order. Anything here is a good place to start if you want to hel
   stopped can damage hardware, so it waits until it can be done properly.
 
 Deliberately not here, because Plasma already does them well: window management and tiling,
-another launcher, screen OCR, day and night theme switching, and file manager context actions.
+another launcher, screen OCR, day and night theme switching, file manager context actions, and
+a panel applet for live readings, since Plasma ships seven system monitor applets and being the
+eighth is not the point of this suite. The point is one place for everything.
 
 ## Contributing
 

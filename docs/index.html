@@ -167,6 +167,11 @@
     are Kavverna's own in both, so it looks like itself on any colour scheme.</li>
     <li><strong>A tray menu that reaches the whole suite</strong>, not just keep awake: mute
     every microphone, move to the next output, open the history.</li>
+    <li><strong>A shortcut for every utility worth reaching blind</strong>: the panel, the
+    clipboard, keep awake, mute every microphone, the next output. Registered through the
+    desktop, so System Settings lists them beside every other shortcut.</li>
+    <li><strong>Each utility says what it costs</strong>: nothing at rest, reads on a timer,
+    watches the clipboard. The label sits beside the switch.</li>
   </ul>
 
   <h3>Sound</h3>
@@ -175,14 +180,20 @@
     because a single application can hold several and PipeWire gives them nothing to tell apart.
     The row shows its loudest stream and a change reaches all of them.</li>
     <li><strong>Every output and input</strong> with live volumes, mute, and switching which one
-    is the default.</li>
-    <li><strong>Mute every microphone</strong> in one click.</li>
+    is the default. Device volume is written on the card's route, so the slider moves what you
+    hear.</li>
+    <li><strong>Mute every microphone</strong> in one click, or from a shortcut.</li>
+    <li><strong>Come back to a preferred microphone</strong>: pin one and it is made the default
+    again whenever it is plugged back in.</li>
+    <li><strong>Step through the outputs you choose</strong> from a shortcut or the tray.</li>
   </ul>
 
   <h3>Monitoring</h3>
   <ul>
     <li><strong>Processor</strong> load overall and a bar per thread, with temperature read from
     the chip by name rather than by index, since those move between boots.</li>
+    <li><strong>The last two minutes behind each reading</strong>, drawn as a trace, so the
+    spike that was over before the panel opened is still there to see.</li>
     <li><strong>Memory</strong> with the page cache excluded, what applications actually hold,
     and pressure from the kernel's own PSI rather than a guess.</li>
     <li><strong>Compressed swap</strong> priced by what it really costs in RAM.</li>
@@ -204,6 +215,9 @@
     lock, without touching a saved entry.</li>
     <li><strong>Take the tracking out of copied links</strong>, and leave everything else byte
     for byte as it was.</li>
+    <li><strong>Turn what was copied into something else</strong>: plain text, laid out JSON,
+    or Markdown made from the copy's own HTML, read at the moment you ask rather than stored.
+    The next paste is the result.</li>
   </ul>
 
   <h3>Energy and tools</h3>
@@ -260,7 +274,8 @@ sha256sum -c kavverna-x86_64.pkg.tar.zst.sha256</pre>
   <ul>
     <li><strong>Which application copied something cannot be known.</strong> A selection carries
     no client identity. Exclusions work by the mime type a password manager sets instead.</li>
-    <li><strong>The tray icon cannot show text.</strong> Live readings need a panel applet.</li>
+    <li><strong>The tray icon cannot show text.</strong> The live numbers live in the panel,
+    one click away.</li>
     <li><strong>A window cannot place itself.</strong> The panel anchors to a screen edge.</li>
     <li><strong>Emptying the clipboard fights Plasma</strong> until Klipper's Prevent empty
     clipboard option is turned off.</li>
@@ -271,11 +286,9 @@ sha256sum -c kavverna-x86_64.pkg.tar.zst.sha256</pre>
   <h2>What is next</h2>
   <p>In roughly this order. Anything here is a good place to start if you want to help.</p>
   <ul>
-    <li><strong>Turning what was copied into something else</strong>: as plain text, as
-    Markdown, as JSON. The clipboard is already ours, so none of it needs a new privilege.</li>
-    <li><strong>A panel applet</strong>, so the readings are visible without opening anything.
-    The tray cannot show text, so this is the only place live numbers can live.</li>
     <li><strong>Network and disk</strong> in the monitor.</li>
+    <li><strong>Quick toggles</strong>: dark mode, lock, screens off, night colour, eject
+    removable disks. Nearly all one call each, and the tools page has room.</li>
     <li><strong>Pasting straight from the picker</strong> into the application you were in,
     which needs synthetic input and is why it is not here yet.</li>
     <li><strong>A shelf</strong> for files, text and links, anchored to a screen edge.</li>
@@ -293,8 +306,9 @@ sha256sum -c kavverna-x86_64.pkg.tar.zst.sha256</pre>
     watchdog.</li>
   </ul>
   <p>Deliberately not here, because Plasma already does them well: window management and
-  tiling, another launcher, screen OCR, day and night theme switching, and file manager context
-  actions.</p>
+  tiling, another launcher, screen OCR, day and night theme switching, file manager context
+  actions, and a panel applet for live readings, since Plasma ships seven system monitor
+  applets already. The point of this suite is one place for everything.</p>
 </section>
 
 <section class="wrap" id="contribute">

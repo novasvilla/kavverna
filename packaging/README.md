@@ -7,7 +7,7 @@ cd packaging
 makepkg -si
 ```
 
-The `PKGBUILD` builds from the tagged release tarball, runs the library tests, and installs the
+The `PKGBUILD` builds from the release's git tag, runs the library tests, and installs the
 binary, the desktop entry and the icon. The tests that talk to a live compositor and a live
 session bus are left out, since a build chroot has neither.
 
@@ -24,7 +24,7 @@ git clone ssh://aur@aur.archlinux.org/kavverna.git aur-kavverna
 cd aur-kavverna
 cp ../packaging/PKGBUILD ../packaging/.SRCINFO .
 git add PKGBUILD .SRCINFO
-git commit -m "Add kavverna 0.2.1"
+git commit -m "Add kavverna X.Y.Z"
 git push
 ```
 
@@ -32,13 +32,15 @@ git push
 
 The version lives in three places and all three have to move together:
 
-1. `version` in the workspace `Cargo.toml`
-2. `pkgver` in `PKGBUILD`, with `sha256sums` recomputed from the new tarball
-3. `.SRCINFO`, regenerated with `makepkg --printsrcinfo > .SRCINFO`
+1. `version` in the workspace `Cargo.toml`, and build afterwards, so the lock file moves with
+   it. Committing a bump without building leaves `--locked` refusing the next CI run.
+2. `pkgver` in `PKGBUILD`. The source is the git tag itself, so there is no checksum to
+   recompute: a checksum for a tarball GitHub generates from the tag cannot exist in a commit
+   made before the tag does.
+3. `.SRCINFO`, regenerated with `makepkg --printsrcinfo > .SRCINFO`. CI diffs it against the
+   definition and fails the build when they disagree.
 
-```sh
-sha256sum <(curl -sL https://github.com/novasvilla/kavverna/archive/refs/tags/vX.Y.Z.tar.gz)
-```
-
-The fourth number in a version is the CI run that built the binary, so it is never written
-down here: `KAVVERNA_BUILD` supplies it and a build made by hand reads zero.
+The tag and `pkgver` are compared by the release workflow before anything is published, and
+the built binary is asked its own version. The fourth number in a version is the CI run that
+built the binary, so it is never written down here: `KAVVERNA_BUILD` supplies it and a build
+made by hand reads zero.

@@ -104,8 +104,6 @@ struct CardRoute {
     device: i32,
 }
 
-/// Steam hands each game its own identity, and the entry Steam writes for that game names its
-/// icon after the same number, so one lookup covers every game rather than a chosen few.
 /// Three ways in, most specific first.
 ///
 /// Steam hands each game its own identity, and the entry Steam writes for that game names its

@@ -59,6 +59,14 @@ richer than plain text, since taking the selection destroys what its owner offer
 **Taking over from Plasma.** Klipper's saved history can be adopted, keeping the times and stars
 it already had.
 
+**Transformation.** What is on the clipboard right now can be re-offered as plain text, laid
+out as JSON, or turned into Markdown. The Markdown comes from the copy's own `text/html`, read
+at the moment of the ask rather than stored: the watcher keeps the current offer alive, and an
+offer stays readable until the next one replaces it, which a probe against the running KWin
+established. So the history still holds plain text only, and the richer type never touches
+disk. It works only for the copy that is still on the clipboard, which is the honest limit, and
+the buttons follow what the current offer holds rather than failing.
+
 ## What Wayland does not allow
 
 These are limits of the protocols, not of the implementation, and they are not going away.
@@ -112,20 +120,9 @@ as SDL Application becomes the game it actually is.
 
 ## Still to come
 
-In order. Each is useful on its own.
-
-1. **Turning what was copied into something else**: as plain text, as Markdown, as JSON. The
-   clipboard is already ours, so this needs no new privilege and no synthetic input. Plasma's
-   own clipboard has Actions but does none of this. This is the next one to build.
-2. **Pasting straight from the picker**, behind the ydotool trade-off stated plainly before it
-   is switched on.
-3. **A plugin for KRunner.**
-4. **A shelf**, anchored to a screen edge.
-5. **Text snippets**, expanded through the input method so they need no privilege at all.
-6. **A scratchpad.**
-7. **A second history for the middle-click selection.**
-8. **A rules editor for link cleaning**, so the built-in list can be added to and switched off
-   without editing a file.
+The public list lives in the README's "What is next" and is not repeated here. One idea is
+recorded here because it belongs to this document: **a rules editor for link cleaning**, so the
+built-in list can be added to and switched off without editing a file.
 
 ## Credit
 

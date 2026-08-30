@@ -33,97 +33,90 @@ ColumnLayout {
 
     Card {
         theme: card.theme
-        implicitHeight: list.implicitHeight + card.theme.pad * 2
+        spacing: card.theme.gap
 
-        ColumnLayout {
-            id: list
-            anchors.fill: parent
-            anchors.margins: card.theme.pad
-            spacing: card.theme.gap
+        Repeater {
+            model: card.features.ids.length
 
-            Repeater {
-                model: card.features.ids.length
+            delegate: ColumnLayout {
+                id: entry
 
-                delegate: ColumnLayout {
-                    id: entry
+                required property int index
 
-                    required property int index
+                readonly property string id: card.features.ids[index]
+                readonly property bool built: card.features.built[index]
+                // The group name is only drawn when it changes, which turns a flat list into
+                // the same five groups the panel has without a second model to keep in step.
+                readonly property bool opensGroup: index === 0
+                    || card.features.groups[index] !== card.features.groups[index - 1]
 
-                    readonly property string id: card.features.ids[index]
-                    readonly property bool built: card.features.built[index]
-                    // The group name is only drawn when it changes, which turns a flat list into
-                    // the same five groups the panel has without a second model to keep in step.
-                    readonly property bool opensGroup: index === 0
-                        || card.features.groups[index] !== card.features.groups[index - 1]
+                Layout.fillWidth: true
+                spacing: card.theme.gapSnug
 
+                Label {
+                    visible: entry.opensGroup
                     Layout.fillWidth: true
-                    spacing: card.theme.gapSnug
+                    Layout.topMargin: entry.index === 0 ? 0 : card.theme.gapSnug
+                    text: card.features.groups[entry.index].toUpperCase()
+                    font.pixelSize: card.theme.textBody
+                    font.bold: true
+                    color: card.theme.mutedText
+                }
 
-                    Label {
-                        visible: entry.opensGroup
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: card.theme.gap
+
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        Layout.topMargin: entry.index === 0 ? 0 : card.theme.gapSnug
-                        text: card.features.groups[entry.index].toUpperCase()
-                        font.pixelSize: card.theme.textBody
-                        font.bold: true
-                        color: card.theme.mutedText
-                    }
+                        spacing: 1
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: card.theme.gap
-
-                        ColumnLayout {
+                        RowLayout {
                             Layout.fillWidth: true
-                            spacing: 1
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: card.theme.gapSnug
-
-                                Label {
-                                    text: card.features.titles[entry.index]
-                                    font.pixelSize: card.theme.textStrong
-                                    font.bold: true
-                                    color: entry.built ? card.theme.primaryText
-                                                       : card.theme.mutedText
-                                    elide: Text.ElideRight
-                                }
-
-                                // What this utility keeps alive, so the choice to leave one on
-                                // is made against what it costs rather than against a guess.
-                                Label {
-                                    text: card.features.energies[entry.index]
-                                    font.pixelSize: card.theme.textBody
-                                    color: card.theme.mutedText
-                                    elide: Text.ElideRight
-                                }
-
-                                Item { Layout.fillWidth: true }
-                            }
+                            spacing: card.theme.gapSnug
 
                             Label {
-                                Layout.fillWidth: true
-                                text: card.features.summaries[entry.index]
-                                font.pixelSize: card.theme.textBody
-                                color: card.theme.secondaryText
-                                wrapMode: Text.WordWrap
+                                text: card.features.titles[entry.index]
+                                font.pixelSize: card.theme.textStrong
+                                font.bold: true
+                                color: entry.built ? card.theme.primaryText
+                                                   : card.theme.mutedText
+                                elide: Text.ElideRight
                             }
+
+                            // What this utility keeps alive, so the choice to leave one on
+                            // is made against what it costs rather than against a guess.
+                            Label {
+                                text: card.features.energies[entry.index]
+                                font.pixelSize: card.theme.textBody
+                                color: card.theme.mutedText
+                                elide: Text.ElideRight
+                            }
+
+                            Item { Layout.fillWidth: true }
                         }
 
                         Label {
-                            visible: !entry.built
-                            text: "On the way"
+                            Layout.fillWidth: true
+                            text: card.features.summaries[entry.index]
                             font.pixelSize: card.theme.textBody
-                            color: card.theme.mutedText
+                            color: card.theme.secondaryText
+                            wrapMode: Text.WordWrap
                         }
+                    }
 
-                        Toggle {
-                            theme: card.theme
-                            visible: entry.built
-                            checked: card.features.installed[entry.index]
-                            onToggled: card.features.choose_installed(entry.id, checked)
-                        }
+                    Label {
+                        visible: !entry.built
+                        text: "On the way"
+                        font.pixelSize: card.theme.textBody
+                        color: card.theme.mutedText
+                    }
+
+                    Toggle {
+                        theme: card.theme
+                        visible: entry.built
+                        checked: card.features.installed[entry.index]
+                        onToggled: card.features.choose_installed(entry.id, checked)
                     }
                 }
             }

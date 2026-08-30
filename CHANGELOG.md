@@ -3,6 +3,50 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## 0.3.0
+
+### Added
+
+- **Transform the clipboard.** What was copied can be made plain text, laid out JSON, or
+  Markdown, from the clipboard page. The Markdown comes from the copy's own HTML, read at the
+  moment you ask rather than stored, so the history keeps holding plain text only. It works on
+  the copy that is still on the clipboard, the buttons follow what that copy offers, and every
+  ask is answered in the panel, including not being JSON. This replaces the catalogued
+  "Paste as plain text", which promised pasting, something Wayland does not allow without
+  synthetic input; what this does is rewrite the selection so the next paste is the result.
+- **A shortcut for every utility worth reaching blind**: the panel on Ctrl+Alt+K, keep awake on
+  Ctrl+Alt+A, mute every microphone on Ctrl+Alt+M, the next output on Ctrl+Alt+O, beside the
+  clipboard's Ctrl+Alt+V. Registered through the desktop as defaults only, so a key rebound in
+  System Settings survives the next launch, and a utility switched off registers nothing.
+- **The last two minutes behind each reading** in the monitor, drawn as a trace behind the bar,
+  so the spike that ended before the panel opened is still there to see. Per graphics card, so
+  switching cards shows that card's own past.
+- **Come back to a preferred microphone.** Pin one in the settings and it is made the default
+  again whenever it is plugged back in, and only then, so choosing another while it is here
+  still works.
+- **Step through the outputs you choose.** The switcher cycles the ticked set instead of every
+  output there is. All of them, until you say otherwise.
+- **Each utility says what it costs** in the settings list: nothing at rest, reads on a timer,
+  watches the clipboard, waits on a key.
+- **`--selftest`** prints one line for everything Kavverna relies on, names the distribution,
+  and exits zero only when all of it answered, so a report from an untested machine arrives as
+  data. An argument that is not understood is now said back with exit code 2 and the usage,
+  instead of silently opening the panel.
+
+### Fixed
+
+- **The output volume slider did nothing, and never had.** Volume and mute were written into
+  the node's Props, and for a hardware device the level that reaches the speaker lives on the
+  card's route. Every readback of our own agreed with the write, which is why it went
+  unnoticed: the first live test that read back with pactl instead found it within minutes.
+  Writes go to the route now, with save set so a level survives a replug. The same fix ends
+  the USB microphone refusing to mute, which had been in Known not to work since the start.
+- **Middle clicking the tray held sleep off forever** whatever the default duration said. The
+  toggle decision was written out four times and the fourth ignored the setting; it is decided
+  in one place now.
+- **Global shortcuts failed in silence.** The log filter named crates one by one and the crate
+  that registers shortcuts was never on the list.
+
 ## 0.2.3
 
 ### Fixed

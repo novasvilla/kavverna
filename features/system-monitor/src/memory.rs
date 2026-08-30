@@ -139,7 +139,8 @@ impl MemoryPressure {
     }
 }
 
-/// Parses `/proc/pressure/memory`.
+/// Both lines, though `full` is the one the card leads with: `some` counts one task stalling
+/// while others run, which is life, and `full` is every task stuck at once.
 pub fn parse_pressure(contents: &str) -> MemoryPressure {
     let read = |prefix: &str| -> f32 {
         contents
