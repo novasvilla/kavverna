@@ -50,6 +50,114 @@ ColumnLayout {
         }
     }
 
+    SectionLabel {
+        theme: page.theme
+        text: "APPEARANCE"
+    }
+
+    Card {
+        theme: page.theme
+        spacing: 12
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: page.theme.gapSnug
+            visible: page.shows("themes")
+
+            Label {
+                text: "Theme"
+                font.pixelSize: page.theme.textStrong
+                font.bold: true
+                color: page.theme.primaryText
+            }
+
+            Repeater {
+                model: [
+                    { id: "torch", label: "Torch",
+                      line: "The cavern as it has always been, lit warm." },
+                    { id: "tide", label: "Tide",
+                      line: "The cave flooded: deep blue water, a cold bright flame." },
+                    { id: "ember", label: "Ember",
+                      line: "The cave burning down: red heat, clay in daylight." }
+                ]
+
+                delegate: RowLayout {
+                    id: themeRow
+                    required property var modelData
+                    readonly property bool current: page.hub.theme_name === modelData.id
+                    readonly property var shade:
+                        page.theme.palettes[modelData.id][page.theme.dark ? "dark" : "light"]
+
+                    Layout.fillWidth: true
+                    spacing: page.theme.gapSnug
+
+                    Label {
+                        text: themeRow.current ? "●" : "○"
+                        font.pixelSize: page.theme.textSmall
+                        color: themeRow.current ? page.theme.accent
+                                                : page.theme.secondaryText
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 1
+
+                        Label {
+                            text: themeRow.modelData.label
+                            font.pixelSize: page.theme.textBody
+                            font.bold: themeRow.current
+                            color: page.theme.primaryText
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: themeRow.modelData.line
+                            font.pixelSize: page.theme.textSmall
+                            color: page.theme.secondaryText
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
+                    Row {
+                        spacing: 4
+
+                        Repeater {
+                            model: [themeRow.shade.accent, themeRow.shade.surface,
+                                    themeRow.shade.primaryText]
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: 14
+                                height: 14
+                                radius: 4
+                                color: modelData
+                                border.width: 1
+                                border.color: page.theme.hairline
+                            }
+                        }
+                    }
+
+                    TapHandler {
+                        onTapped: page.hub.choose_theme(themeRow.modelData.id)
+                    }
+                }
+            }
+        }
+
+        ChoiceRow {
+            theme: page.theme
+            title: "Appearance"
+            detail: "Follow the desktop, or pick a side."
+            choices: [
+                { label: "Follow", value: 0 },
+                { label: "Dark", value: 1 },
+                { label: "Light", value: 2 }
+            ]
+            current: page.hub.appearance
+            onPicked: (value) => page.hub.choose_appearance(value)
+        }
+    }
+
     FeaturesCard {
         theme: page.theme
         features: page.features
@@ -78,19 +186,6 @@ ColumnLayout {
             detail: "Puts back the hold that was running when Kavverna last closed, minus the time that passed."
             on: page.hub.restore_on_start
             onToggled: (value) => page.hub.choose_restore_on_start(value)
-        }
-
-        ChoiceRow {
-            theme: page.theme
-            title: "Appearance"
-            detail: "Follow the desktop, or pick a side."
-            choices: [
-                { label: "Follow", value: 0 },
-                { label: "Dark", value: 1 },
-                { label: "Light", value: 2 }
-            ]
-            current: page.hub.appearance
-            onPicked: (value) => page.hub.choose_appearance(value)
         }
     }
 

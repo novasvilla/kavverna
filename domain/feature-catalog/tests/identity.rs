@@ -19,6 +19,7 @@ fn ids_match_the_released_set() {
         "output-switcher",
         "clipboard-transform",
         "system-monitor",
+        "themes",
         "volume-mixer",
     ];
 
@@ -62,6 +63,7 @@ fn only_what_is_written_is_offered_as_built() {
         "mouse-jiggle",
         "output-switcher",
         "system-monitor",
+        "themes",
         "volume-mixer",
     ];
 

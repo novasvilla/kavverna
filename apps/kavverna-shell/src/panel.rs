@@ -35,6 +35,7 @@ pub mod qobject {
         #[qproperty(bool, jiggle_available)]
         #[qproperty(QString, jiggle_status)]
         #[qproperty(i32, appearance)]
+        #[qproperty(QString, theme_name)]
         #[qproperty(bool, launch_at_login)]
         #[qproperty(QString, settings_path)]
         #[qproperty(QString, version)]
@@ -83,6 +84,8 @@ pub mod qobject {
         fn choose_default_minutes(self: Pin<&mut KavvernaPanel>, minutes: i32);
         #[qinvokable]
         fn choose_appearance(self: Pin<&mut KavvernaPanel>, appearance: i32);
+        #[qinvokable]
+        fn choose_theme(self: Pin<&mut KavvernaPanel>, name: &QString);
         #[qinvokable]
         fn choose_middle_click_toggle(self: Pin<&mut KavvernaPanel>, toggle: bool);
         #[qinvokable]
@@ -137,6 +140,7 @@ pub struct KavvernaPanelRust {
     jiggle_available: bool,
     jiggle_status: QString,
     appearance: i32,
+    theme_name: QString,
     launch_at_login: bool,
     settings_path: QString,
     version: QString,
@@ -200,6 +204,7 @@ impl Default for KavvernaPanelRust {
                 settings::integer_at(settings::APPEARANCE, settings::APPEARANCE_DEFAULT),
                 0,
             ),
+            theme_name: QString::from(&settings::text_at(settings::THEME, settings::THEME_DEFAULT)),
             launch_at_login: launch_at_login::is_enabled(),
             settings_path: QString::from(&settings_location()),
             version: QString::from(&crate::remote::version()),
@@ -334,6 +339,12 @@ impl qobject::KavvernaPanel {
     fn choose_appearance(mut self: Pin<&mut Self>, appearance: i32) {
         settings::put_integer(settings::APPEARANCE, i64::from(appearance));
         self.as_mut().set_appearance(appearance);
+    }
+
+    fn choose_theme(mut self: Pin<&mut Self>, name: &QString) {
+        let name = name.to_string();
+        settings::put_text(settings::THEME, &name);
+        self.as_mut().set_theme_name(QString::from(&name));
     }
 
     fn choose_jiggle_activity(mut self: Pin<&mut Self>, activity: i32) {

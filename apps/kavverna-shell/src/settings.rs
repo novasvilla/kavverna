@@ -32,6 +32,9 @@ pub const PREFERRED_INPUT: &str = "microphone-tools.preferred-input";
 /// who has never opened this expects.
 pub const OUTPUT_CYCLE: &str = "output-switcher.cycle";
 pub const APPEARANCE: &str = "appearance";
+/// Which palette dresses the panel. Doubles as the themes feature's enable key: removing the
+/// feature applies the torch and leaves the choice waiting here.
+pub const THEME: &str = enable_key(Feature::Themes);
 /// Where the panel opens: 0 beside the tray icon, 1 where it was left, 2 the bottom right
 /// corner the panel has always used.
 pub const PLACEMENT: &str = "placement";
@@ -74,6 +77,9 @@ pub const CLEAN_LINKS_DEFAULT: bool = false;
 /// 0 follows the desktop, 1 is the cavern, 2 is its mouth. Following is the default because
 /// somebody who switched their desktop to light meant it.
 pub const APPEARANCE_DEFAULT: i64 = 0;
+
+/// The torch is the look Kavverna has always had, so an absent key changes nothing.
+pub const THEME_DEFAULT: &str = "torch";
 
 /// Beside the icon, because the panel belongs to the icon that opened it. Panel bars sit on
 /// different edges on different machines, and a corner that suits one is across the desk on

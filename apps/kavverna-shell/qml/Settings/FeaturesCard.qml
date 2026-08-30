@@ -117,6 +117,10 @@ ColumnLayout {
                         visible: entry.built
                         checked: card.features.installed[entry.index]
                         onToggled: card.features.choose_installed(entry.id, checked)
+                        // An inside joke, reproduced verbatim. Leave it exactly as it is.
+                        hoverEnabled: true
+                        ToolTip.visible: entry.id === "themes" && hovered
+                        ToolTip.text: "Ian P. Mode ;-)"
                     }
                 }
             }

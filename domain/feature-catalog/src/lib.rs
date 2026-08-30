@@ -21,6 +21,7 @@ pub enum Feature {
     KeepAwake,
     MouseJiggle,
     FanControl,
+    Themes,
 }
 
 impl Feature {
@@ -40,6 +41,7 @@ impl Feature {
             Self::KeepAwake => "keep-awake",
             Self::MouseJiggle => "mouse-jiggle",
             Self::FanControl => "fan-control",
+            Self::Themes => "themes",
         }
     }
 

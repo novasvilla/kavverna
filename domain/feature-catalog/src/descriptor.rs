@@ -184,6 +184,17 @@ impl Feature {
                 readiness: Readiness::Planned,
                 enable_keys: &["fan-control.enabled"],
             },
+            Self::Themes => Descriptor {
+                title: "Themes",
+                summary: "Dress the panel in another palette, applied the moment it is picked.",
+                group: Group::Tools,
+                icon: "preferences-desktop-color",
+                energy: EnergyProfile::Idle,
+                readiness: Readiness::Built,
+                // The selection key itself: with the feature removed the torch palette
+                // applies, and the choice waits untouched for its return.
+                enable_keys: &["theme"],
+            },
         }
     }
 }

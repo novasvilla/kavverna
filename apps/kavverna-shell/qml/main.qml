@@ -109,11 +109,13 @@ Window {
         onActivated: hub.dismiss()
     }
 
-    // 0 follows the desktop, 1 is the cavern, 2 is its mouth.
+    // 0 follows the desktop, 1 is the cavern, 2 is its mouth. The palette follows the themes
+    // utility: removed, the torch applies and the stored choice waits.
     Theme {
         id: theme
         dark: hub.appearance === 0 ? Application.styleHints.colorScheme !== Qt.Light
                                    : hub.appearance === 1
+        name: root.shows("themes") ? hub.theme_name : "torch"
     }
 
     KavvernaPanel {
