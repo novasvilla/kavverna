@@ -36,7 +36,7 @@ Window {
         ["keep-awake"],
         ["volume-mixer", "output-switcher", "microphone-tools"],
         ["system-monitor"],
-        ["clipboard-history", "clipboard-auto-clear", "clean-url", "clipboard-transform"],
+        ["clipboard-history", "clipboard-auto-clear", "clean-url", "clipboard-transform", "shelf"],
         ["mouse-jiggle"]
     ]
 
@@ -354,15 +354,6 @@ Window {
                     }
                 }
 
-                IconButton {
-                    theme: theme
-                    source: "mail-attachment"
-                    visible: root.shows("shelf")
-                    Layout.alignment: Qt.AlignTop
-                    ToolTip.visible: hovered
-                    ToolTip.text: "Shelf"
-                    onClicked: shelfBridge.set_open(!shelfBridge.shelf_open)
-                }
             }
 
             Rectangle {
@@ -488,6 +479,7 @@ Window {
                     theme: theme
                     shows: root.shows
                     clipboard: clipboard
+                    shelf: shelfBridge
                     visible: !hub.showing_settings && root.page === root.clipboardPage
                              && root.pageShown(root.clipboardPage)
                     // Choosing an entry puts it on the clipboard, so the panel gets out of the way

@@ -187,7 +187,8 @@ impl Feature {
             Self::Shelf => Descriptor {
                 title: "Shelf",
                 summary: "Hold files, text and links at the screen edge until they move on.",
-                group: Group::Tools,
+                // Beside the clipboard: both are places where things wait to be put somewhere.
+                group: Group::Clipboard,
                 icon: "mail-attachment",
                 energy: EnergyProfile::Idle,
                 readiness: Readiness::Built,

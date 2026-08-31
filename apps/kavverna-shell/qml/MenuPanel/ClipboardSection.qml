@@ -2,6 +2,7 @@ import QtQml
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import org.kde.kirigami as Kirigami
 import "../Shared"
 
 ColumnLayout {
@@ -9,6 +10,7 @@ ColumnLayout {
 
     required property var theme
     required property var clipboard
+    required property var shelf
     required property var shows
 
     // Which row the keyboard is on. Reset whenever the list changes, since the row that was
@@ -55,6 +57,49 @@ ColumnLayout {
             sequence: "Ctrl+" + (index + 1)
             enabled: section.visible
             onActivated: section.choose(index)
+        }
+    }
+
+    SectionLabel {
+        theme: section.theme
+        text: "SHELF"
+        visible: section.shows("shelf")
+    }
+
+    Card {
+        theme: section.theme
+        visible: section.shows("shelf")
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: section.theme.gap
+
+            Kirigami.Icon {
+                source: "mail-attachment"
+                implicitWidth: 18
+                implicitHeight: 18
+                isMask: true
+                color: section.shelf.item_count > 0 ? section.theme.accent
+                                                    : section.theme.secondaryText
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: section.shelf.item_count === 0
+                      ? "Nothing waiting"
+                      : section.shelf.item_count === 1
+                        ? "One thing waiting"
+                        : section.shelf.item_count + " things waiting"
+                font.pixelSize: section.theme.textBody
+                color: section.theme.secondaryText
+                elide: Text.ElideRight
+            }
+
+            PillButton {
+                theme: section.theme
+                text: section.shelf.shelf_open ? "Close" : "Open"
+                onClicked: section.shelf.set_open(!section.shelf.shelf_open)
+            }
         }
     }
 
