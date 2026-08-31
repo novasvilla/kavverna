@@ -2,7 +2,7 @@
 Type=Application
 Name=Kavverna
 GenericName=Desktop utilities
-Comment=Volume per application, system monitor, clipboard history and keep awake, in one tray icon
+Comment=Per-application volume and routing, clipboard history, a drag-and-drop shelf, system monitor and keep awake, in one tray icon
 Exec=kavverna-shell
 Icon=dev.kavverna.Kavverna
 Terminal=false
