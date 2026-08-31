@@ -64,7 +64,9 @@ pub const ALLOW_DISPLAY_SLEEP_DEFAULT: bool = true;
 pub const RESTORE_ON_START_DEFAULT: bool = false;
 pub const MOUSE_JIGGLE_DEFAULT: bool = false;
 pub const JIGGLE_SHORTEST_DEFAULT: i64 = 2;
-pub const JIGGLE_LONGEST_DEFAULT: i64 = 7;
+// One of the values the panel's choices can show, so a fresh install marks its current
+// setting instead of lighting nothing.
+pub const JIGGLE_LONGEST_DEFAULT: i64 = 5;
 pub const JIGGLE_ACTIVITY_DEFAULT: i64 = 0;
 pub const JIGGLE_KEYSTROKE_DEFAULT: i64 = 0;
 /// Zero means indefinite, matching the duration picker's first entry.

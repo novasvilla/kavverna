@@ -177,72 +177,94 @@ Window {
         home: shelfWindow
     }
 
-    // The shelf's drag ghost, the same gesture as the panel's below.
+    // The shelf's drag ghost, the same gesture as the panel's below. Changing a layer
+    // surface's margins never moves it once it is mapped on this compositor (measured with
+    // an isolated surface), so the ghost is one still overlay across the screen's free area
+    // and the picture moves inside it as an ordinary item.
     Window {
-        width: shelfWindow.width
-        height: shelfWindow.height
         visible: shelfBridge.ghost_visible
         color: "transparent"
         transientParent: null
         flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput
 
         LayerShell.Window.anchors: LayerShell.Window.AnchorTop | LayerShell.Window.AnchorLeft
+                                 | LayerShell.Window.AnchorRight | LayerShell.Window.AnchorBottom
         LayerShell.Window.layer: LayerShell.Window.LayerOverlay
-        LayerShell.Window.margins: Qt.rect(shelfBridge.ghost_left, shelfBridge.ghost_top, 0, 0)
         LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
         LayerShell.Window.scope: "kavverna-shelf-ghost"
         LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
 
-        Image {
-            anchors.fill: parent
-            anchors.margins: 6
-            source: shelfWindow.shelfShot ? shelfWindow.shelfShot.url : ""
-            opacity: 0.85
-        }
+        Item {
+            x: shelfBridge.ghost_left
+            y: shelfBridge.ghost_top
+            width: shelfWindow.width
+            height: shelfWindow.height
 
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 6
-            radius: 14
-            color: shelfWindow.shelfShot ? "transparent" : theme.glow
-            border.width: 2
-            border.color: theme.accent
+            Image {
+                anchors.fill: parent
+                anchors.margins: 6
+                source: shelfWindow.shelfShot ? shelfWindow.shelfShot.url : ""
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 6
+                radius: 14
+                color: shelfWindow.shelfShot ? "transparent" : theme.glow
+                border.width: 2
+                border.color: theme.accent
+            }
         }
     }
 
-    // The outline that follows a header drag. The real panel cannot move under the pointer
+    // The picture that follows a header drag. The real panel cannot move under the pointer
     // without poisoning the pointer's own readings, so this ghost does the moving and the
-    // panel jumps to it on release. Transparent to input, or it would sit under the cursor
-    // and swallow the very drag it is drawing.
+    // panel jumps to it on release. One still overlay, transparent to input, with the
+    // panel's portrait moving inside it: margins cannot move a mapped layer surface here.
     Window {
-        width: hub.panel_width
-        height: root.height
         visible: hub.ghost_visible
         color: "transparent"
         transientParent: null
         flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput
 
         LayerShell.Window.anchors: LayerShell.Window.AnchorTop | LayerShell.Window.AnchorLeft
+                                 | LayerShell.Window.AnchorRight | LayerShell.Window.AnchorBottom
         LayerShell.Window.layer: LayerShell.Window.LayerOverlay
-        LayerShell.Window.margins: Qt.rect(hub.ghost_left, hub.ghost_top, 0, 0)
         LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
         LayerShell.Window.scope: "kavverna-panel-ghost"
         LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
 
-        Image {
-            anchors.fill: parent
-            anchors.margins: 6
-            source: root.ghostShot ? root.ghostShot.url : ""
-            opacity: 0.85
+        Binding on screen {
+            when: hub.panel_screen.length > 0
+            value: root.screenNamed(hub.panel_screen)
         }
 
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 6
-            radius: 14
-            color: root.ghostShot ? "transparent" : theme.glow
-            border.width: 2
-            border.color: theme.accent
+        // The mapped overlay is the one honest report of the screen's free area: the
+        // compositor sizes it around every reserved strip, which no Qt property exposes on
+        // Wayland. The drag arithmetic corrects itself with the measurement.
+        onHeightChanged: if (height > 0 && width > 0 && screen)
+                             hub.report_work_area(screen.name, width, height)
+
+        Item {
+            x: hub.ghost_left
+            y: hub.ghost_top
+            width: hub.panel_width
+            height: root.height
+
+            Image {
+                anchors.fill: parent
+                anchors.margins: 6
+                source: root.ghostShot ? root.ghostShot.url : ""
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 6
+                radius: 14
+                color: root.ghostShot ? "transparent" : theme.glow
+                border.width: 2
+                border.color: theme.accent
+            }
         }
     }
 
@@ -258,6 +280,11 @@ Window {
         color: theme.surface
         border.width: 1
         border.color: theme.hairline
+        // While the ghost carries the panel's portrait, the panel itself goes blank, so the
+        // drag reads as the app moving rather than a copy leaving a twin behind. Only blank:
+        // hiding the window would tear down the surface and the pointer grab with it. The
+        // portrait must exist first, or a fast flick would grab an empty picture.
+        opacity: hub.ghost_visible && root.ghostShot ? 0 : 1
 
         // The header strip is the panel's handle. A MouseArea rather than a DragHandler
         // because the handler never activates on this layer surface under KWin. The panel
@@ -442,6 +469,18 @@ Window {
                 // Nothing here is ever meant to be wider than the panel, so a horizontal bar
                 // would only ever mean a page had overflowed.
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+                // Every page shares this one scroller, so a switch would otherwise open the
+                // next page wherever the last one was left, its top hidden above the fold.
+                Connections {
+                    target: root
+                    function onPageChanged() { scroller.contentItem.contentY = 0 }
+                }
+
+                Connections {
+                    target: hub
+                    function onShowing_settingsChanged() { scroller.contentItem.contentY = 0 }
+                }
 
                 ColumnLayout {
                     id: pages

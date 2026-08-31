@@ -141,6 +141,32 @@ ColumnLayout {
                     TapHandler {
                         onTapped: page.hub.choose_theme(themeRow.modelData.id)
                     }
+
+                    HoverHandler { id: rowHover }
+
+                    // An inside joke living on the blue theme; the text stays exactly as it
+                    // is. Drawn in the window because a ToolTip popup is unreliable over a
+                    // layer surface.
+                    Rectangle {
+                        visible: themeRow.modelData.id === "tide" && rowHover.hovered
+                        anchors.bottom: parent.top
+                        anchors.bottomMargin: 2
+                        anchors.right: parent.right
+                        width: quip.implicitWidth + 16
+                        height: quip.implicitHeight + 10
+                        radius: page.theme.radiusSmall
+                        color: page.theme.surface
+                        border.width: 1
+                        border.color: page.theme.hairline
+
+                        Label {
+                            id: quip
+                            anchors.centerIn: parent
+                            text: "Ian P. Mode ;-)"
+                            font.pixelSize: page.theme.textSmall
+                            color: page.theme.primaryText
+                        }
+                    }
                 }
             }
         }

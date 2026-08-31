@@ -12,6 +12,11 @@ Slider {
     property real unity: to > 100 ? 100 : to
 
     implicitHeight: 18
+    // The wheel adjusts rather than scrolls while over a slider. Two per notch: fine enough
+    // to land on an exact figure, quick enough to cross the range. Drags stay free because
+    // no snap mode is set.
+    wheelEnabled: true
+    stepSize: 2
 
     background: Rectangle {
         x: level.leftPadding

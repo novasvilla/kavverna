@@ -107,6 +107,8 @@ pub mod qobject {
         fn drag_preview(self: Pin<&mut KavvernaPanel>, dx: i32, dy: i32, width: i32, height: i32);
         #[qinvokable]
         fn drag_commit(self: Pin<&mut KavvernaPanel>, width: i32, height: i32);
+        #[qinvokable]
+        fn report_work_area(self: Pin<&mut KavvernaPanel>, name: &QString, width: i32, height: i32);
     }
 }
 
@@ -118,8 +120,26 @@ static PANEL: Mutex<Option<cxx_qt::CxxQtThread<qobject::KavvernaPanel>>> = Mutex
 /// thread but the report arrives once at startup, so a copy behind a mutex is enough.
 static SCREENS: Mutex<Vec<panel_anchor::Screen>> = Mutex::new(Vec::new());
 
+/// The free area of each screen, measured by the drag overlay when it first maps: the
+/// compositor sizes that surface around every reserved strip, and no Qt property reports
+/// that on Wayland. Free-position arithmetic uses these sizes so a spot the ghost shows is
+/// the spot the panel lands on, clear of the task bar.
+static WORK_AREAS: Mutex<Vec<(String, i32, i32)>> = Mutex::new(Vec::new());
+
 pub(crate) fn screens() -> Vec<panel_anchor::Screen> {
     SCREENS.lock().map(|held| held.clone()).unwrap_or_default()
+}
+
+/// The screen with its size cut down to the measured free area, when one is known.
+fn worked(screen: &panel_anchor::Screen) -> panel_anchor::Screen {
+    let mut shaped = screen.clone();
+    if let Ok(held) = WORK_AREAS.lock() {
+        if let Some((_, width, height)) = held.iter().find(|(name, _, _)| *name == screen.name) {
+            shaped.width = *width;
+            shaped.height = *height;
+        }
+    }
+    shaped
 }
 
 pub(crate) fn gap() -> i32 {
@@ -403,6 +423,17 @@ impl qobject::KavvernaPanel {
         }
     }
 
+    fn report_work_area(self: Pin<&mut Self>, name: &QString, width: i32, height: i32) {
+        if width <= 0 || height <= 0 {
+            return;
+        }
+        let name = name.to_string();
+        if let Ok(mut held) = WORK_AREAS.lock() {
+            held.retain(|(known, _, _)| *known != name);
+            held.push((name, width, height));
+        }
+    }
+
     fn choose_placement(mut self: Pin<&mut Self>, mode: i32, width: i32, height: i32) {
         settings::put_integer(settings::PLACEMENT, i64::from(mode));
         self.as_mut().set_placement(mode);
@@ -427,7 +458,8 @@ impl qobject::KavvernaPanel {
         else {
             return;
         };
-        let from = panel_anchor::position_of(&self.read_placement(), screen, (width, height));
+        let from =
+            panel_anchor::position_of(&self.read_placement(), &worked(screen), (width, height));
         if let Ok(mut held) = DRAG_FROM.lock() {
             *held = Some(from);
         }
@@ -449,7 +481,7 @@ impl qobject::KavvernaPanel {
         else {
             return;
         };
-        let at = panel_anchor::pinned((x + dx, y + dy), screen, (width, height), gap());
+        let at = panel_anchor::pinned((x + dx, y + dy), &worked(screen), (width, height), gap());
         self.as_mut().set_ghost_left(at.left);
         self.as_mut().set_ghost_top(at.top);
         self.as_mut().set_ghost_visible(true);
@@ -471,7 +503,7 @@ impl qobject::KavvernaPanel {
         };
         let landed = panel_anchor::pinned(
             (*self.ghost_left(), *self.ghost_top()),
-            screen,
+            &worked(screen),
             (width, height),
             gap(),
         );
@@ -501,8 +533,9 @@ impl qobject::KavvernaPanel {
         else {
             return;
         };
-        let (x, y) = panel_anchor::position_of(&self.read_placement(), screen, (width, height));
-        let pinned = panel_anchor::pinned((x, y), screen, (width, height), gap());
+        let shaped = worked(screen);
+        let (x, y) = panel_anchor::position_of(&self.read_placement(), &shaped, (width, height));
+        let pinned = panel_anchor::pinned((x, y), &shaped, (width, height), gap());
         let name = screen.name.clone();
         let entries = settings::texts_at(settings::PLACEMENT_REMEMBERED).unwrap_or_default();
         settings::put_texts(
@@ -553,7 +586,7 @@ fn place(panel: &mut Pin<&mut qobject::KavvernaPanel>, click: Option<(i32, i32)>
             let entries = settings::texts_at(settings::PLACEMENT_REMEMBERED).unwrap_or_default();
             panel_anchor::last_remembered(&entries, &screens).map(|((x, y), screen)| {
                 let size = (panel_anchor::WIDTH, 720.min(screen.height - 24));
-                (panel_anchor::pinned((x, y), screen, size, spacing), screen.name.clone())
+                (panel_anchor::pinned((x, y), &worked(screen), size, spacing), screen.name.clone())
             })
         }
         2 => None,

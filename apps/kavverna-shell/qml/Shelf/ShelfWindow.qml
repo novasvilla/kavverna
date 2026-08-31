@@ -101,6 +101,9 @@ Window {
         color: shelfWindow.theme.surface
         border.width: 1
         border.color: shelfWindow.theme.hairline
+        // Blank while the ghost carries the portrait, so the drag reads as the shelf itself
+        // moving; the surface stays mapped to keep the pointer grab alive.
+        opacity: shelfWindow.shelf.ghost_visible && shelfWindow.shelfShot ? 0 : 1
 
         DropArea {
             anchors.fill: parent

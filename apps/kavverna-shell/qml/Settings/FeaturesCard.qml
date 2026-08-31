@@ -67,6 +67,10 @@ ColumnLayout {
                     Layout.fillWidth: true
                     spacing: card.theme.gap
 
+                    // The whole row hovers, not the 40px switch: a joke nobody can find is
+                    // not a joke.
+                    HoverHandler { id: quipHover }
+
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 1
@@ -118,10 +122,6 @@ ColumnLayout {
                         visible: entry.built
                         checked: card.features.installed[entry.index]
                         onToggled: card.features.choose_installed(entry.id, checked)
-
-                        // The same handler the clipboard rows hover with: the control's own
-                        // hovered property never went true on this surface.
-                        HoverHandler { id: quipHover }
 
                         // An inside joke, reproduced verbatim; leave the text exactly as it
                         // is. Drawn in the window rather than as a ToolTip popup, which does
