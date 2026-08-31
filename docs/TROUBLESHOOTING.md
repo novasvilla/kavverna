@@ -71,3 +71,19 @@ Some devices, USB headsets in particular, report the mute as applied while `pact
 the input unmuted. A node's mute and a device route's mute are different layers and each tool
 reads a different one. Until that is settled, mute all is not claimed to cover every input:
 check with `pactl list sources short` if it matters.
+
+## The panel does not open beside the tray icon
+
+On Plasma the tray click carries the icon's real screen coordinates and the panel opens beside
+them; a shortcut or a script reuses the last click it saw. Before the icon has been clicked
+once, and on a tray host that sends no coordinates, the panel falls back to the bottom right
+corner. Every fallback is silent because none of them is an error. On a desktop without layer
+shell, GNOME among them, the compositor places the window and the placement setting does
+nothing.
+
+## The shelf strip does not react to a drag
+
+The strip only exists while the Shelf utility is installed and its edge strip setting is on.
+Wayland also shows a client nothing about a drag until the pointer actually crosses the
+client's own surface, so the drag has to touch the strip itself, right on the screen edge, or
+be brought to the shelf with Ctrl+Alt+S, which works mid-drag.

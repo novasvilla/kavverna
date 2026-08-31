@@ -118,13 +118,16 @@ ColumnLayout {
                         visible: entry.built
                         checked: card.features.installed[entry.index]
                         onToggled: card.features.choose_installed(entry.id, checked)
-                        hoverEnabled: true
+
+                        // The same handler the clipboard rows hover with: the control's own
+                        // hovered property never went true on this surface.
+                        HoverHandler { id: quipHover }
 
                         // An inside joke, reproduced verbatim; leave the text exactly as it
                         // is. Drawn in the window rather than as a ToolTip popup, which does
                         // not reliably appear over a layer surface.
                         Rectangle {
-                            visible: entry.id === "themes" && entrySwitch.hovered
+                            visible: entry.id === "themes" && quipHover.hovered
                             anchors.bottom: parent.top
                             anchors.bottomMargin: 6
                             anchors.right: parent.right

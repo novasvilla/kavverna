@@ -414,9 +414,21 @@ ColumnLayout {
         SettingRow {
             theme: page.theme
             title: "Keep a strip on the screen edge"
-            detail: "A thin landing zone on the right edge. Dragging onto it opens the shelf, and so does clicking it."
+            detail: "A thin landing zone. Dragging onto it opens the shelf, and so does clicking it."
             on: page.shelf.edge_strip
             onToggled: (value) => page.shelf.choose_edge_strip(value)
+        }
+
+        ChoiceRow {
+            theme: page.theme
+            title: "Which edge"
+            detail: "Where the strip lives, and where the shelf hangs until it is dragged somewhere. Drag the shelf by its header to place it exactly."
+            choices: [
+                { label: "Right", value: 0 },
+                { label: "Left", value: 1 }
+            ]
+            current: page.shelf.strip_on_left ? 1 : 0
+            onPicked: (value) => page.shelf.choose_strip_edge(value === 1)
         }
 
         SettingRow {

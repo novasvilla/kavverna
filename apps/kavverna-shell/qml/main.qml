@@ -177,6 +177,39 @@ Window {
         home: shelfWindow
     }
 
+    // The shelf's drag ghost, the same gesture as the panel's below.
+    Window {
+        width: shelfWindow.width
+        height: shelfWindow.height
+        visible: shelfBridge.ghost_visible
+        color: "transparent"
+        transientParent: null
+        flags: Qt.FramelessWindowHint | Qt.WindowTransparentForInput
+
+        LayerShell.Window.anchors: LayerShell.Window.AnchorTop | LayerShell.Window.AnchorLeft
+        LayerShell.Window.layer: LayerShell.Window.LayerOverlay
+        LayerShell.Window.margins: Qt.rect(shelfBridge.ghost_left, shelfBridge.ghost_top, 0, 0)
+        LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
+        LayerShell.Window.scope: "kavverna-shelf-ghost"
+        LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
+
+        Image {
+            anchors.fill: parent
+            anchors.margins: 6
+            source: shelfWindow.shelfShot ? shelfWindow.shelfShot.url : ""
+            opacity: 0.85
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 6
+            radius: 14
+            color: shelfWindow.shelfShot ? "transparent" : theme.glow
+            border.width: 2
+            border.color: theme.accent
+        }
+    }
+
     // The outline that follows a header drag. The real panel cannot move under the pointer
     // without poisoning the pointer's own readings, so this ghost does the moving and the
     // panel jumps to it on release. Transparent to input, or it would sit under the cursor
@@ -196,17 +229,29 @@ Window {
         LayerShell.Window.scope: "kavverna-panel-ghost"
         LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
 
+        Image {
+            anchors.fill: parent
+            anchors.margins: 6
+            source: root.ghostShot ? root.ghostShot.url : ""
+            opacity: 0.85
+        }
+
         Rectangle {
             anchors.fill: parent
             anchors.margins: 6
             radius: 14
-            color: theme.glow
+            color: root.ghostShot ? "transparent" : theme.glow
             border.width: 2
             border.color: theme.accent
         }
     }
 
+    // What the ghost outline shows while the panel is dragged: a picture of the panel as it
+    // was at the press, so the drag looks like moving the thing rather than an empty frame.
+    property var ghostShot: null
+
     Rectangle {
+        id: skin
         anchors.fill: parent
         anchors.margins: 6
         radius: 14
@@ -231,6 +276,7 @@ Window {
             onPressed: (mouse) => {
                 pressX = mouse.x
                 pressY = mouse.y
+                skin.grabToImage((shot) => root.ghostShot = shot)
                 hub.drag_begun(root.width, root.height)
             }
             onPositionChanged: (mouse) => {

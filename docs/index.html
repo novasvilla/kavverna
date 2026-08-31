@@ -134,13 +134,21 @@
       <source media="(prefers-color-scheme: dark)" srcset="assets/readme/dark-settings.png">
       <img src="assets/readme/light-settings.png" alt="Settings, with every utility and its own switch">
     </picture>
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/readme/dark-shelf.png">
+      <img src="assets/readme/light-shelf.png" alt="The shelf, holding files, a pile and a link">
+    </picture>
   </div>
   <div class="shots themes">
-    <img src="assets/readme/light-energy.png" alt="The energy page in the light theme">
-    <img src="assets/readme/dark-energy.png" alt="The energy page in the dark theme">
+    <img src="assets/readme/theme-torch-dark.png" alt="The Torch theme, dark">
+    <img src="assets/readme/theme-torch-light.png" alt="The Torch theme, light">
+    <img src="assets/readme/theme-tide-dark.png" alt="The Tide theme, dark">
+    <img src="assets/readme/theme-tide-light.png" alt="The Tide theme, light">
+    <img src="assets/readme/theme-ember-dark.png" alt="The Ember theme, dark">
+    <img src="assets/readme/theme-ember-light.png" alt="The Ember theme, light">
   </div>
-  <p class="caption">The panel follows your desktop into light or dark, and can be
-  pinned to either.</p>
+  <p class="caption">The same page in every light the cavern has: Torch, Tide and Ember, each
+  dark and light, following the desktop or pinned to either.</p>
 </header>
 
 <section class="wrap" id="why">
@@ -163,13 +171,17 @@
     <li><strong>Every utility has its own switch</strong>, grouped as the panel groups them. One
     switched off disappears from the panel and from the settings, and stops running: its thread
     never starts. Turning it back on restores what it was configured to do.</li>
-    <li><strong>Light and dark</strong>, following the desktop or pinned to either. The colours
-    are Kavverna's own in both, so it looks like itself on any colour scheme.</li>
+    <li><strong>Three themes, each designed whole.</strong> Torch is the cavern it has always
+    been; Tide floods it in blue-slate; Ember burns it down in red. Light and dark variants in
+    all three, measured against WCAG AA, applied the moment one is picked.</li>
+    <li><strong>The panel opens where it is useful.</strong> Beside the tray icon by default,
+    wherever your bar lives; or wherever you last dragged it, one spot per screen; or the old
+    corner. Drag it by its header and an outline shows where it will land.</li>
     <li><strong>A tray menu that reaches the whole suite</strong>, not just keep awake: mute
-    every microphone, move to the next output, open the history.</li>
+    every microphone, move to the next output, open the history, open the shelf.</li>
     <li><strong>A shortcut for every utility worth reaching blind</strong>: the panel, the
-    clipboard, keep awake, mute every microphone, the next output. Registered through the
-    desktop, so System Settings lists them beside every other shortcut.</li>
+    clipboard, the shelf, keep awake, mute every microphone, the next output. Registered
+    through the desktop, so System Settings lists them beside every other shortcut.</li>
     <li><strong>Each utility says what it costs</strong>: nothing at rest, reads on a timer,
     watches the clipboard. The label sits beside the switch.</li>
   </ul>
@@ -182,10 +194,32 @@
     <li><strong>Every output and input</strong> with live volumes, mute, and switching which one
     is the default. Device volume is written on the card's route, so the slider moves what you
     hear.</li>
+    <li><strong>Send each application to its own output.</strong> Music to the speakers, the
+    game to the headset. The choice is remembered by application, survives the device
+    unplugging, and comes back when it returns. A stream that refuses to move says so on its
+    row instead of hiding.</li>
+    <li><strong>The same for microphones</strong>: applications recording are listed with the
+    source each one reads from, and each can be pointed at its own.</li>
     <li><strong>Mute every microphone</strong> in one click, or from a shortcut.</li>
     <li><strong>Come back to a preferred microphone</strong>: pin one and it is made the default
     again whenever it is plugged back in.</li>
     <li><strong>Step through the outputs you choose</strong> from a shortcut or the tray.</li>
+  </ul>
+
+  <h3>The shelf</h3>
+  <ul>
+    <li><strong>A place to put things down mid-task.</strong> Drop files, text or links onto it
+    and they wait until dragged somewhere else. Several things dropped together stay together
+    as one pile.</li>
+    <li><strong>Dropping stages, never copies.</strong> A local file is held by its path; only
+    content with no file behind it is written into the shelf's own directory. A web address
+    stays a link and is never fetched.</li>
+    <li><strong>Reachable mid-drag.</strong> A thin strip on the right screen edge opens the
+    shelf the moment a drag touches it, and Ctrl+Alt+S works even with a file in hand.</li>
+    <li><strong>It lives where you put it.</strong> Drag it by its header and it reopens
+    there; pick which edge the strip hangs from until then.</li>
+    <li><strong>It survives restarts</strong> behind a setting, and an item dragged to a
+    destination that accepted it leaves the shelf on its own.</li>
   </ul>
 
   <h3>Monitoring</h3>
@@ -217,7 +251,8 @@
     for byte as it was.</li>
     <li><strong>Turn what was copied into something else</strong>: plain text, laid out JSON,
     or Markdown made from the copy's own HTML, read at the moment you ask rather than stored.
-    The next paste is the result.</li>
+    The result is shown first, the clipboard changes only when you take it, and the original
+    stays in the history.</li>
   </ul>
 
   <h3>Energy and tools</h3>
@@ -276,7 +311,13 @@ sha256sum -c kavverna-x86_64.pkg.tar.zst.sha256</pre>
     no client identity. Exclusions work by the mime type a password manager sets instead.</li>
     <li><strong>The tray icon cannot show text.</strong> The live numbers live in the panel,
     one click away.</li>
-    <li><strong>A window cannot place itself.</strong> The panel anchors to a screen edge.</li>
+    <li><strong>An ordinary window cannot place itself.</strong> Kavverna's surfaces are layer
+    shell, which places itself by anchors and margins, and on Plasma the tray click carries the
+    icon's coordinates, so the panel opens beside it and can be dragged anywhere. Without layer
+    shell, GNOME among others, the compositor decides and the placement setting is inert.</li>
+    <li><strong>A drag in progress elsewhere is invisible</strong> until it crosses one of our
+    own surfaces, so the shelf cannot appear the moment a drag starts anywhere: the edge strip
+    and a mid-drag shortcut are the honest versions.</li>
     <li><strong>Emptying the clipboard fights Plasma</strong> until Klipper's Prevent empty
     clipboard option is turned off.</li>
   </ul>
@@ -291,7 +332,6 @@ sha256sum -c kavverna-x86_64.pkg.tar.zst.sha256</pre>
     removable disks. Nearly all one call each, and the tools page has room.</li>
     <li><strong>Pasting straight from the picker</strong> into the application you were in,
     which needs synthetic input and is why it is not here yet.</li>
-    <li><strong>A shelf</strong> for files, text and links, anchored to a screen edge.</li>
     <li><strong>Text snippets</strong>, expanded through the input method so they need no
     privilege at all.</li>
     <li><strong>A scratchpad</strong> for notes on their way somewhere else.</li>
@@ -333,7 +373,7 @@ sha256sum -c kavverna-x86_64.pkg.tar.zst.sha256</pre>
   <p>Written by <a href="https://github.com/novasvilla">@novasvilla</a>,
   <a href="https://www.linkedin.com/in/novasvilla/">on LinkedIn</a>.
   Inspired by <a href="https://github.com/vorssaintapp/vorssaint-utils">Vorssaint</a>.
-  GPL-3.0-or-later.</p>
+  Thanks to Ian Ponce for his early feedback. GPL-3.0-or-later.</p>
 </footer>
 
 </body>

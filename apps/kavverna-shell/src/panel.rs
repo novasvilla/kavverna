@@ -118,11 +118,11 @@ static PANEL: Mutex<Option<cxx_qt::CxxQtThread<qobject::KavvernaPanel>>> = Mutex
 /// thread but the report arrives once at startup, so a copy behind a mutex is enough.
 static SCREENS: Mutex<Vec<panel_anchor::Screen>> = Mutex::new(Vec::new());
 
-fn screens() -> Vec<panel_anchor::Screen> {
+pub(crate) fn screens() -> Vec<panel_anchor::Screen> {
     SCREENS.lock().map(|held| held.clone()).unwrap_or_default()
 }
 
-fn gap() -> i32 {
+pub(crate) fn gap() -> i32 {
     as_i32(settings::integer_at(settings::PLACEMENT_GAP, settings::PLACEMENT_GAP_DEFAULT), 12)
 }
 

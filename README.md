@@ -47,21 +47,30 @@
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dark-settings.png">
     <img src="docs/assets/readme/light-settings.png" width="186" alt="Settings, with every utility and its own switch">
   </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dark-shelf.png">
+    <img src="docs/assets/readme/light-shelf.png" width="186" alt="The shelf, holding files, a pile and a link until they are dragged on">
+  </picture>
 </p>
 
 <p align="center">
-  <img src="docs/assets/readme/light-energy.png" width="186" alt="The energy page in the light theme">
-  <img src="docs/assets/readme/dark-energy.png" width="186" alt="The energy page in the dark theme">
+  <img src="docs/assets/readme/theme-torch-dark.png" width="140" alt="The Torch theme, dark">
+  <img src="docs/assets/readme/theme-torch-light.png" width="140" alt="The Torch theme, light">
+  <img src="docs/assets/readme/theme-tide-dark.png" width="140" alt="The Tide theme, dark">
+  <img src="docs/assets/readme/theme-tide-light.png" width="140" alt="The Tide theme, light">
+  <img src="docs/assets/readme/theme-ember-dark.png" width="140" alt="The Ember theme, dark">
+  <img src="docs/assets/readme/theme-ember-light.png" width="140" alt="The Ember theme, light">
 </p>
 
 <p align="center">
-  <sub>The panel follows your desktop into light or dark, and can be pinned to either.</sub>
+  <sub>The same page in every light the cavern has: Torch, Tide and Ember, each dark and
+  light, following the desktop or pinned to either.</sub>
 </p>
 
-Per application volume, a real system monitor, clipboard history with a picker on a shortcut,
-keep awake, and a pointer that refuses to go idle. The tools a Plasma desktop spreads across
-half a dozen applets, or does not ship at all, behind one icon in the tray, with no account, no
-telemetry and no subscription.
+Per application volume and routing, a real system monitor, clipboard history with a picker on
+a shortcut, a shelf that holds files mid-task, keep awake, and a pointer that refuses to go
+idle. The tools a Plasma desktop spreads across half a dozen applets, or does not ship at all,
+behind one icon in the tray, with no account, no telemetry and no subscription.
 
 ## Why this exists
 
@@ -89,6 +98,13 @@ not. See [CREDITS.md](CREDITS.md).
 - **Every output and input** with live volumes, mute, and switching which one is the default.
   Device volume is written where it actually lives, on the card's route, so the slider moves
   what you hear.
+- **Send each application to its own output.** Music to the speakers, the game to the headset:
+  every application row carries where it plays, a tap opens the outputs, and the choice is
+  remembered by application. Unplug the chosen device and sound falls back to the default; plug
+  it back in and the application returns to it. A stream that refuses to be moved says so on
+  its row instead of hiding.
+- **The same for microphones.** Applications recording are listed with the source each one
+  reads from, and each can be pointed at its own.
 - **Mute every microphone** in one click, or from a shortcut.
 - **Come back to a preferred microphone**: pin one and it is made the default again whenever it
   is plugged back in.
@@ -122,8 +138,29 @@ not. See [CREDITS.md](CREDITS.md).
 - **Take the tracking out of copied links**, campaign and click parameters removed the moment a
   link arrives, and everything else left byte for byte as it was.
 - **Turn what was copied into something else**: plain text, laid out JSON, or Markdown made
-  from the copy's own HTML, read at the moment you ask rather than stored. The next paste is
-  the result.
+  from the copy's own HTML, read at the moment you ask rather than stored. The result is shown
+  first with a sentence measuring it, the clipboard changes only when you take it, and the
+  original stays in the history.
+
+### The shelf
+
+- **A place to put things down mid-task.** Drop files, folders, text or links onto it and they
+  wait until dragged somewhere else: a file manager, an upload field, a chat. Several things
+  dropped together stay together as one pile.
+- **Dropping stages, never copies.** A local file is held by its path; only content with no
+  file behind it, an image dragged out of Firefox or a snippet of text, is written into the
+  shelf's own directory. A web address stays a link and is never fetched.
+- **Reachable mid-drag.** A thin strip on the right screen edge opens the shelf the moment a
+  drag touches it, and Ctrl+Alt+S works even with a file in hand. A drag elsewhere on the
+  desktop is invisible to every Wayland client, so the strip is the honest version of a shelf
+  that appears when dragging starts.
+- **Per item**: open, reveal in the file manager, copy the path, take it off. Items whose file
+  has meanwhile vanished dim and say so instead of offering a dead drag.
+- **It lives where you put it.** Drag the shelf by its header, with the same live outline the
+  panel shows, and it reopens there; pick which edge the strip and the shelf hang from until
+  then.
+- **It survives restarts** behind a setting, and an item dragged to a destination that accepted
+  it leaves the shelf on its own, the way a hand-off should.
 
 ### The suite itself
 
@@ -131,13 +168,19 @@ not. See [CREDITS.md](CREDITS.md).
   disappears from the panel and from the settings, and stops running: its thread never starts.
   Turning it back on restores what it was configured to do, since removing one never writes to
   its own settings.
-- **Light and dark**, following the desktop or pinned to either. The colours are Kavverna's own
-  in both, so it looks like itself on any colour scheme.
+- **Three themes, each designed whole.** Torch is the cavern Kavverna has always been; Tide
+  floods it in blue-slate; Ember burns it down in red. Every one has a light and a dark
+  variant, every text and surface pair was measured against WCAG AA before its values froze,
+  and the palette applies the moment it is picked. Following the desktop or pinning light and
+  dark works the same in all three.
+- **The panel opens where it is useful.** Beside the tray icon by default, wherever your bar
+  lives; or wherever you last dragged it, one spot per screen; or the old corner. Drag it by
+  its header, and an outline the exact size of the panel shows where it will land.
 - **A tray menu that reaches the whole suite**, not just keep awake: mute every microphone, move
   to the next output, open the history.
-- **A shortcut for every utility worth reaching blind**: the panel, the clipboard, keep awake,
-  mute every microphone, the next output. Registered through the desktop, so System Settings
-  lists them beside every other shortcut and rebinding is done there.
+- **A shortcut for every utility worth reaching blind**: the panel, the clipboard, the shelf,
+  keep awake, mute every microphone, the next output. Registered through the desktop, so System
+  Settings lists them beside every other shortcut and rebinding is done there.
 - **Each utility says what it costs**: nothing at rest, reads on a timer, watches the
   clipboard. The label sits beside the switch, so the choice is made against a fact.
 - **`--selftest`** reports what the machine offers of everything Kavverna relies on, one line
@@ -235,8 +278,15 @@ Being straight about this up front, because these limits are not going away:
   exclusions work by the mime type a password manager sets rather than by application.
 - **The tray icon cannot show text.** A StatusNotifierItem carries an icon and nothing else,
   so the live numbers live in the panel, one click away.
-- **A window cannot place itself.** The panel anchors to a screen edge rather than appearing
-  under the pointer.
+- **An ordinary window cannot place itself.** Kavverna's surfaces are layer shell, which is
+  placed by its own anchors and margins, and the tray click carries the icon's coordinates on
+  Plasma, so the panel can open beside the icon and be dragged anywhere. On a desktop without
+  layer shell, GNOME among them, the compositor places the panel and every placement setting
+  is inert.
+- **A drag in progress elsewhere is invisible.** A client learns of a drag only when it
+  crosses the client's own surface, so the shelf cannot pop up the moment a drag starts
+  anywhere; the always-present edge strip and a shortcut that works mid-drag are the honest
+  versions.
 - **Emptying the clipboard fights Plasma.** Klipper puts the content straight back unless its
   Prevent empty clipboard option is turned off.
 - **Per-process power draw cannot be measured.** RAPL needs root, so anything labelled energy
@@ -251,7 +301,6 @@ In roughly this order. Anything here is a good place to start if you want to hel
   all one call each, and the tools page has room.
 - **Pasting straight from the picker** into the application you were in, which needs synthetic
   input and is why it is not here yet.
-- **A shelf** for files, text and links, anchored to a screen edge.
 - **Text snippets**, expanded through the input method rather than by typing keystrokes, so it
   needs no privilege at all.
 - **A scratchpad** for the notes that are on their way somewhere else.
@@ -282,3 +331,5 @@ Written by [@novasvilla](https://github.com/novasvilla),
 
 Inspired by [Vorssaint](https://github.com/vorssaintapp/vorssaint-utils), which is where these
 ideas come from. GPL-3.0-or-later, the same licence they chose.
+
+Thanks to Ian Ponce for his early feedback on this software.

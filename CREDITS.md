@@ -34,3 +34,9 @@ that inspired it.
 - PipeWire and WirePlumber, which make per-app audio routing possible
 - [cxx-qt](https://github.com/KDAB/cxx-qt) by KDAB, for the Rust and Qt bridge
 - [ksni](https://github.com/iovxw/ksni), for the StatusNotifierItem implementation
+- [layer-shell-qt](https://invent.kde.org/plasma/layer-shell-qt), which is what lets the
+  panel, the shelf and the drag outline place themselves at all
+
+## People
+
+Thanks to Ian Ponce for his early feedback on this software.

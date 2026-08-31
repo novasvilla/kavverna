@@ -41,6 +41,10 @@ pub const APPEARANCE: &str = "appearance";
 pub const SHELF_EDGE_STRIP: &str = enable_key(Feature::Shelf);
 pub const SHELF_KEEP_ACROSS_RESTARTS: &str = "shelf.keep-across-restarts";
 pub const SHELF_REMOVE_AFTER_DROP: &str = "shelf.remove-after-drop";
+/// The strip and the shelf live on the right edge unless moved to the left.
+pub const SHELF_STRIP_LEFT: &str = "shelf.strip-left";
+/// Where the shelf was left, one entry per screen, same shape as the panel's.
+pub const SHELF_POSITION: &str = "shelf.position";
 /// Which palette dresses the panel. Doubles as the themes feature's enable key: removing the
 /// feature applies the torch and leaves the choice waiting here.
 pub const THEME: &str = enable_key(Feature::Themes);
@@ -95,6 +99,7 @@ pub const SHELF_EDGE_STRIP_DEFAULT: bool = true;
 pub const SHELF_KEEP_ACROSS_RESTARTS_DEFAULT: bool = true;
 /// A drag something accepted took the item along, so it leaves; a cancelled drag keeps it.
 pub const SHELF_REMOVE_AFTER_DROP_DEFAULT: bool = true;
+pub const SHELF_STRIP_LEFT_DEFAULT: bool = false;
 
 /// Beside the icon, because the panel belongs to the icon that opened it. Panel bars sit on
 /// different edges on different machines, and a corner that suits one is across the desk on

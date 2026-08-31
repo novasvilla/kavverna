@@ -3,6 +3,49 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## 0.4.0
+
+### Added
+
+- **Each application can play through its own output.** The mixer row carries where the
+  application plays; a tap opens every output inline, with Follow system default first. The
+  choice is remembered by application and survives the device unplugging: sound falls back to
+  the default meanwhile, the row says so, and the application returns to its device the moment
+  it is plugged back in. Applications recording get the same against the microphones, and a
+  stream that refuses to be moved keeps its row with the reason where the picker would be.
+- **A shelf.** Files, text and links dropped onto it wait until they are dragged somewhere
+  else. Dropping stages rather than copies: local files are held by path, only content with no
+  file behind it is written into the shelf's own private directory, and a web address stays a
+  link, never a download. One drop gesture forms one pile; drag out one item, a Ctrl+click
+  selection, or the pile. A thin strip on the right screen edge opens the shelf the moment a
+  drag touches it, Ctrl+Alt+S summons it even mid-drag, it can be dragged by its header to
+  wherever it should live and reopens there, and it survives restarts behind a setting.
+- **Two more themes, and a picker.** Torch stays the default and the look nothing changes
+  without asking. Tide is the cave flooded in blue-slate; Ember is the cave burning down in
+  red. Each is a designed whole with light and dark variants, measured against WCAG AA before
+  the values froze, and the palette applies the moment a row is tapped.
+- **The panel opens where it is useful.** Beside the tray icon by default, using the real
+  coordinates the tray click carries on Plasma, on whichever screen and edge the bar lives; or
+  wherever it was last dragged, one spot per screen, validated against the screens actually
+  connected; or the old bottom right corner, byte for byte. Dragging the panel by its header
+  shows an outline the exact size of the panel and places it on release.
+- **The transformation card shows before it touches.** Plain, JSON and Markdown now preview
+  the result with a sentence measuring it; the clipboard changes only on Use it, and the
+  original copy stays in the history.
+- **The settings page regrouped.** Placement and appearance first, the mouse jiggle's timing
+  rows moved in from the panel where nobody could find them, startup sunk to the bottom.
+
+### Fixed
+
+- **Moving a stream between devices works now, and the old claim is corrected.** The first
+  attempt wrote the stream's node id as the routing target and concluded the mechanism did not
+  work; WirePlumber matches a numeric target only against the object's serial, so the write
+  failed silently. The session now writes the serial, the same write pactl performs, and the
+  live test reads the landing back from pactl by serial for playback and recording both.
+- **Muting an application can no longer reach across the microphone.** Streams are grouped by
+  role as well as by application, so an application's playback controls stop at its playback
+  streams now that recording streams are tracked too.
+
 ## 0.3.0
 
 ### Added

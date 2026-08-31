@@ -10,7 +10,13 @@ turned off: no HTTP client is linked into the binary at all. You can check with
 |---|---|---|
 | Clipboard entries | `$XDG_DATA_HOME/kavverna/clipboard.db` | your user only, `0600` |
 | Copied images | `$XDG_DATA_HOME/kavverna/clipboard-images/` | your user only, `0700` |
+| The shelf | `$XDG_DATA_HOME/kavverna/shelf/` | your user only, `0700` |
 | Settings | `$XDG_CONFIG_HOME/kavverna/settings.json` | your user only, `0600` |
+
+The shelf stores local files by path, never by copy. Only content with no file behind it, an
+image dragged out of a browser or a snippet of dropped text, is written there, and taking an
+item off the shelf deletes what the shelf itself wrote. A dropped web address is kept as text
+and never fetched.
 
 On a normal machine `$XDG_DATA_HOME` is `~/.local/share` and `$XDG_CONFIG_HOME` is `~/.config`.
 

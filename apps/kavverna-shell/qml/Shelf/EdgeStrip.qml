@@ -23,19 +23,23 @@ Window {
     // The same transient-of-a-hidden-panel trap the shelf window has.
     transientParent: null
 
-    LayerShell.Window.anchors: LayerShell.Window.AnchorRight
+    LayerShell.Window.anchors: strip.shelf.strip_on_left ? LayerShell.Window.AnchorLeft
+                                                         : LayerShell.Window.AnchorRight
     LayerShell.Window.layer: LayerShell.Window.LayerOverlay
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
     LayerShell.Window.scope: "kavverna-shelf-strip"
     LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
 
     Rectangle {
-        anchors.right: parent.right
+        anchors.right: strip.shelf.strip_on_left ? undefined : parent.right
+        anchors.left: strip.shelf.strip_on_left ? parent.left : undefined
         anchors.verticalCenter: parent.verticalCenter
         width: landing.containsDrag ? 14 : 6
         height: parent.height
-        topLeftRadius: 6
-        bottomLeftRadius: 6
+        topLeftRadius: strip.shelf.strip_on_left ? 0 : 6
+        bottomLeftRadius: strip.shelf.strip_on_left ? 0 : 6
+        topRightRadius: strip.shelf.strip_on_left ? 6 : 0
+        bottomRightRadius: strip.shelf.strip_on_left ? 6 : 0
         color: landing.containsDrag ? strip.theme.selected : strip.theme.glow
         border.width: 1
         border.color: strip.theme.hairline

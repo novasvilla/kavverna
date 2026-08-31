@@ -65,6 +65,17 @@ first, or a running instance saves the tests' own copies into your history.
   `Level` from `qml/Shared/` instead. Icons come from the desktop theme through `Kirigami.Icon`,
   never from a character.
 
+## Adding a theme
+
+A theme is one entry in the `palettes` object in `qml/Theme.qml`: the thirteen colour tokens,
+each defined twice, `dark` and `light`. Copy an existing entry, change the values, and add a
+row for it to the picker model in `qml/Settings/SettingsPage.qml`; nothing else refers to a
+theme by name. Three rules keep a new theme worth shipping. Design the grounds and the inks,
+not only the accent, or it reads as a tinted copy of the torch. Measure every text and surface
+pair against WCAG AA before freezing values, the way the existing palettes were, and put the
+ratios in the commit message; `mutedText` is decorative by design and is the one token allowed
+below AA. And never change the torch, which is the look an absent setting has to keep meaning.
+
 ## Commit messages
 
 A subject line saying what changed, then the reasoning: why this way, what was rejected, what

@@ -55,6 +55,9 @@ Window {
         copier.copy()
     }
 
+    /// What the drag ghost shows: the shelf as it looked at the press.
+    property var shelfShot: null
+
     width: 240
     height: Math.min(body.implicitHeight + 36, Math.min(640, Screen.desktopAvailableHeight - 24))
     visible: shelfWindow.shows("shelf") && shelfWindow.shelf.shelf_open
@@ -63,9 +66,15 @@ Window {
     // child, and a transient of a hidden window is never mapped.
     transientParent: null
 
-    LayerShell.Window.anchors: LayerShell.Window.AnchorRight
+    // A shelf stays where it was put. Never dragged, it hangs centred off the strip's edge.
+    LayerShell.Window.anchors: shelfWindow.shelf.placed
+        ? (LayerShell.Window.AnchorTop | LayerShell.Window.AnchorLeft)
+        : (shelfWindow.shelf.strip_on_left ? LayerShell.Window.AnchorLeft
+                                           : LayerShell.Window.AnchorRight)
     LayerShell.Window.layer: LayerShell.Window.LayerOverlay
-    LayerShell.Window.margins: Qt.rect(0, 0, 12, 0)
+    LayerShell.Window.margins: shelfWindow.shelf.placed
+        ? Qt.rect(shelfWindow.shelf.shelf_left, shelfWindow.shelf.shelf_top, 0, 0)
+        : (shelfWindow.shelf.strip_on_left ? Qt.rect(12, 0, 0, 0) : Qt.rect(0, 0, 12, 0))
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityOnDemand
     LayerShell.Window.scope: "kavverna-shelf"
     // The same primary-screen pinning as the panel, for the same reason: the active screen
@@ -85,6 +94,7 @@ Window {
     }
 
     Rectangle {
+        id: shelfSkin
         anchors.fill: parent
         anchors.margins: 6
         radius: 14
@@ -95,6 +105,32 @@ Window {
         DropArea {
             anchors.fill: parent
             onDropped: (drop) => shelfWindow.receive(drop)
+        }
+
+        // The header is the shelf's handle, the same ghost gesture as the panel's.
+        MouseArea {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 44
+            property real pressX: 0
+            property real pressY: 0
+
+            onPressed: (mouse) => {
+                pressX = mouse.x
+                pressY = mouse.y
+                shelfSkin.grabToImage((shot) => shelfWindow.shelfShot = shot)
+                shelfWindow.shelf.drag_begun(shelfWindow.width, shelfWindow.height)
+            }
+            onPositionChanged: (mouse) => {
+                if (!pressed) {
+                    return
+                }
+                shelfWindow.shelf.drag_preview(Math.round(mouse.x - pressX),
+                                               Math.round(mouse.y - pressY),
+                                               shelfWindow.width, shelfWindow.height)
+            }
+            onReleased: shelfWindow.shelf.drag_commit(shelfWindow.width, shelfWindow.height)
         }
 
         ColumnLayout {
