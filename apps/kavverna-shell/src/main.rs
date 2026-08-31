@@ -127,6 +127,18 @@ fn main() {
         engine.load(&QUrl::from("qrc:/qt/qml/dev/kavverna/shell/qml/main.qml"));
     }
 
+    // A missing QML runtime piece fails the load with nothing but library noise, and the
+    // process would then sit behind a tray icon that opens nothing. The interface attaches
+    // during a successful load, so its absence here is the failure, named in a sentence a
+    // person can act on instead of a stack of warnings.
+    if !panel::attached() {
+        eprintln!("The interface could not load, which usually means a piece of the Qt QML");
+        eprintln!("runtime is missing. Check that layer-shell-qt, kirigami and the Qt");
+        eprintln!("Declarative runtime are installed; the library messages above name the");
+        eprintln!("missing module. `kavverna-shell --selftest` checks everything else.");
+        std::process::exit(1);
+    }
+
     if let Some(app) = app.as_mut() {
         app.exec();
     }

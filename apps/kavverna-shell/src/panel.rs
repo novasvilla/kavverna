@@ -130,6 +130,12 @@ pub(crate) fn screens() -> Vec<panel_anchor::Screen> {
     SCREENS.lock().map(|held| held.clone()).unwrap_or_default()
 }
 
+/// Whether the interface came up: `attach()` runs synchronously inside a successful QML
+/// load, so right after the load this answers whether the load worked at all.
+pub(crate) fn attached() -> bool {
+    PANEL.lock().map(|held| held.is_some()).unwrap_or(false)
+}
+
 /// The screen with its size cut down to the measured free area, when one is known.
 pub(crate) fn worked(screen: &panel_anchor::Screen) -> panel_anchor::Screen {
     let mut shaped = screen.clone();
