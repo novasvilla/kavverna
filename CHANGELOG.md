@@ -3,7 +3,7 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
-## Unreleased
+## 0.4.1
 
 ### Fixed
 
@@ -307,7 +307,7 @@ survived a second pass that tried to refute them.
 - Security and credit pages corrected: the pointer nudge does use synthetic input through
   `ydotool`, and the tracking parameter lists come from the reference app as data.
 
-## Unreleased
+## 0.1.0
 
 ### Added
 
