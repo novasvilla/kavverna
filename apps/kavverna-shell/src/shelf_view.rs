@@ -219,6 +219,7 @@ impl qobject::ShelfView {
         let Some(screen) = screens.first() else {
             return;
         };
+        let screen = &crate::panel::worked(screen);
         let from = if *self.placed() {
             (*self.shelf_left(), *self.shelf_top())
         } else {
@@ -246,7 +247,7 @@ impl qobject::ShelfView {
         };
         let at = crate::panel_anchor::pinned(
             (x + dx, y + dy),
-            screen,
+            &crate::panel::worked(screen),
             (width, height),
             crate::panel::gap(),
         );
@@ -269,7 +270,7 @@ impl qobject::ShelfView {
         };
         let landed = crate::panel_anchor::pinned(
             (*self.ghost_left(), *self.ghost_top()),
-            screen,
+            &crate::panel::worked(screen),
             (width, height),
             crate::panel::gap(),
         );

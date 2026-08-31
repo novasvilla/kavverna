@@ -131,7 +131,7 @@ pub(crate) fn screens() -> Vec<panel_anchor::Screen> {
 }
 
 /// The screen with its size cut down to the measured free area, when one is known.
-fn worked(screen: &panel_anchor::Screen) -> panel_anchor::Screen {
+pub(crate) fn worked(screen: &panel_anchor::Screen) -> panel_anchor::Screen {
     let mut shaped = screen.clone();
     if let Ok(held) = WORK_AREAS.lock() {
         if let Some((_, width, height)) = held.iter().find(|(name, _, _)| *name == screen.name) {

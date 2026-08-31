@@ -194,6 +194,11 @@ Window {
         LayerShell.Window.scope: "kavverna-shelf-ghost"
         LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
 
+        // The same free-area measurement the panel's overlay reports, so a shelf drag
+        // calibrates even when the panel was never dragged.
+        onHeightChanged: if (height > 0 && width > 0 && screen)
+                             hub.report_work_area(screen.name, width, height)
+
         Item {
             x: shelfBridge.ghost_left
             y: shelfBridge.ghost_top
