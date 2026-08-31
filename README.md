@@ -163,7 +163,7 @@ not. See [CREDITS.md](CREDITS.md).
   it leaves the shelf on its own, the way a hand-off should.
 
 <p align="center">
-  <img src="docs/assets/readme/shelf.gif" width="220" alt="The shelf filling up: things dropped on it wait until they are dragged on">
+  <img src="docs/assets/readme/shelf.gif" width="220" alt="The shelf filling up and emptying again: things dropped on it wait, then leave for Copy Here">
 </p>
 
 <p align="center">
