@@ -3,6 +3,17 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## 0.4.2
+
+### Added
+
+- **The panel can stop floating over everything.** It has always lived above every window,
+  fullscreen included, and nothing offered a say. A switch under the panel settings now
+  chooses: on, the way it has always been; off, the ordinary panel layer, where a
+  fullscreen application covers it. Takes hold the next time the panel opens. The shelf
+  and its edge strip stay above: a drag target that must catch what crosses it cannot
+  hide.
+
 ## 0.4.1
 
 ### Fixed
