@@ -3,6 +3,40 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## Unreleased
+
+### Fixed
+
+- **Dragging the panel carries the panel.** The gesture used to move an empty outline that
+  froze a few pixels in: this compositor never repositions a mapped layer surface when only
+  its margins change, which an isolated test surface proved. The moving picture now lives
+  inside one still overlay, drawn at full strength with the real panel blanked for the
+  gesture, so what follows the hand is the application itself, and it lands exactly where it
+  shows because the overlay measures the screen's true free area, which no Qt property
+  reports on Wayland. The shelf's drag shares all of it.
+- **The mouse jiggle's timing and key rows are back on the panel's Tools page.** Moving them
+  to settings read as tidy and lived as a loss; they now sit in both places, like the other
+  duplicated quick controls. The longest-wait default became five minutes, a value its own
+  choices can display.
+- **Every page opens at its top.** The pages share one scroller, and a switch used to open
+  the next page wherever the last one was left, first rows hidden above the fold.
+- **The inside joke is findable.** The bubble hovers on the blue theme's own row and across
+  the whole utilities row, not behind a 40 pixel switch.
+- **Volume sliders answer the wheel**, two points a notch; the page keeps scrolling
+  everywhere else.
+- **A failed interface load names itself.** A missing QML runtime piece used to leave a live
+  process behind a tray icon that opened nothing; it now prints four lines naming the cure
+  and exits.
+
+### Changed
+
+- **The shelf's animation tells the whole story**: three new frames carry an item out under
+  the copy cursor, through the compositor's own Move, Copy or Link menu, and off the shelf.
+- **Both install routes name what they need.** The build-anywhere instructions listed no
+  prerequisites at all; they now name the toolchain, headers and runtime modules, and point
+  at `--selftest`. The package's dependency list was verified complete against an empty
+  Arch container.
+
 ## 0.4.0
 
 ### Added
