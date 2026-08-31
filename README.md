@@ -162,6 +162,15 @@ not. See [CREDITS.md](CREDITS.md).
 - **It survives restarts** behind a setting, and an item dragged to a destination that accepted
   it leaves the shelf on its own, the way a hand-off should.
 
+<p align="center">
+  <img src="docs/assets/readme/shelf.gif" width="220" alt="The shelf filling up: things dropped on it wait until they are dragged on">
+</p>
+
+<p align="center">
+  <sub>The shelf is young, and the idea is already whole: put something down, keep working,
+  pick it up where it is needed.</sub>
+</p>
+
 ### The suite itself
 
 - **Every utility has its own switch**, grouped as the panel groups them. One switched off

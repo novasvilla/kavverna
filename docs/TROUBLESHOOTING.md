@@ -79,7 +79,9 @@ them; a shortcut or a script reuses the last click it saw. Before the icon has b
 once, and on a tray host that sends no coordinates, the panel falls back to the bottom right
 corner. Every fallback is silent because none of them is an error. On a desktop without layer
 shell, GNOME among them, the compositor places the window and the placement setting does
-nothing.
+nothing. The gap the panel keeps from whatever it hangs off is `placement.gap` in
+`settings.json`, twelve pixels unless changed there; it is deliberately not on the settings
+page.
 
 ## The shelf strip does not react to a drag
 

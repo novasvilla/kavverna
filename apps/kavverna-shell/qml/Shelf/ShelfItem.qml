@@ -104,9 +104,24 @@ Rectangle {
 
         Label {
             visible: row.opensPile
-            text: row.shelf.row_pile_sizes[row.at] + " dropped together"
+            text: row.shelf.row_pile_sizes[row.at] + " dropped together · tap to take all"
             font.pixelSize: row.theme.textFine
             color: row.theme.mutedText
+
+            // Selecting the pile is how the whole drop gesture leaves together: pick it
+            // here, then drag any of its rows.
+            TapHandler {
+                onTapped: {
+                    const mine = row.shelf.row_pile_ids[row.at]
+                    const all = []
+                    for (let at = 0; at < row.shelf.row_ids.length; at += 1) {
+                        if (row.shelf.row_pile_ids[at] === mine) {
+                            all.push(row.shelf.row_ids[at])
+                        }
+                    }
+                    row.home.picked = all
+                }
+            }
         }
 
         RowLayout {
