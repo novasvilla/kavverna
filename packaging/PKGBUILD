@@ -7,6 +7,8 @@ pkgdesc="One tray icon for the utilities a KDE Plasma desktop is missing"
 arch=('x86_64')
 url="https://github.com/novasvilla/kavverna"
 license=('GPL-3.0-or-later')
+# Verified against an empty Arch container: this closure alone installs, links and answers
+# --version. The Wayland platform plugin ships inside qt6-base since Qt 6.10.
 depends=('qt6-base' 'qt6-declarative' 'layer-shell-qt' 'kirigami' 'libpipewire' 'sqlite'
          'hicolor-icon-theme')
 makedepends=('git' 'rust' 'clang' 'pkgconf')

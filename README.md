@@ -250,6 +250,13 @@ yourself is the recommended route.
 
 ### Anywhere else
 
+Building needs a Rust toolchain, `clang` (the Rust-to-Qt bridge reads C++ headers through
+libclang), `pkgconf`, and the development headers for Qt 6 Base, Qt 6 Declarative and
+PipeWire. Those are the Arch names; other distributions ship the same things with a `-dev`
+or `-devel` suffix. Running needs `layer-shell-qt` and `kirigami` beside the libraries the
+build linked, and on a Qt older than 6.10 also the separate Qt Wayland package, which has
+since moved into Qt Base.
+
 ```sh
 git clone https://github.com/novasvilla/kavverna
 cd kavverna
@@ -258,7 +265,9 @@ cargo build --release
 ```
 
 A prebuilt binary is attached to every
-[release](https://github.com/novasvilla/kavverna/releases), built on Arch with Qt 6.
+[release](https://github.com/novasvilla/kavverna/releases), built on Arch with Qt 6. Either
+way, `kavverna-shell --selftest` prints one line per thing the machine must offer, so a
+missing piece names itself instead of failing quietly.
 
 ## What you need
 

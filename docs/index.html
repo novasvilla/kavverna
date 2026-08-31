@@ -299,8 +299,14 @@ sha256sum -c kavverna-x86_64.pkg.tar.zst.sha256</pre>
   on the day of the release rather than against what is on your machine now.</p>
 
   <h3>Anywhere else</h3>
+  <p>Building needs a Rust toolchain, <code>clang</code>, <code>pkgconf</code>, and the
+  development headers for Qt 6 Base, Qt 6 Declarative and PipeWire; running needs
+  <code>layer-shell-qt</code> and <code>kirigami</code>. Other distributions ship the same
+  things with a <code>-dev</code> or <code>-devel</code> suffix.</p>
 <pre>cargo build --release
 ./target/release/kavverna-shell</pre>
+  <p><code>kavverna-shell --selftest</code> prints one line per thing the machine must offer,
+  so a missing piece names itself instead of failing quietly.</p>
   <div class="note">
     <p>Tested on CachyOS with KDE Plasma 6.7 on Wayland and Qt 6.11. Other distributions are
     untested rather than refused: everything KDE specific is reached over D-Bus and QML imports
