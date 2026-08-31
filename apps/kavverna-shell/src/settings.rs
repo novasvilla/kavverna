@@ -58,8 +58,12 @@ pub const PLACEMENT_GAP: &str = "placement.gap";
 pub const PLACEMENT_ANCHOR: &str = "placement.anchor";
 /// Where the panel was left, one entry per screen, most recent last. Same shape as the anchor.
 pub const PLACEMENT_REMEMBERED: &str = "placement.remembered";
+/// Whether the panel floats over every window, fullscreen included, the way it always has.
+/// Off, it sits on the ordinary panel layer and fullscreen applications cover it.
+pub const PANEL_ON_TOP: &str = "panel.on-top";
 pub const HOLD_UNTIL: &str = "keep-awake.hold-until";
 
+pub const PANEL_ON_TOP_DEFAULT: bool = true;
 pub const ALLOW_DISPLAY_SLEEP_DEFAULT: bool = true;
 pub const RESTORE_ON_START_DEFAULT: bool = false;
 pub const MOUSE_JIGGLE_DEFAULT: bool = false;

@@ -40,6 +40,7 @@ pub mod qobject {
         #[qproperty(QString, settings_path)]
         #[qproperty(QString, version)]
         #[qproperty(i32, placement)]
+        #[qproperty(bool, panel_on_top)]
         #[qproperty(i32, panel_width)]
         #[qproperty(QString, panel_screen)]
         #[qproperty(bool, at_bottom)]
@@ -101,6 +102,8 @@ pub mod qobject {
         fn report_screens(self: Pin<&mut KavvernaPanel>, report: &QString);
         #[qinvokable]
         fn choose_placement(self: Pin<&mut KavvernaPanel>, mode: i32, width: i32, height: i32);
+        #[qinvokable]
+        fn choose_panel_on_top(self: Pin<&mut KavvernaPanel>, on_top: bool);
         #[qinvokable]
         fn drag_begun(self: Pin<&mut KavvernaPanel>, width: i32, height: i32);
         #[qinvokable]
@@ -176,6 +179,7 @@ pub struct KavvernaPanelRust {
     settings_path: QString,
     version: QString,
     placement: i32,
+    panel_on_top: bool,
     panel_width: i32,
     panel_screen: QString,
     at_bottom: bool,
@@ -246,6 +250,7 @@ impl Default for KavvernaPanelRust {
                 settings::integer_at(settings::PLACEMENT, settings::PLACEMENT_DEFAULT),
                 0,
             ),
+            panel_on_top: settings::bool_at(settings::PANEL_ON_TOP, settings::PANEL_ON_TOP_DEFAULT),
             panel_width: panel_anchor::WIDTH,
             panel_screen: QString::default(),
             at_bottom: true,
@@ -438,6 +443,13 @@ impl qobject::KavvernaPanel {
             held.retain(|(known, _, _)| *known != name);
             held.push((name, width, height));
         }
+    }
+
+    /// The layer is read when the surface maps, so a change made while the panel is open
+    /// takes hold on the next open; the panel remaps on every one.
+    fn choose_panel_on_top(mut self: Pin<&mut Self>, on_top: bool) {
+        settings::put_bool(settings::PANEL_ON_TOP, on_top);
+        self.as_mut().set_panel_on_top(on_top);
     }
 
     fn choose_placement(mut self: Pin<&mut Self>, mode: i32, width: i32, height: i32) {

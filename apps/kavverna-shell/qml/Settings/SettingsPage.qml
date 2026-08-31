@@ -43,6 +43,14 @@ ColumnLayout {
             onPicked: (value) => page.hub.choose_placement(value, Window.width, Window.height)
         }
 
+        SettingRow {
+            theme: page.theme
+            title: "Stay above every window"
+            detail: "On, the panel floats over everything, fullscreen included. Off, it sits with ordinary panels and fullscreen applications cover it. Takes hold the next time the panel opens."
+            on: page.hub.panel_on_top
+            onToggled: (value) => page.hub.choose_panel_on_top(value)
+        }
+
         Label {
             Layout.fillWidth: true
             text: "Drag the panel by its header to move it."

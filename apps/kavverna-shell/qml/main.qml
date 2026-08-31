@@ -75,7 +75,11 @@ Window {
                                               : LayerShell.Window.AnchorTop)
                              | (hub.at_right ? LayerShell.Window.AnchorRight
                                              : LayerShell.Window.AnchorLeft)
-    LayerShell.Window.layer: LayerShell.Window.LayerOverlay
+    // Overlay floats over everything, fullscreen included, the way the panel always has.
+    // The ordinary panel layer lets fullscreen applications cover it instead. The layer is
+    // read when the surface maps, and the panel maps on every open.
+    LayerShell.Window.layer: hub.panel_on_top ? LayerShell.Window.LayerOverlay
+                                              : LayerShell.Window.LayerTop
     LayerShell.Window.margins: Qt.rect(hub.margin_left, hub.margin_top,
                                        hub.margin_right, hub.margin_bottom)
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityOnDemand
