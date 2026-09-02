@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 /// The shelf holds things someone deliberately parked, so it refuses new drops when full
@@ -81,6 +82,42 @@ impl Item {
             ItemKind::Link { url, .. } => host_of(url).unwrap_or_default().to_owned(),
         }
     }
+
+    /// What the item holds, for a closer look than the row gives: the path, the address, or
+    /// the text itself. Only staged text is read, and only a prefix: a dropped selection can
+    /// be any size and this runs on the interface thread. The character cap stays under a
+    /// quarter of the byte cap so a sequence cut at the byte boundary is never shown.
+    pub fn glance(&self) -> String {
+        const MOST_BYTES: u64 = 16 * 1024;
+        const MOST_CHARACTERS: usize = 1_000;
+        const _: () = assert!(4 * MOST_CHARACTERS as u64 <= MOST_BYTES);
+
+        match &self.kind {
+            ItemKind::File { path, .. } if path.exists() => path.display().to_string(),
+            ItemKind::File { path, .. } => {
+                format!("{}\n\nThis file is no longer on disk.", path.display())
+            }
+            ItemKind::Link { url, .. } => url.clone(),
+            ItemKind::Text { staged, preview } => {
+                let mut bytes = Vec::new();
+                let read = std::fs::File::open(staged)
+                    .and_then(|file| file.take(MOST_BYTES).read_to_end(&mut bytes));
+                match read {
+                    Ok(_) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        return format!("{preview}\n\nThe staged text is no longer on disk.");
+                    }
+                    Err(_) => return format!("{preview}\n\nThe staged text could not be read."),
+                }
+                let text = String::from_utf8_lossy(&bytes);
+                let mut shown: String = text.chars().take(MOST_CHARACTERS).collect();
+                if text.chars().nth(MOST_CHARACTERS).is_some() {
+                    shown.push('…');
+                }
+                shown
+            }
+        }
+    }
 }
 
 fn host_of(url: &str) -> Option<&str> {
@@ -145,5 +182,44 @@ mod tests {
             staged.owned_blob().map(|p| p.display().to_string()).as_deref(),
             Some("/data/items/abc.png")
         );
+    }
+
+    #[test]
+    fn a_glance_at_long_text_is_bounded_and_a_missing_one_is_explained() {
+        let room = tempfile::tempdir().unwrap();
+        let path = room.path().join("long.txt");
+        std::fs::write(&path, "€".repeat(20_000)).unwrap();
+        let item = Item {
+            id: 1,
+            kind: ItemKind::Text { staged: path.clone(), preview: "€€€".into() },
+            bytes: Some(60_000),
+            image: None,
+        };
+        let glance = item.glance();
+        assert_eq!(glance.chars().count(), 1_001);
+        assert!(glance.starts_with("€€€") && glance.ends_with('…'));
+        assert!(!glance.contains('\u{FFFD}'));
+
+        std::fs::write(&path, "short").unwrap();
+        assert_eq!(item.glance(), "short");
+
+        std::fs::remove_file(path).unwrap();
+        assert!(item.glance().contains("no longer on disk"));
+    }
+
+    #[test]
+    fn a_glance_at_a_missing_file_keeps_the_path_and_explains() {
+        let item = Item {
+            id: 2,
+            kind: ItemKind::File {
+                path: "/tmp/kavverna-file-that-is-not-there".into(),
+                staged: false,
+            },
+            bytes: None,
+            image: None,
+        };
+        let glance = item.glance();
+        assert!(glance.contains("/tmp/kavverna-file-that-is-not-there"));
+        assert!(glance.contains("no longer on disk"));
     }
 }

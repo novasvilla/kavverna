@@ -23,6 +23,11 @@ Rectangle {
 
     /// What the running drag carries, so the finish knows what left.
     property string draggedIds: ""
+    /// A closer look at the item, read when the pointer arrives and shown under the row
+    /// until it leaves or a drag begins. Inline rather than a popup: the row grows to hold
+    /// it, so nothing floats over other rows and the pointer stays on the row it is reading.
+    property string glance: ""
+    readonly property bool glancing: hover.hovered && row.glance.length > 0
 
     implicitHeight: line.implicitHeight + 12
     radius: 8
@@ -40,7 +45,10 @@ Rectangle {
         row.draggedIds = ""
     }
 
-    HoverHandler { id: hover }
+    HoverHandler {
+        id: hover
+        onHoveredChanged: row.glance = hovered ? row.shelf.glance_of(row.entryId) : ""
+    }
 
     MouseArea {
         anchors.fill: parent
@@ -89,6 +97,8 @@ Rectangle {
             row.Drag.mimeData = mime
             // The drag carries a picture of the row, the way a native file drag looks, and
             // begins through the property: startDrag() never started one on this platform.
+            // The glance is folded away first so the picture is the row alone.
+            row.glance = ""
             row.grabToImage((grabbed) => {
                 row.Drag.imageSource = grabbed.url
                 row.Drag.active = true
@@ -233,6 +243,30 @@ Rectangle {
                     }
                 }
             }
+        }
+
+        Image {
+            id: closer
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.min(160, implicitHeight)
+            visible: row.glancing && row.shelf.row_thumbs[row.at] !== ""
+            source: visible ? row.shelf.row_thumbs[row.at] : ""
+            sourceSize: Qt.size(400, 320)
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+        }
+
+        Label {
+            Layout.fillWidth: true
+            visible: row.glancing
+            text: row.glance
+            // Whatever was dropped is shown as text, never rendered or fetched through.
+            textFormat: Text.PlainText
+            font.pixelSize: row.theme.textSmall
+            color: row.theme.secondaryText
+            wrapMode: Text.WrapAnywhere
+            maximumLineCount: 8
+            elide: Text.ElideRight
         }
     }
 }

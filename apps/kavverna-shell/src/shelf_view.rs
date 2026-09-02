@@ -82,6 +82,8 @@ pub mod qobject {
         #[qinvokable]
         fn path_of(self: Pin<&mut ShelfView>, id: i32) -> QString;
         #[qinvokable]
+        fn glance_of(self: Pin<&mut ShelfView>, id: i32) -> QString;
+        #[qinvokable]
         fn reveal(self: Pin<&mut ShelfView>, id: i32);
         #[qinvokable]
         fn choose_edge_strip(self: Pin<&mut ShelfView>, on: bool);
@@ -462,6 +464,15 @@ impl qobject::ShelfView {
         })
         .flatten()
         .unwrap_or_default()
+    }
+
+    fn glance_of(self: Pin<&mut Self>, id: i32) -> QString {
+        let Ok(id) = u64::try_from(id) else {
+            return QString::default();
+        };
+        shelf_state::with(|shelf| shelf.item(id).map(|item| QString::from(&item.glance())))
+            .flatten()
+            .unwrap_or_default()
     }
 
     /// The file manager's own D-Bus door, on a thread of its own: activating one can take a
