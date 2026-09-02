@@ -1,3 +1,95 @@
+use std::path::{Path, PathBuf};
+
+/// What the machine calls its processor, and how much of it there is. Read once: a chip does
+/// not change while the program runs.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Processor {
+    /// The marketing name, tidied of the padding vendors put in it.
+    pub name: String,
+    pub cores: usize,
+    pub threads: usize,
+    clocks: Vec<PathBuf>,
+}
+
+impl Processor {
+    pub fn discover() -> Self {
+        Self::discover_in(Path::new("/proc"), Path::new("/sys/devices/system/cpu"))
+    }
+
+    pub fn discover_in(proc_root: &Path, cpu_root: &Path) -> Self {
+        let described = std::fs::read_to_string(proc_root.join("cpuinfo")).unwrap_or_default();
+        let (name, cores, threads) = describe(&described);
+        Self { name, cores, threads, clocks: clock_files(cpu_root) }
+    }
+
+    /// The fastest core right now, which is the number a boost clock is about. `None` when the
+    /// kernel exposes no frequency for this processor, as it does not inside a container.
+    pub fn speed_ghz(&self) -> Option<f32> {
+        self.clocks
+            .iter()
+            .filter_map(|path| std::fs::read_to_string(path).ok())
+            .filter_map(|value| value.trim().parse::<f64>().ok())
+            .max_by(f64::total_cmp)
+            .map(|kilohertz| (kilohertz / 1_000_000.0) as f32)
+    }
+}
+
+/// `scaling_cur_freq` is what the governor asked for; `cpuinfo_cur_freq` is what the hardware
+/// reports and needs privileges on some drivers, so the governor's figure is the one every
+/// machine can read.
+fn clock_files(cpu_root: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(cpu_root) else {
+        return Vec::new();
+    };
+    let mut found: Vec<PathBuf> = entries
+        .flatten()
+        .map(|entry| entry.path().join("cpufreq/scaling_cur_freq"))
+        .filter(|path| path.exists())
+        .collect();
+    found.sort();
+    found
+}
+
+/// Vendors pad the name with their own words: "AMD Ryzen 7 9700X 8-Core Processor" says the
+/// core count twice over once the count is shown beside it, and Intel writes "(R)" and "CPU".
+fn describe(cpuinfo: &str) -> (String, usize, usize) {
+    let field = |name: &str| {
+        cpuinfo.lines().find_map(|line| {
+            let (key, value) = line.split_once(':')?;
+            key.trim().eq(name).then(|| value.trim().to_owned())
+        })
+    };
+    let threads = cpuinfo.lines().filter(|line| line.starts_with("processor")).count();
+    let cores = field("cpu cores").and_then(|value| value.parse().ok()).unwrap_or(threads);
+    let name = field("model name").map(|name| tidy(&name)).unwrap_or_default();
+    (name, cores, threads)
+}
+
+fn tidy(name: &str) -> String {
+    let mut kept: Vec<&str> = Vec::new();
+    for word in name.split_whitespace() {
+        let plain = word.trim_end_matches("(R)").trim_end_matches("(TM)").trim_end_matches("(tm)");
+        let padding = plain.eq_ignore_ascii_case("cpu")
+            || plain.eq_ignore_ascii_case("processor")
+            || plain.ends_with("-Core")
+            || plain.eq_ignore_ascii_case("with");
+        if padding {
+            if plain.eq_ignore_ascii_case("with") {
+                break;
+            }
+            continue;
+        }
+        if !plain.is_empty() {
+            kept.push(plain);
+        }
+    }
+    let name = kept.join(" ");
+    match name.split_once(" @ ") {
+        Some((before, _)) => before.trim().to_owned(),
+        None => name,
+    }
+}
+
 /// Cumulative jiffies since boot. Usage is only meaningful as the difference between two
 /// readings, so a single sample says nothing on its own.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -126,5 +218,50 @@ ctxt 987654
 
         assert_eq!(waiting.busy, 0);
         assert_eq!(waiting.idle, 1000);
+    }
+    /// The line every AMD chip carries, and the shape Intel writes instead.
+    #[test]
+    fn a_processor_is_named_the_way_a_person_would_name_it() {
+        let amd = "processor\t: 0\nmodel name\t: AMD Ryzen 7 9700X 8-Core Processor\ncpu cores\t: 8\nprocessor\t: 1\n";
+        assert_eq!(describe(amd), ("AMD Ryzen 7 9700X".into(), 8, 2));
+
+        let intel = "processor\t: 0\nmodel name\t: Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz\ncpu cores\t: 6\n";
+        assert_eq!(describe(intel), ("Intel Core i7-9750H".into(), 6, 1));
+
+        let graphics = "processor\t: 0\nmodel name\t: AMD Ryzen 5 5600G with Radeon Graphics\ncpu cores\t: 6\n";
+        assert_eq!(describe(graphics).0, "AMD Ryzen 5 5600G");
+    }
+
+    #[test]
+    fn a_machine_that_says_nothing_about_its_processor_is_left_blank() {
+        assert_eq!(describe(""), (String::new(), 0, 0));
+        assert_eq!(describe("processor\t: 0\nprocessor\t: 1\n"), (String::new(), 2, 2));
+    }
+
+    /// The kernel exposes one clock file per core, and the fastest is the boost figure.
+    #[test]
+    fn the_speed_is_the_fastest_core_the_kernel_reports() {
+        let room = tempfile::tempdir().unwrap();
+        let proc_root = room.path().join("proc");
+        let cpu_root = room.path().join("cpu");
+        std::fs::create_dir_all(&proc_root).unwrap();
+        std::fs::write(
+            proc_root.join("cpuinfo"),
+            "processor\t: 0\nmodel name\t: AMD Ryzen 7 9700X 8-Core Processor\ncpu cores\t: 8\n",
+        )
+        .unwrap();
+        for (core, kilohertz) in [("cpu0", "4200000"), ("cpu1", "5558825")] {
+            let dir = cpu_root.join(core).join("cpufreq");
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("scaling_cur_freq"), kilohertz).unwrap();
+        }
+
+        let processor = Processor::discover_in(&proc_root, &cpu_root);
+        assert_eq!(processor.name, "AMD Ryzen 7 9700X");
+        assert_eq!((processor.cores, processor.threads), (8, 1));
+        assert!(processor.speed_ghz().is_some_and(|ghz| (ghz - 5.558825).abs() < 0.001));
+
+        let bare = Processor::discover_in(&proc_root, &room.path().join("nothing"));
+        assert_eq!(bare.speed_ghz(), None);
     }
 }

@@ -21,6 +21,8 @@ pub mod qobject {
         #[qproperty(f32, cpu_load)]
         #[qproperty(QString, cpu_load_text)]
         #[qproperty(QString, cpu_temperature_text)]
+        #[qproperty(QString, processor_name)]
+        #[qproperty(QString, processor_detail)]
         #[qproperty(QList_f32, core_loads)]
         #[qproperty(QList_f32, cpu_history)]
         #[qproperty(f32, memory_used)]
@@ -61,6 +63,8 @@ pub struct VitalsViewRust {
     cpu_load: f32,
     cpu_load_text: QString,
     cpu_temperature_text: QString,
+    processor_name: QString,
+    processor_detail: QString,
     core_loads: QList<f32>,
     cpu_history: QList<f32>,
     memory_used: f32,
@@ -124,6 +128,23 @@ impl qobject::VitalsView {
             Some(celsius) => format!("{celsius:.0} C"),
             None => "--".into(),
         }));
+
+        let processor = vitals_state::processor();
+        self.as_mut().set_processor_name(QString::from(&processor.name));
+        // Cores and threads say the same thing on a chip without simultaneous threading, and
+        // saying it twice reads as a mistake.
+        let mut detail = match (processor.cores, processor.threads) {
+            (0, 0) => String::new(),
+            (cores, threads) if cores == threads => format!("{cores} cores"),
+            (cores, threads) => format!("{cores} cores, {threads} threads"),
+        };
+        if let Some(ghz) = vitals.cpu_speed {
+            if !detail.is_empty() {
+                detail.push_str("  ·  ");
+            }
+            detail.push_str(&format!("{ghz:.2} GHz"));
+        }
+        self.as_mut().set_processor_detail(QString::from(&detail));
 
         let mut cores = QList::<f32>::default();
         for load in &vitals.core_loads {

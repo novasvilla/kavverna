@@ -79,6 +79,29 @@ ColumnLayout {
         theme: section.theme
         spacing: 10
 
+        ColumnLayout {
+            Layout.fillWidth: true
+            visible: section.vitals.processor_name.length > 0
+            spacing: 1
+
+            Label {
+                Layout.fillWidth: true
+                text: section.vitals.processor_name
+                font.pixelSize: section.theme.textBody
+                font.bold: true
+                color: section.theme.primaryText
+                elide: Text.ElideRight
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: section.vitals.processor_detail
+                font.pixelSize: section.theme.textFine
+                color: section.theme.mutedText
+                elide: Text.ElideRight
+            }
+        }
+
         Meter {
             theme: section.theme
             label: "CPU  ·  " + section.vitals.cpu_temperature_text

@@ -1,4 +1,5 @@
-//! Reading what the machine is doing: processor, memory, graphics and temperatures.
+//! Reading what the machine is and what it is doing: the processor it names itself after, its
+//! load and speed, memory, graphics and temperatures.
 
 mod graphics;
 mod memory;
@@ -12,7 +13,7 @@ pub use memory::{
     parse_meminfo, parse_mm_stat, parse_pressure,
 };
 pub use nvidia::NvidiaCards;
-pub use processor::{CpuTicks, ProcessorTicks, parse_stat};
+pub use processor::{CpuTicks, Processor, ProcessorTicks, parse_stat};
 pub use thermal::{Sensor, Thermometer, parse_label};
 
 use std::time::Instant;
@@ -22,6 +23,8 @@ pub struct Vitals {
     pub cpu_load: Option<f32>,
     pub core_loads: Vec<f32>,
     pub cpu_temperature: Option<f32>,
+    /// The fastest core at this moment, in GHz.
+    pub cpu_speed: Option<f32>,
     pub memory: MemoryReading,
     pub pressure: MemoryPressure,
     pub compressed_swap: Vec<CompressedSwap>,
@@ -32,6 +35,7 @@ pub struct Vitals {
 /// Holds the previous processor reading, because load is a difference rather than a value.
 pub struct Vitalsigns {
     previous: Option<ProcessorTicks>,
+    processor: Processor,
     thermometer: Thermometer,
     nvidia: Option<NvidiaCards>,
     amd: Vec<SysfsCard>,
@@ -41,10 +45,16 @@ impl Vitalsigns {
     pub fn open() -> Self {
         Self {
             previous: None,
+            processor: Processor::discover(),
             thermometer: Thermometer::discover(),
             nvidia: NvidiaCards::open(),
             amd: discover_sysfs_cards(),
         }
+    }
+
+    /// What the machine calls its processor, read once when the sampler opened.
+    pub fn processor(&self) -> &Processor {
+        &self.processor
     }
 
     /// The first call cannot report processor load: there is nothing to compare against.
@@ -77,6 +87,7 @@ impl Vitalsigns {
             cpu_load,
             core_loads,
             cpu_temperature: self.thermometer.processor_celsius(),
+            cpu_speed: self.processor.speed_ghz(),
             memory: std::fs::read_to_string("/proc/meminfo")
                 .map(|contents| parse_meminfo(&contents))
                 .unwrap_or_default(),

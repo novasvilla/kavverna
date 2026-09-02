@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
-use system_monitor::{Vitals, Vitalsigns};
+use system_monitor::{Processor, Vitals, Vitalsigns};
 
 /// Two minutes at the sampler's own tick. Long enough to show the spike that was over before
 /// the panel was opened, short enough that a panel left open all day is not drawing an hour of
@@ -9,6 +9,8 @@ use system_monitor::{Vitals, Vitalsigns};
 const KEPT: usize = 60;
 
 static LATEST: Mutex<Option<Vitals>> = Mutex::new(None);
+/// What the machine calls its processor, read once when the sampler opens and never again.
+static PROCESSOR: Mutex<Option<Processor>> = Mutex::new(None);
 static HISTORY: Mutex<Option<History>> = Mutex::new(None);
 
 /// What each meter looked like a moment ago. Kept here rather than in `system-monitor`, which
@@ -32,6 +34,10 @@ fn history_lock() -> MutexGuard<'static, Option<History>> {
 
 pub fn get() -> Vitals {
     lock().clone().unwrap_or_default()
+}
+
+pub fn processor() -> Processor {
+    PROCESSOR.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone().unwrap_or_default()
 }
 
 pub fn history() -> History {
@@ -63,7 +69,9 @@ fn record(history: &mut History, reading: &Vitals) {
 /// establishes a baseline.
 pub fn run(interval: Duration, on_change: impl Fn()) {
     let mut vitals = Vitalsigns::open();
-    tracing::info!("vitals sampler started");
+    *PROCESSOR.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) =
+        Some(vitals.processor().clone());
+    tracing::info!(processor = %vitals.processor().name, "vitals sampler started");
 
     loop {
         let reading = vitals.sample();
