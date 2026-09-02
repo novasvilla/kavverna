@@ -89,7 +89,8 @@ not. See [CREDITS.md](CREDITS.md).
 
 - **Volume per application.** One row per application rather than per stream, because a single
   application can hold several and PipeWire gives them nothing to tell apart. The row shows its
-  loudest stream and a change reaches all of them.
+  loudest stream and a change reaches all of them. The percentage beside a slider can be
+  typed: click it, type the figure, Enter. Outputs stop at 100 and applications at 200.
 - **Named and drawn by what it is, not by what it was built with.** A stream calls itself SDL
   Application, Chromium or electron; the desktop knows it as Dota 2 or Vesktop and carries its
   icon. Three ways in: the identity Steam hands a game, the identity a program announces through
@@ -113,6 +114,8 @@ not. See [CREDITS.md](CREDITS.md).
 
 ### Monitoring
 
+- **The processor by name**, its cores and threads, and the speed of its fastest core right
+  now, read from the governor rather than from a privileged table.
 - **Processor** load overall and a bar per thread, with temperature read from the chip by name
   rather than by index, since those move between boots.
 - **The last two minutes behind each reading**, drawn as a trace, so the spike that was over
@@ -136,7 +139,10 @@ not. See [CREDITS.md](CREDITS.md).
 - **Empty the clipboard on its own**, on a timer, when the machine suspends or when the screen
   locks. Saved entries are left alone, and it works with the history switched off.
 - **Take the tracking out of copied links**, campaign and click parameters removed the moment a
-  link arrives, and everything else left byte for byte as it was.
+  link arrives, and everything else left byte for byte as it was. Every rule is listed under
+  its site with a switch of its own, a name of your own can apply everywhere or to one site
+  and its subdomains, and switching a name off for one site leaves it alone everywhere else.
+  The clipboard page names what the last clean took out.
 - **Turn what was copied into something else**: plain text, laid out JSON, or Markdown made
   from the copy's own HTML, read at the moment you ask rather than stored. The result is shown
   first with a sentence measuring it, the clipboard changes only when you take it, and the
@@ -156,6 +162,9 @@ not. See [CREDITS.md](CREDITS.md).
   that appears when dragging starts.
 - **Per item**: open, reveal in the file manager, copy the path, take it off. Items whose file
   has meanwhile vanished dim and say so instead of offering a dead drag.
+- **A closer look on hover.** A row opens underneath itself: an image at a readable size, the
+  first thousand characters of a dropped text, a link or a path in full, and a file that has
+  gone from disk says so.
 - **It lives where you put it.** Drag the shelf by its header, with the same live outline the
   panel shows, and it reopens there; pick which edge the strip and the shelf hang from until
   then.
@@ -184,12 +193,20 @@ not. See [CREDITS.md](CREDITS.md).
   dark works the same in all three.
 - **The panel opens where it is useful.** Beside the tray icon by default, wherever your bar
   lives; or wherever you last dragged it, one spot per screen; or the old corner. Drag it by
-  its header, and an outline the exact size of the panel shows where it will land.
+  its header, and an outline the exact size of the panel shows where it will land. A screen
+  that leaves sends the panel and the shelf to the first still connected, and the spot kept on
+  the one that left waits for its return.
+- **Choose whether the panel floats over everything.** Above every window, fullscreen included,
+  is how it has always been; the ordinary panel layer lets fullscreen applications cover it and
+  closes the panel once another window takes the focus.
 - **A tray menu that reaches the whole suite**, not just keep awake: mute every microphone, move
   to the next output, open the history.
 - **A shortcut for every utility worth reaching blind**: the panel, the clipboard, the shelf,
   keep awake, mute every microphone, the next output. Registered through the desktop, so System
   Settings lists them beside every other shortcut and rebinding is done there.
+- **Settings are an index, not a scroll.** Ten groups, closed, each saying in a line what it
+  holds, and one open at a time, so the last setting is a tap away rather than a page of
+  scrolling.
 - **Each utility says what it costs**: nothing at rest, reads on a timer, watches the
   clipboard. The label sits beside the switch, so the choice is made against a fact.
 - **`--selftest`** reports what the machine offers of everything Kavverna relies on, one line

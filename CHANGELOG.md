@@ -3,6 +3,52 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## 0.5.0
+
+### Added
+
+- **Every percentage in Sound can be typed.** The figure beside a slider reads as plain text
+  until it is clicked, then holds the number selected so the next keystroke replaces it.
+  Enter applies, Escape puts the old figure back, outputs stop at 100 and applications at 200,
+  and a figure past the range is refused where it stands rather than quietly dropped.
+- **Monitoring names the machine.** The processor card opens with what the chip calls itself,
+  its cores and threads, and the speed of its fastest core right now, read from the governor
+  so no privilege is needed. Memory speed is not there: it lives in SMBIOS, which is readable
+  only by root on this kind of system, and a figure Kavverna cannot read is a figure it will
+  not show.
+- **A settings page that fits on one screen.** Ten groups, closed, each saying in a line what
+  it holds, and one open at a time. The seventy-odd Clean URL rules stopped being a wall: the
+  list shows what is switched off and what you added, and a search field reaches the rest.
+- **Clean URL rules can be seen and switched.** Every built-in rule is listed under its site
+  with a switch of its own, the campaign family answering for the `utm_` names nobody listed.
+  A name of your own applies everywhere or to one site and its subdomains, and switching a
+  name off for one site leaves it alone everywhere else. The clipboard page names what the
+  last clean took out of a link.
+- **A closer look at what is on the shelf.** Hovering a row opens it underneath: an image at a
+  readable size, the first thousand characters of a dropped text, a link or a path in full,
+  and a file that has gone from disk says so.
+
+### Fixed
+
+- **A drag is never interrupted.** Pressing the header maps the drag ghost, which moves the
+  focus about, and an ordinary-layer panel took that for the focus leaving and closed itself
+  under the hand. It stays for as long as a drag is running.
+- **A screen that leaves takes nothing with it.** The panel and the shelf move to the first
+  screen still connected, and the spot remembered on the one that left waits for its return.
+- **An ordinary-layer panel gets out of the way.** With Stay above every window off, the panel
+  closes once another window takes the focus, after a short recheck that lets the transient
+  focus changes of mapping settle, and the tray click that took the focus is not mistaken for
+  a request to reopen. The setting remaps the panel at once rather than on the next open.
+
+### Changed
+
+- **The Steam client wears its own name.** The desktop entry Steam writes for a game runs the
+  Steam binary with the game's address, and the first such entry read used to lend the client
+  the game's name and icon. Entries that hand a launcher an address name nothing now, and so do
+  entries hidden from menus, so an editor is no longer "Visual Studio Code - URL Handler".
+  What the desktop knows about a program moved into a crate of its own, with its reasons and
+  its tests, on the way.
+
 ## 0.4.2
 
 ### Added
