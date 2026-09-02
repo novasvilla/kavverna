@@ -36,6 +36,13 @@ pub fn cleans_links() -> bool {
     settings::bool_at(settings::CLEAN_LINKS, settings::CLEAN_LINKS_DEFAULT)
 }
 
+pub fn clean_rules() -> link_cleaner::Rules {
+    link_cleaner::Rules::from_entries(
+        &settings::texts_at(settings::CLEAN_URL_ADDED_RULES).unwrap_or_default(),
+        &settings::texts_at(settings::CLEAN_URL_DISABLED_RULES).unwrap_or_default(),
+    )
+}
+
 pub fn clears_on_suspend() -> bool {
     settings::bool_at(settings::CLEAR_ON_SUSPEND, settings::CLEAR_ON_SUSPEND_DEFAULT)
 }
@@ -75,7 +82,7 @@ pub fn run(on_change: impl Fn()) {
         match (wanted(), running.is_some()) {
             (true, false) => {
                 applied = read_settings();
-                match History::start(&root, applied) {
+                match History::start(&root, applied.clone()) {
                     Ok((history, snapshots)) => {
                         set_commands(Some(history.commands()));
                         running = Some((history, snapshots));
@@ -104,8 +111,8 @@ pub fn run(on_change: impl Fn()) {
 
         let current = read_settings();
         if current != applied {
+            history.send(Command::Apply(current.clone()));
             applied = current;
-            history.send(Command::Apply(current));
         }
 
         match snapshots.recv_timeout(POLL) {
@@ -135,6 +142,7 @@ fn read_settings() -> Settings {
     Settings {
         keep_history: keeps_history(),
         clean_links: cleans_links(),
+        rules: clean_rules(),
         clear_after: clear_after(),
         limit: u32::try_from(settings::integer_at(
             settings::CLIPBOARD_LIMIT,

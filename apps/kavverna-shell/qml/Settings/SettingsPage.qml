@@ -18,6 +18,7 @@ ColumnLayout {
     /// One group open at a time, so the page is an index that unfolds in place rather than a
     /// column somebody has to scroll past to reach the last setting.
     property string openSection: ""
+    property bool cleanRulesOpen: false
 
     Layout.fillWidth: true
     spacing: 12
@@ -355,6 +356,180 @@ ColumnLayout {
             detail: "Removes campaign and click parameters the moment a link reaches the clipboard, and leaves everything else exactly as it was. Never touches a copy that carries formatting or files."
             on: page.clipboard.clean_links
             onToggled: (value) => page.clipboard.choose_clean_links(value)
+        }
+
+        PillButton {
+            theme: page.theme
+            Layout.fillWidth: true
+            visible: page.shows("clean-url")
+            text: page.cleanRulesOpen ? "Hide URL rules" : "Edit URL rules…"
+            onClicked: page.cleanRulesOpen = !page.cleanRulesOpen
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            visible: page.shows("clean-url") && page.cleanRulesOpen
+            spacing: page.theme.gapSnug
+
+            /// Seventy-odd built-in rules are a wall rather than a list, so the ones nobody
+            /// has touched stay out of the way: what is shown is what was switched off, what
+            /// was added by hand, and whatever the search finds.
+            readonly property var shown: {
+                const found = []
+                const wanted = ruleSearch.text.trim().toLowerCase()
+                for (let at = 0; at < page.clipboard.clean_rule_parameters.length; at += 1) {
+                    const name = page.clipboard.clean_rule_parameters[at].toLowerCase()
+                    const site = page.clipboard.clean_rule_scopes[at].toLowerCase()
+                    const off = !page.clipboard.clean_rule_enabled[at]
+                    const mine = page.clipboard.clean_rule_custom[at]
+                    if (wanted.length > 0 ? (name.indexOf(wanted) >= 0 || site.indexOf(wanted) >= 0)
+                                          : (off || mine)) {
+                        found.push(at)
+                    }
+                }
+                return found
+            }
+
+            TextField {
+                id: ruleSearch
+                Layout.fillWidth: true
+                placeholderText: "Search " + page.clipboard.clean_rule_parameters.length
+                                 + " rules by name or site"
+                placeholderTextColor: page.theme.mutedText
+                font.pixelSize: page.theme.textBody
+                color: page.theme.primaryText
+                selectionColor: page.theme.selected
+                selectedTextColor: page.theme.primaryText
+                background: Rectangle {
+                    radius: page.theme.radiusSmall
+                    color: page.theme.sunken
+                    border.width: ruleSearch.activeFocus ? 1 : 0
+                    border.color: page.theme.accent
+                }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: ruleSearch.text.trim().length > 0
+                      ? parent.shown.length + " found"
+                      : (parent.shown.length === 0
+                         ? "Every rule is on. Search to find one and switch it off."
+                         : "Switched off or added by you. Search to reach the rest.")
+                font.pixelSize: page.theme.textSmall
+                color: page.theme.secondaryText
+                wrapMode: Text.WordWrap
+            }
+
+            Repeater {
+                model: parent.shown
+
+                delegate: RowLayout {
+                    id: ruleRow
+                    required property int modelData
+                    readonly property bool yours:
+                        modelData < page.clipboard.clean_rule_custom.length
+                        && page.clipboard.clean_rule_custom[modelData]
+
+                    Layout.fillWidth: true
+                    spacing: page.theme.gapSnug
+
+                    Tick {
+                        Layout.fillWidth: true
+                        theme: page.theme
+                        text: page.clipboard.clean_rule_scopes[ruleRow.modelData] + " · "
+                              + page.clipboard.clean_rule_parameters[ruleRow.modelData]
+                        // A click writes the box itself and would drop a plain binding; the
+                        // rows move as rules are added and searched, and the box would then
+                        // sit beside a different rule.
+                        Binding on checked {
+                            value: ruleRow.modelData < page.clipboard.clean_rule_enabled.length
+                                   && page.clipboard.clean_rule_enabled[ruleRow.modelData]
+                        }
+                        onToggled: page.clipboard.toggle_clean_rule(ruleRow.modelData, checked)
+                    }
+
+                    IconButton {
+                        theme: page.theme
+                        source: "edit-delete"
+                        size: 12
+                        visible: ruleRow.yours
+                        ToolTip.visible: hovered
+                        ToolTip.text: "Remove this rule"
+                        onClicked: page.clipboard.remove_clean_rule(ruleRow.modelData)
+                    }
+                }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                Layout.topMargin: page.theme.gapSnug
+                text: "A site's rules reach its subdomains and nobody else's, so switching a "
+                      + "name off for one site leaves it alone everywhere else."
+                font.pixelSize: page.theme.textFine
+                color: page.theme.mutedText
+                wrapMode: Text.WordWrap
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: page.theme.gapSnug
+
+                TextField {
+                    id: cleanDomain
+                    Layout.fillWidth: true
+                    placeholderText: "Site, or empty for every site"
+                    placeholderTextColor: page.theme.mutedText
+                    font.pixelSize: page.theme.textBody
+                    color: page.theme.primaryText
+                    selectionColor: page.theme.selected
+                    selectedTextColor: page.theme.primaryText
+                    background: Rectangle {
+                        radius: page.theme.radiusSmall
+                        color: page.theme.sunken
+                        border.width: cleanDomain.activeFocus ? 1 : 0
+                        border.color: page.theme.accent
+                    }
+                }
+
+                TextField {
+                    id: cleanParameter
+                    Layout.preferredWidth: 110
+                    placeholderText: "Parameter"
+                    placeholderTextColor: page.theme.mutedText
+                    font.pixelSize: page.theme.textBody
+                    color: page.theme.primaryText
+                    selectionColor: page.theme.selected
+                    selectedTextColor: page.theme.primaryText
+                    onAccepted: addRule.clicked()
+                    background: Rectangle {
+                        radius: page.theme.radiusSmall
+                        color: page.theme.sunken
+                        border.width: cleanParameter.activeFocus ? 1 : 0
+                        border.color: page.theme.accent
+                    }
+                }
+
+                PillButton {
+                    id: addRule
+                    theme: page.theme
+                    text: "Add"
+                    onClicked: {
+                        if (page.clipboard.add_clean_rule(cleanDomain.text, cleanParameter.text)) {
+                            cleanDomain.clear()
+                            cleanParameter.clear()
+                        }
+                    }
+                }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                visible: page.clipboard.clean_rule_notice.length > 0
+                text: page.clipboard.clean_rule_notice
+                font.pixelSize: page.theme.textSmall
+                color: page.theme.ember
+                wrapMode: Text.WordWrap
+            }
         }
 
         ChoiceRow {

@@ -39,6 +39,12 @@ pub mod qobject {
         #[qproperty(bool, clear_on_suspend)]
         #[qproperty(bool, clear_on_screen_lock)]
         #[qproperty(bool, clean_links)]
+        #[qproperty(QStringList, clean_rule_scopes)]
+        #[qproperty(QStringList, clean_rule_parameters)]
+        #[qproperty(QList_bool, clean_rule_enabled)]
+        #[qproperty(QList_bool, clean_rule_custom)]
+        #[qproperty(QString, clean_rule_notice)]
+        #[qproperty(QString, clean_notice)]
         #[qproperty(QString, transform_notice)]
         #[qproperty(QString, transform_preview)]
         #[qproperty(bool, can_transform)]
@@ -87,6 +93,16 @@ pub mod qobject {
         fn choose_clear_on_screen_lock(self: Pin<&mut ClipboardView>, on: bool);
         #[qinvokable]
         fn choose_clean_links(self: Pin<&mut ClipboardView>, on: bool);
+        #[qinvokable]
+        fn toggle_clean_rule(self: Pin<&mut ClipboardView>, index: i32, enabled: bool);
+        #[qinvokable]
+        fn add_clean_rule(
+            self: Pin<&mut ClipboardView>,
+            domain: &QString,
+            parameter: &QString,
+        ) -> bool;
+        #[qinvokable]
+        fn remove_clean_rule(self: Pin<&mut ClipboardView>, index: i32);
     }
 }
 
@@ -114,6 +130,12 @@ pub struct ClipboardViewRust {
     clear_on_suspend: bool,
     clear_on_screen_lock: bool,
     clean_links: bool,
+    clean_rule_scopes: QStringList,
+    clean_rule_parameters: QStringList,
+    clean_rule_enabled: QList<bool>,
+    clean_rule_custom: QList<bool>,
+    clean_rule_notice: QString,
+    clean_notice: QString,
     transform_notice: QString,
     transform_preview: QString,
     can_transform: bool,
@@ -198,6 +220,55 @@ impl qobject::ClipboardView {
         self.as_mut().set_clean_links(on);
     }
 
+    /// The rules live in settings and reach the clipboard thread the way every other clipboard
+    /// setting does, on its next poll; nothing here talks to that thread directly.
+    fn toggle_clean_rule(mut self: Pin<&mut Self>, index: i32, enabled: bool) {
+        let mut rules = clipboard_state::clean_rules();
+        let Some(rule) =
+            usize::try_from(index).ok().and_then(|at| rules.catalogue().get(at).cloned())
+        else {
+            return;
+        };
+        rules.set_enabled(&rule.scope, &rule.parameter, enabled);
+        settings::put_texts(settings::CLEAN_URL_DISABLED_RULES, &rules.disabled);
+        self.as_mut().set_clean_rule_notice(QString::default());
+        self.as_mut().apply_clean_rules();
+    }
+
+    fn add_clean_rule(mut self: Pin<&mut Self>, domain: &QString, parameter: &QString) -> bool {
+        let mut rules = clipboard_state::clean_rules();
+        let added = match rules.add(&domain.to_string(), &parameter.to_string()) {
+            Ok(()) => {
+                settings::put_texts(settings::CLEAN_URL_ADDED_RULES, &rules.added_entries());
+                self.as_mut().set_clean_rule_notice(QString::default());
+                true
+            }
+            Err(error) => {
+                self.as_mut().set_clean_rule_notice(QString::from(&error.to_string()));
+                false
+            }
+        };
+        self.as_mut().apply_clean_rules();
+        added
+    }
+
+    fn remove_clean_rule(mut self: Pin<&mut Self>, index: i32) {
+        let mut rules = clipboard_state::clean_rules();
+        let Some(rule) =
+            usize::try_from(index).ok().and_then(|at| rules.catalogue().get(at).cloned())
+        else {
+            return;
+        };
+        if !rule.custom {
+            return;
+        }
+        rules.remove(&rule.scope, &rule.parameter);
+        settings::put_texts(settings::CLEAN_URL_ADDED_RULES, &rules.added_entries());
+        settings::put_texts(settings::CLEAN_URL_DISABLED_RULES, &rules.disabled);
+        self.as_mut().set_clean_rule_notice(QString::default());
+        self.as_mut().apply_clean_rules();
+    }
+
     fn adopt_klipper_history(mut self: Pin<&mut Self>) {
         clipboard_state::send(Command::AdoptKlipperHistory);
         self.as_mut().set_klipper_waiting(0);
@@ -250,6 +321,13 @@ impl qobject::ClipboardView {
         self.as_mut().set_row_pinned(pinned);
         self.as_mut().set_row_times(times);
         self.as_mut().set_transform_notice(QString::from(&snapshot.notice));
+        self.as_mut().set_clean_notice(QString::from(&match snapshot.cleaned.as_slice() {
+            [] => String::new(),
+            [one] => format!("Took {one} out of the last link"),
+            [most @ .., last] => {
+                format!("Took {} and {last} out of the last link", most.join(", "))
+            }
+        }));
         self.as_mut().set_transform_preview(QString::from(&snapshot.preview));
         self.as_mut().set_can_transform(snapshot.can_transform);
         self.as_mut().set_can_markdown(snapshot.can_markdown);
@@ -276,6 +354,28 @@ impl qobject::ClipboardView {
         self.as_mut().set_clear_on_suspend(clipboard_state::clears_on_suspend());
         self.as_mut().set_clear_on_screen_lock(clipboard_state::clears_on_screen_lock());
         self.as_mut().set_clean_links(clipboard_state::cleans_links());
+        self.as_mut().apply_clean_rules();
+    }
+
+    fn apply_clean_rules(mut self: Pin<&mut Self>) {
+        let mut scopes = QStringList::default();
+        let mut parameters = QStringList::default();
+        let mut enabled = QList::<bool>::default();
+        let mut custom = QList::<bool>::default();
+        for rule in clipboard_state::clean_rules().catalogue() {
+            scopes.append(QString::from(if rule.scope.is_empty() {
+                "Every site"
+            } else {
+                &rule.scope
+            }));
+            parameters.append(QString::from(&rule.parameter));
+            enabled.append(rule.enabled);
+            custom.append(rule.custom);
+        }
+        self.as_mut().set_clean_rule_scopes(scopes);
+        self.as_mut().set_clean_rule_parameters(parameters);
+        self.as_mut().set_clean_rule_enabled(enabled);
+        self.as_mut().set_clean_rule_custom(custom);
     }
 }
 

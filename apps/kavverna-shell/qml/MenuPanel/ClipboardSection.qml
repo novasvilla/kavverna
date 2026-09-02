@@ -232,6 +232,15 @@ ColumnLayout {
             wrapMode: Text.WordWrap
         }
 
+        Label {
+            Layout.fillWidth: true
+            visible: section.shows("clean-url") && section.clipboard.clean_notice.length > 0
+            text: section.clipboard.clean_notice
+            font.pixelSize: section.theme.textSmall
+            color: section.theme.accent
+            wrapMode: Text.WordWrap
+        }
+
         RowLayout {
             Layout.fillWidth: true
             spacing: 6

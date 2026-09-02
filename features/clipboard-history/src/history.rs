@@ -19,7 +19,7 @@ use crate::selection::{
 use crate::sensitivity::looks_sensitive;
 use crate::store::{Captured, Store, StoreError, Summary};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Settings {
     /// With this off nothing is read at all: the compositor still says a copy happened, which
     /// is all auto clear needs, but the content never reaches this process.
@@ -29,6 +29,7 @@ pub struct Settings {
     pub images_and_files: bool,
     pub clear_after: Option<Duration>,
     pub clean_links: bool,
+    pub rules: link_cleaner::Rules,
 }
 
 impl Default for Settings {
@@ -40,6 +41,7 @@ impl Default for Settings {
             images_and_files: true,
             clear_after: None,
             clean_links: false,
+            rules: link_cleaner::Rules::default(),
         }
     }
 }
@@ -81,6 +83,8 @@ pub struct Snapshot {
     pub recent: usize,
     /// What the last transformation had to say, cleared by the next copy.
     pub notice: String,
+    /// The parameters taken out of the last copied link, cleared by the next copy.
+    pub cleaned: Vec<String>,
     /// The previewed result, elided for the panel: a copied novel should not travel to the
     /// interface whole. Empty when nothing is staged.
     pub preview: String,
@@ -179,7 +183,7 @@ fn run(
     };
 
     let policy = Arc::new(CapturePolicy::default());
-    apply_policy(&policy, settings);
+    apply_policy(&policy, &settings);
 
     let report = events_out.clone();
     let watcher = match SelectionWatcher::start(
@@ -202,9 +206,10 @@ fn run(
     // The previewed transformation, waiting for Use it. A new copy discards it: the thing it
     // was made from is gone.
     let mut staged: Option<String> = None;
+    let mut cleaned = Vec::new();
     let mut clearing = AutoClear::default();
     clearing.set_delay(settings.clear_after);
-    publish(&store, &watcher, &query, &notice, staged.as_deref(), &snapshots);
+    publish(&store, &watcher, &query, &notice, &cleaned, staged.as_deref(), &snapshots);
 
     loop {
         let changed = match events_in.recv_timeout(TICK) {
@@ -214,10 +219,12 @@ fn run(
                 plain_only,
             })) => {
                 clearing.noticed_copy(Instant::now());
-                let payload = tidy(&watcher, payload, plain_only, settings);
+                let (payload, removed) = tidy(&watcher, payload, plain_only, &settings);
+                let was_cleaned = !removed.is_empty();
+                cleaned = removed;
                 notice.clear();
                 staged = None;
-                save(&mut store, payload, settings) || settings.keep_history
+                save(&mut store, payload, &settings) || settings.keep_history || was_cleaned
             }
             Ok(Event::Copied(SelectionEvent::Changed(Selection::Clipboard))) => {
                 clearing.noticed_copy(Instant::now());
@@ -257,7 +264,7 @@ fn run(
             Ok(Event::Asked(command)) => {
                 let changed = act(&mut store, &watcher, &mut settings, &mut query, command);
                 clearing.set_delay(settings.clear_after);
-                apply_policy(&policy, settings);
+                apply_policy(&policy, &settings);
                 changed
             }
             Err(RecvTimeoutError::Timeout) => {
@@ -270,7 +277,7 @@ fn run(
         };
 
         if changed {
-            publish(&store, &watcher, &query, &notice, staged.as_deref(), &snapshots);
+            publish(&store, &watcher, &query, &notice, &cleaned, staged.as_deref(), &snapshots);
         }
     }
 }
@@ -285,24 +292,24 @@ fn tidy(
     watcher: &SelectionWatcher,
     payload: Payload,
     plain_only: bool,
-    settings: Settings,
-) -> Payload {
+    settings: &Settings,
+) -> (Payload, Vec<String>) {
     if !settings.clean_links || !plain_only {
-        return payload;
+        return (payload, Vec::new());
     }
     let Payload::Text(text) = &payload else {
-        return payload;
+        return (payload, Vec::new());
     };
-    let Some(cleaned) = link_cleaner::clean(text, &link_cleaner::Rules::default()) else {
-        return payload;
+    let Some(cleaned) = link_cleaner::clean(text, &settings.rules) else {
+        return (payload, Vec::new());
     };
 
     tracing::info!(removed = ?cleaned.removed, "took the tracking out of a copied link");
     watcher.offer(Selection::Clipboard, Payload::Text(cleaned.link.clone()));
-    Payload::Text(cleaned.link)
+    (Payload::Text(cleaned.link), cleaned.removed)
 }
 
-fn apply_policy(policy: &CapturePolicy, settings: Settings) {
+fn apply_policy(policy: &CapturePolicy, settings: &Settings) {
     policy.read_content.store(settings.keep_history || settings.clean_links, Ordering::Relaxed);
     policy.images_and_files.store(settings.images_and_files, Ordering::Relaxed);
 }
@@ -338,8 +345,9 @@ fn act(
         | Command::DiscardTransform => return false,
         Command::AdoptKlipperHistory => crate::klipper::import_into(store).map(|_| ()),
         Command::Apply(wanted) => {
+            let limit = wanted.limit;
             *settings = wanted;
-            store.trim_to(entry::sanitized_limit(wanted.limit))
+            store.trim_to(entry::sanitized_limit(limit))
         }
     };
 
@@ -382,7 +390,7 @@ fn payload_for(store: &Store, entry: &Entry) -> Option<Payload> {
     }
 }
 
-fn save(store: &mut Store, payload: Payload, settings: Settings) -> bool {
+fn save(store: &mut Store, payload: Payload, settings: &Settings) -> bool {
     // Link cleaning needs the content read to rewrite it, which is not permission to keep it.
     // The gate belongs on the write as well as on the read, or switching the history off while
     // anything else is on quietly fills the database.
@@ -404,7 +412,7 @@ fn save(store: &mut Store, payload: Payload, settings: Settings) -> bool {
     }
 }
 
-fn worth_keeping(payload: Payload, settings: Settings) -> Option<Captured> {
+fn worth_keeping(payload: Payload, settings: &Settings) -> Option<Captured> {
     match payload {
         Payload::Text(raw) => {
             let text = entry::storable_text(&raw)?;
@@ -452,6 +460,7 @@ fn publish(
     watcher: &SelectionWatcher,
     query: &str,
     notice: &str,
+    cleaned: &[String],
     staged: Option<&str>,
     snapshots: &Sender<Snapshot>,
 ) {
@@ -470,6 +479,7 @@ fn publish(
         pinned,
         recent,
         notice: notice.to_string(),
+        cleaned: cleaned.to_vec(),
         preview: staged.map(elided_for_panel).unwrap_or_default(),
         can_transform: crate::selection::preferred_text(&offered).is_some(),
         can_markdown: offered.iter().any(|mime| mime == "text/html"),
@@ -576,10 +586,10 @@ mod tests {
     fn a_secret_shaped_copy_is_not_kept_unless_the_setting_is_off() {
         let secret = || Payload::Text("sk-live-4f9a2b71c8e0d3a6f5b2".into());
         let mut settings = Settings::default();
-        assert!(worth_keeping(secret(), settings).is_none());
+        assert!(worth_keeping(secret(), &settings).is_none());
 
         settings.skip_sensitive = false;
-        assert!(worth_keeping(secret(), settings).is_some());
+        assert!(worth_keeping(secret(), &settings).is_some());
     }
 
     /// Link cleaning has to read the content to rewrite it. Reading is not permission to keep,
@@ -590,34 +600,34 @@ mod tests {
         let mut store = Store::open(room.path()).unwrap();
         let settings = Settings { keep_history: false, clean_links: true, ..Settings::default() };
 
-        assert!(!save(&mut store, Payload::Text("a copy nobody asked to keep".into()), settings));
+        assert!(!save(&mut store, Payload::Text("a copy nobody asked to keep".into()), &settings));
         assert_eq!(store.counts().unwrap(), (0, 0));
     }
 
     #[test]
     fn blank_text_is_never_kept() {
-        assert!(worth_keeping(Payload::Text("   \n".into()), Settings::default()).is_none());
+        assert!(worth_keeping(Payload::Text("   \n".into()), &Settings::default()).is_none());
     }
 
     #[test]
     fn a_copy_of_too_many_files_is_a_folder_operation() {
         let many = (0..MAX_FILES + 1).map(|n| PathBuf::from(format!("/tmp/{n}"))).collect();
-        assert!(worth_keeping(Payload::Files(many), Settings::default()).is_none());
-        assert!(worth_keeping(Payload::Files(Vec::new()), Settings::default()).is_none());
+        assert!(worth_keeping(Payload::Files(many), &Settings::default()).is_none());
+        assert!(worth_keeping(Payload::Files(Vec::new()), &Settings::default()).is_none());
     }
 
     #[test]
     fn something_that_is_not_a_picture_is_not_stored_as_one() {
         assert!(
-            worth_keeping(Payload::Image(b"not a png".to_vec()), Settings::default()).is_none()
+            worth_keeping(Payload::Image(b"not a png".to_vec()), &Settings::default()).is_none()
         );
     }
 
     #[test]
     fn the_same_picture_gets_the_same_name_twice() {
         let png = tiny_png();
-        let first = worth_keeping(Payload::Image(png.clone()), Settings::default()).unwrap();
-        let again = worth_keeping(Payload::Image(png), Settings::default()).unwrap();
+        let first = worth_keeping(Payload::Image(png.clone()), &Settings::default()).unwrap();
+        let again = worth_keeping(Payload::Image(png), &Settings::default()).unwrap();
 
         let name = |captured: &Captured| captured.image.as_ref().unwrap().0.digest.clone();
         assert_eq!(name(&first), name(&again));

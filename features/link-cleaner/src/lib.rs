@@ -2,7 +2,7 @@
 
 pub mod rules;
 
-pub use rules::Rules;
+pub use rules::{CAMPAIGN_FAMILY, RuleDefinition, RuleError, Rules};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Cleaned {

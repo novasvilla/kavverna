@@ -26,6 +26,9 @@ pub const CLEAR_AFTER_SECONDS: &str = "clipboard-auto-clear.after-seconds";
 pub const CLEAR_ON_SUSPEND: &str = "clipboard-auto-clear.on-suspend";
 pub const CLEAR_ON_SCREEN_LOCK: &str = "clipboard-auto-clear.on-screen-lock";
 pub const CLEAN_LINKS: &str = enable_key(Feature::CleanUrl);
+/// Custom URL rules and disabled rule identities use `scope<TAB>parameter`. `*` is global.
+pub const CLEAN_URL_ADDED_RULES: &str = "clean-url.added-rules";
+pub const CLEAN_URL_DISABLED_RULES: &str = "clean-url.disabled-rules";
 /// `node.name` of the input to come back to, which is what survives a restart. Empty for none.
 pub const PREFERRED_INPUT: &str = "microphone-tools.preferred-input";
 /// The outputs the switcher moves between. Absent means every output, which is what somebody
