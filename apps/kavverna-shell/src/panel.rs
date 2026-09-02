@@ -50,6 +50,7 @@ pub mod qobject {
         #[qproperty(i32, margin_right)]
         #[qproperty(i32, margin_bottom)]
         #[qproperty(bool, ghost_visible)]
+        #[qproperty(QString, ghost_screen)]
         #[qproperty(i32, ghost_left)]
         #[qproperty(i32, ghost_top)]
         type KavvernaPanel = super::KavvernaPanelRust;
@@ -105,9 +106,21 @@ pub mod qobject {
         #[qinvokable]
         fn choose_panel_on_top(self: Pin<&mut KavvernaPanel>, on_top: bool);
         #[qinvokable]
-        fn drag_begun(self: Pin<&mut KavvernaPanel>, width: i32, height: i32);
+        fn drag_begun(
+            self: Pin<&mut KavvernaPanel>,
+            pointer_x: i32,
+            pointer_y: i32,
+            width: i32,
+            height: i32,
+        );
         #[qinvokable]
-        fn drag_preview(self: Pin<&mut KavvernaPanel>, dx: i32, dy: i32, width: i32, height: i32);
+        fn drag_preview(
+            self: Pin<&mut KavvernaPanel>,
+            pointer_x: i32,
+            pointer_y: i32,
+            width: i32,
+            height: i32,
+        );
         #[qinvokable]
         fn drag_commit(self: Pin<&mut KavvernaPanel>, width: i32, height: i32);
         #[qinvokable]
@@ -119,8 +132,8 @@ use core::pin::Pin;
 
 static PANEL: Mutex<Option<cxx_qt::CxxQtThread<qobject::KavvernaPanel>>> = Mutex::new(None);
 
-/// What the interface reported the connected screens to be. Placement math happens on the Qt
-/// thread but the report arrives once at startup, so a copy behind a mutex is enough.
+/// What the interface last reported the connected screens to be. Qt sends a fresh report for
+/// hotplug and geometry changes; other surfaces read the same snapshot behind this mutex.
 static SCREENS: Mutex<Vec<panel_anchor::Screen>> = Mutex::new(Vec::new());
 
 /// The free area of each screen, measured by the drag overlay when it first maps: the
@@ -189,6 +202,7 @@ pub struct KavvernaPanelRust {
     margin_right: i32,
     margin_bottom: i32,
     ghost_visible: bool,
+    ghost_screen: QString,
     ghost_left: i32,
     ghost_top: i32,
 }
@@ -260,15 +274,37 @@ impl Default for KavvernaPanelRust {
             margin_right: gap(),
             margin_bottom: gap(),
             ghost_visible: false,
+            ghost_screen: QString::default(),
             ghost_left: 0,
             ghost_top: 0,
         }
     }
 }
 
-/// Where a drag started from, in the screen's local coordinates. One drag at a time, on the
-/// Qt thread only; the mutex is for the static.
-static DRAG_FROM: Mutex<Option<(i32, i32)>> = Mutex::new(None);
+/// Where a drag started from. `origin` is the surface's top-left corner in global desktop
+/// coordinates, worked out from its placement, and `pressed` is the press in the surface's own
+/// coordinates: on Wayland a window never learns its global position, so a global pointer is
+/// only ever origin plus a surface-local reading. One drag at a time, on the Qt thread only;
+/// the mutex is for the static.
+struct DragStart {
+    origin: (i32, i32),
+    pressed: (i32, i32),
+}
+
+static DRAG_FROM: Mutex<Option<DragStart>> = Mutex::new(None);
+
+/// When the interface last closed the panel on its own. A tray click on an ordinary-layer
+/// panel takes the focus first, which closes the panel, and only then arrives here over
+/// D-Bus asking to toggle: without this the click that meant close would open it again.
+static DISMISSED_AT: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+
+fn dismissed_just_now() -> bool {
+    DISMISSED_AT
+        .lock()
+        .ok()
+        .and_then(|held| *held)
+        .is_some_and(|at| at.elapsed() < Duration::from_millis(250))
+}
 
 fn as_i32(value: i64, fallback: i32) -> i32 {
     i32::try_from(value).unwrap_or(fallback)
@@ -326,6 +362,9 @@ impl qobject::KavvernaPanel {
 
     fn dismiss(mut self: Pin<&mut Self>) {
         self.as_mut().set_panel_open(false);
+        if let Ok(mut held) = DISMISSED_AT.lock() {
+            *held = Some(std::time::Instant::now());
+        }
         tracing::info!("panel closed");
     }
 
@@ -426,12 +465,46 @@ impl qobject::KavvernaPanel {
         command::send(Command::Extend(Duration::from_secs(seconds)));
     }
 
-    fn report_screens(self: Pin<&mut Self>, report: &QString) {
+    /// Arrives at startup and again whenever a screen joins, leaves or changes shape. A panel
+    /// whose screen left moves to the first one still here, keeping its spot on the screen it
+    /// lost for when that comes back; the interface remaps it, since the compositor closed the
+    /// surface with the output.
+    fn report_screens(mut self: Pin<&mut Self>, report: &QString) {
         let seen = panel_anchor::screens_from_report(&report.to_string());
         tracing::info!(screens = seen.len(), "screens reported");
+        let previous = self.panel_screen().to_string();
+        let before = screens();
+        let previous_position =
+            before.iter().find(|screen| screen.name == previous).map(|screen| {
+                panel_anchor::position_of(
+                    &self.read_placement(),
+                    &worked(screen),
+                    (panel_anchor::WIDTH, panel_anchor::tallest(screen.height)),
+                )
+            });
         if let Ok(mut held) = SCREENS.lock() {
-            *held = seen;
+            *held = seen.clone();
         }
+        // A measured free area is only true of the geometry it was measured on.
+        if let Ok(mut held) = WORK_AREAS.lock() {
+            held.retain(|(name, _, _)| {
+                let old = before.iter().find(|screen| screen.name == *name);
+                let current = seen.iter().find(|screen| screen.name == *name);
+                old.is_some() && old == current
+            });
+        }
+
+        if !seen.is_empty() && !seen.iter().any(|screen| screen.name == previous) {
+            let screen = &seen[0];
+            let place = panel_anchor::pinned(
+                previous_position.unwrap_or((*self.margin_left(), *self.margin_top())),
+                &worked(screen),
+                (panel_anchor::WIDTH, panel_anchor::tallest(screen.height)),
+                gap(),
+            );
+            apply_placement(&mut self, place, &screen.name);
+        }
+        crate::shelf_view::screens_changed();
     }
 
     fn report_work_area(self: Pin<&mut Self>, name: &QString, width: i32, height: i32) {
@@ -445,8 +518,8 @@ impl qobject::KavvernaPanel {
         }
     }
 
-    /// The layer is read when the surface maps, so a change made while the panel is open
-    /// takes hold on the next open; the panel remaps on every one.
+    /// The layer is read when the surface maps, so the interface remaps an open panel the
+    /// moment this changes.
     fn choose_panel_on_top(mut self: Pin<&mut Self>, on_top: bool) {
         settings::put_bool(settings::PANEL_ON_TOP, on_top);
         self.as_mut().set_panel_on_top(on_top);
@@ -469,37 +542,61 @@ impl qobject::KavvernaPanel {
     /// compositor replays that shift on its own schedule, which fed back as a panel that
     /// jittered off at random. The panel holds still, a ghost outline tracks the gesture in
     /// clean press-relative coordinates, and release places the panel where the ghost is.
-    fn drag_begun(mut self: Pin<&mut Self>, width: i32, height: i32) {
+    /// The pointer arrives in the surface's own coordinates, the only kind Wayland gives.
+    fn drag_begun(
+        mut self: Pin<&mut Self>,
+        pointer_x: i32,
+        pointer_y: i32,
+        width: i32,
+        height: i32,
+    ) {
         let screens = screens();
         let name = self.panel_screen().to_string();
         let Some(screen) = screens.iter().find(|s| s.name == name).or_else(|| screens.first())
         else {
             return;
         };
-        let from =
+        let local =
             panel_anchor::position_of(&self.read_placement(), &worked(screen), (width, height));
         if let Ok(mut held) = DRAG_FROM.lock() {
-            *held = Some(from);
+            *held = Some(DragStart {
+                origin: (screen.x + local.0, screen.y + local.1),
+                pressed: (pointer_x, pointer_y),
+            });
         }
-        self.as_mut().set_ghost_left(from.0);
-        self.as_mut().set_ghost_top(from.1);
+        self.as_mut().set_ghost_screen(QString::from(&screen.name));
+        self.as_mut().set_ghost_left(local.0);
+        self.as_mut().set_ghost_top(local.1);
     }
 
-    fn drag_preview(mut self: Pin<&mut Self>, dx: i32, dy: i32, width: i32, height: i32) {
-        let Some((x, y)) = DRAG_FROM.lock().ok().and_then(|held| *held) else {
+    fn drag_preview(
+        mut self: Pin<&mut Self>,
+        pointer_x: i32,
+        pointer_y: i32,
+        width: i32,
+        height: i32,
+    ) {
+        let Some((origin, pressed)) = DRAG_FROM
+            .lock()
+            .ok()
+            .and_then(|held| held.as_ref().map(|drag| (drag.origin, drag.pressed)))
+        else {
             return;
         };
         // A click is not a drag; the ghost only appears once the hand has clearly moved.
-        if !*self.ghost_visible() && dx.abs() + dy.abs() < 8 {
+        if !*self.ghost_visible()
+            && (pointer_x - pressed.0).abs() + (pointer_y - pressed.1).abs() < 8
+        {
             return;
         }
         let screens = screens();
-        let name = self.panel_screen().to_string();
+        let name = self.ghost_screen().to_string();
         let Some(screen) = screens.iter().find(|s| s.name == name).or_else(|| screens.first())
         else {
             return;
         };
-        let at = panel_anchor::pinned((x + dx, y + dy), &worked(screen), (width, height), gap());
+        let local = panel_anchor::dragged_local(origin, pressed, (pointer_x, pointer_y), screen);
+        let at = panel_anchor::pinned(local, &worked(screen), (width, height), gap());
         self.as_mut().set_ghost_left(at.left);
         self.as_mut().set_ghost_top(at.top);
         self.as_mut().set_ghost_visible(true);
@@ -514,7 +611,7 @@ impl qobject::KavvernaPanel {
         self.as_mut().set_ghost_visible(false);
 
         let screens = screens();
-        let name = self.panel_screen().to_string();
+        let name = self.ghost_screen().to_string();
         let Some(screen) = screens.iter().find(|s| s.name == name).or_else(|| screens.first())
         else {
             return;
@@ -603,7 +700,7 @@ fn place(panel: &mut Pin<&mut qobject::KavvernaPanel>, click: Option<(i32, i32)>
         1 => {
             let entries = settings::texts_at(settings::PLACEMENT_REMEMBERED).unwrap_or_default();
             panel_anchor::last_remembered(&entries, &screens).map(|((x, y), screen)| {
-                let size = (panel_anchor::WIDTH, 720.min(screen.height - 24));
+                let size = (panel_anchor::WIDTH, panel_anchor::tallest(screen.height));
                 (panel_anchor::pinned((x, y), &worked(screen), size, spacing), screen.name.clone())
             })
         }
@@ -613,7 +710,10 @@ fn place(panel: &mut Pin<&mut qobject::KavvernaPanel>, click: Option<(i32, i32)>
 
     match chosen {
         Some((placement, screen)) => apply_placement(panel, placement, &screen),
-        None => apply_placement(panel, panel_anchor::corner(spacing), ""),
+        None => match screens.first() {
+            Some(screen) => apply_placement(panel, panel_anchor::corner(spacing), &screen.name),
+            None => apply_placement(panel, panel_anchor::corner(spacing), ""),
+        },
     }
 }
 
@@ -681,6 +781,10 @@ pub fn toggle_at(x: i32, y: i32) {
 fn toggle_from(click: Option<(i32, i32)>) {
     with_panel(move |mut panel| {
         let open = *panel.panel_open();
+        if !open && dismissed_just_now() {
+            tracing::info!("tray click arrived after the focus it took had closed the panel");
+            return;
+        }
         panel.as_mut().set_showing_settings(false);
         if !open {
             place(&mut panel, click);

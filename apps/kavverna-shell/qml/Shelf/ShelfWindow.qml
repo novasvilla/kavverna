@@ -13,9 +13,15 @@ Window {
     required property var theme
     required property var shelf
     required property var shows
+    /// Answers a screen by name, the panel's own lookup.
+    required property var screenNamed
 
     /// Selected item ids, presentation state only. Click selects one; Ctrl+click grows it.
     property var picked: []
+
+    // A mapped layer surface keeps the output it was created with, so a shelf that lands on
+    // another screen, by a drag or because its own screen left, is made again there.
+    property bool remapping: false
 
     function isPicked(id) {
         return shelfWindow.picked.indexOf(id) >= 0
@@ -60,7 +66,7 @@ Window {
 
     width: 240
     height: Math.min(body.implicitHeight + 36, Math.min(640, Screen.desktopAvailableHeight - 24))
-    visible: shelfWindow.shows("shelf") && shelfWindow.shelf.shelf_open
+    visible: shelfWindow.shows("shelf") && shelfWindow.shelf.shelf_open && !shelfWindow.remapping
     color: "transparent"
     // Declared inside the panel's window, which would otherwise make this its transient
     // child, and a transient of a hidden window is never mapped.
@@ -77,9 +83,36 @@ Window {
         : (shelfWindow.shelf.strip_on_left ? Qt.rect(12, 0, 0, 0) : Qt.rect(0, 0, 12, 0))
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityOnDemand
     LayerShell.Window.scope: "kavverna-shelf"
-    // The same primary-screen pinning as the panel, for the same reason: the active screen
-    // follows focus, and focus lives in the fullscreen game on the other monitor.
+    // The same explicit screen pinning as the panel, for the same reason: the active screen
+    // follows focus, and focus may live in a fullscreen game on another monitor.
     LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
+
+    Binding on screen {
+        when: shelfWindow.shelf.shelf_screen.length > 0
+        value: shelfWindow.screenNamed(shelfWindow.shelf.shelf_screen)
+    }
+
+    Timer {
+        id: remap
+        interval: 40
+        onTriggered: shelfWindow.remapping = false
+    }
+
+    Connections {
+        target: shelfWindow.shelf
+        function onShelf_screenChanged() { shelfWindow.replace() }
+        function onShelf_leftChanged() { shelfWindow.replace() }
+        function onShelf_topChanged() { shelfWindow.replace() }
+    }
+
+    /// Margins never move a mapped layer surface here, so a shelf that was dragged somewhere
+    /// else is made again there. Never mid-drag: the ghost is what follows the hand.
+    function replace() {
+        if (shelfWindow.shelf.shelf_open && !shelfWindow.shelf.ghost_visible) {
+            shelfWindow.remapping = true
+            remap.restart()
+        }
+    }
 
     Shortcut {
         sequence: "Escape"
@@ -116,21 +149,19 @@ Window {
             anchors.left: parent.left
             anchors.right: parent.right
             height: 44
-            property real pressX: 0
-            property real pressY: 0
 
             onPressed: (mouse) => {
-                pressX = mouse.x
-                pressY = mouse.y
                 shelfSkin.grabToImage((shot) => shelfWindow.shelfShot = shot)
-                shelfWindow.shelf.drag_begun(shelfWindow.width, shelfWindow.height)
+                const at = mapToItem(null, mouse.x, mouse.y)
+                shelfWindow.shelf.drag_begun(Math.round(at.x), Math.round(at.y),
+                                             shelfWindow.width, shelfWindow.height)
             }
             onPositionChanged: (mouse) => {
                 if (!pressed) {
                     return
                 }
-                shelfWindow.shelf.drag_preview(Math.round(mouse.x - pressX),
-                                               Math.round(mouse.y - pressY),
+                const at = mapToItem(null, mouse.x, mouse.y)
+                shelfWindow.shelf.drag_preview(Math.round(at.x), Math.round(at.y),
                                                shelfWindow.width, shelfWindow.height)
             }
             onReleased: shelfWindow.shelf.drag_commit(shelfWindow.width, shelfWindow.height)

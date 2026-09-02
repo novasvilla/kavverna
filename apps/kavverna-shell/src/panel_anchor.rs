@@ -9,7 +9,7 @@ pub const WIDTH: i32 = 360;
 
 /// The panel's height cap, restated from the interface's own formula. Only the vertical
 /// clamp uses it, so a drift of a few pixels moves nothing visible.
-fn tallest(screen_height: i32) -> i32 {
+pub fn tallest(screen_height: i32) -> i32 {
     720.min(screen_height - 24)
 }
 
@@ -52,6 +52,19 @@ pub fn screen_containing(point: (i32, i32), screens: &[Screen]) -> Option<&Scree
             && point.1 >= screen.y
             && point.1 < screen.y + screen.height
     })
+}
+
+/// Where the surface lands, in its screen's coordinates, since margins are screen-local.
+/// `pressed` and `pointer` are both surface-local readings of the same drag: on Wayland a
+/// window is never told where it sits, so a global pointer is only ever the surface's own
+/// corner plus one of these.
+pub fn dragged_local(
+    origin: (i32, i32),
+    pressed: (i32, i32),
+    pointer: (i32, i32),
+    screen: &Screen,
+) -> (i32, i32) {
+    (origin.0 + pointer.0 - pressed.0 - screen.x, origin.1 + pointer.1 - pressed.1 - screen.y)
 }
 
 fn held(value: i32, low: i32, high: i32) -> i32 {
@@ -244,6 +257,15 @@ mod tests {
         assert_eq!(screen_containing((0, 0), &screens).map(|s| s.name.as_str()), Some("DP-1"));
         assert!(screen_containing((0, 5000), &screens).is_none());
         assert!(screen_containing((-1, 0), &screens).is_none());
+    }
+
+    /// The surface sits at (2200, 300) and the hand presses 100 px into it, then moves 400 px
+    /// right: the corner follows by the same 400 px, expressed on its screen.
+    #[test]
+    fn a_drag_moves_the_surface_by_what_the_hand_moved() {
+        let local = dragged_local((2200, 300), (100, 50), (500, 100), &primary());
+
+        assert_eq!(local, (2600, 350));
     }
 
     #[test]

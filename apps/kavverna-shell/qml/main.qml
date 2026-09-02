@@ -18,6 +18,7 @@ Window {
     readonly property int clipboardPage: 3
     readonly property int toolsPage: 4
     property int page: hub.page
+    property bool panelHadFocus: false
 
     /// True while the utility is in the features list. Reading `features.installed` here is what
     /// makes every binding below re-evaluate the moment one is switched off.
@@ -106,9 +107,70 @@ Window {
         value: root.screenNamed(hub.panel_screen)
     }
 
-    // Closing on lost focus reads well until anything else takes focus on its own: a
-    // fullscreen window reclaiming it would shut the panel a moment after it opened. The
-    // tray icon and Escape close it instead, which is predictable.
+    onVisibleChanged: {
+        if (visible) {
+            panelHadFocus = false
+        } else {
+            lostFocusCheck.stop()
+        }
+    }
+
+    onActiveChanged: {
+        if (active) {
+            panelHadFocus = true
+            lostFocusCheck.stop()
+        } else if (visible && panelHadFocus && !hub.panel_on_top && !hub.ghost_visible) {
+            lostFocusCheck.restart()
+        }
+    }
+
+    // Mapping and activation emit transient focus changes. Only an ordinary-layer panel that
+    // has genuinely held focus closes, and the delayed recheck lets those transitions settle.
+    // A drag holds the pointer and maps the ghost, both of which move the focus around: closing
+    // then would take the panel out from under the hand mid-gesture.
+    Timer {
+        id: lostFocusCheck
+        interval: 80
+        onTriggered: if (root.visible && root.panelHadFocus && !root.active
+                         && !hub.panel_on_top && !hub.ghost_visible) hub.dismiss()
+    }
+
+    // A mapped layer surface keeps the layer and the output it was created with: neither a
+    // layer change nor a screen change reaches the compositor until the surface is made again.
+    // The gap between the two writes is what lets Qt tear the old surface down first.
+    Timer {
+        id: remapPanel
+        interval: 40
+        onTriggered: hub.panel_open = true
+    }
+
+    function remap() {
+        if (hub.panel_open) {
+            hub.panel_open = false
+            remapPanel.restart()
+        }
+    }
+
+    /// A placement that changes while the panel is open reaches the compositor the same way:
+    /// margins never move a mapped surface here, so the panel would otherwise hold still after
+    /// a drag and only appear where it was dropped on the next open. Never mid-drag, since the
+    /// ghost is what follows the hand until the button comes up.
+    function replace() {
+        if (!hub.ghost_visible) {
+            root.remap()
+        }
+    }
+
+    Connections {
+        target: hub
+        function onPanel_on_topChanged() { root.remap() }
+        function onPanel_screenChanged() { root.remap() }
+        function onMargin_leftChanged() { root.replace() }
+        function onMargin_topChanged() { root.replace() }
+        function onMargin_rightChanged() { root.replace() }
+        function onMargin_bottomChanged() { root.replace() }
+    }
+
     Shortcut {
         sequence: "Escape"
         onActivated: hub.dismiss()
@@ -126,18 +188,44 @@ Window {
     KavvernaPanel {
         id: hub
         Component.onCompleted: {
-            // Screens first: attach() may open the panel at once for a launch argument, and
-            // placing it needs to know what is connected.
-            const lines = []
-            const all = Qt.application.screens
-            for (let i = 0; i < all.length; i += 1) {
-                const s = all[i]
-                lines.push(s.name + "\t" + s.virtualX + "\t" + s.virtualY
-                           + "\t" + s.width + "\t" + s.height)
-            }
-            report_screens(lines.join("\n"))
+            root.reportScreens()
             report_screen(Screen.desktopAvailableWidth, Screen.desktopAvailableHeight)
             attach()
+        }
+    }
+
+    function reportScreens() {
+        const lines = []
+        const all = Qt.application.screens
+        for (let i = 0; i < all.length; i += 1) {
+            const s = all[i]
+            lines.push(s.name + "\t" + s.virtualX + "\t" + s.virtualY
+                       + "\t" + s.width + "\t" + s.height)
+        }
+        hub.report_screens(lines.join("\n"))
+    }
+
+    Timer {
+        id: screenReport
+        interval: 50
+        onTriggered: root.reportScreens()
+    }
+
+    Connections {
+        target: Qt.application
+        function onScreensChanged() { screenReport.restart() }
+    }
+
+    // Screen geometry can change without a screen joining or leaving.
+    Instantiator {
+        model: Qt.application.screens
+        delegate: Connections {
+            required property var modelData
+            target: modelData
+            function onVirtualXChanged() { screenReport.restart() }
+            function onVirtualYChanged() { screenReport.restart() }
+            function onWidthChanged() { screenReport.restart() }
+            function onHeightChanged() { screenReport.restart() }
         }
     }
 
@@ -172,6 +260,7 @@ Window {
         theme: theme
         shelf: shelfBridge
         shows: root.shows
+        screenNamed: root.screenNamed
     }
 
     EdgeStrip {
@@ -179,6 +268,7 @@ Window {
         shelf: shelfBridge
         shows: root.shows
         home: shelfWindow
+        screenNamed: root.screenNamed
     }
 
     // The shelf's drag ghost, the same gesture as the panel's below. Changing a layer
@@ -197,6 +287,11 @@ Window {
         LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
         LayerShell.Window.scope: "kavverna-shelf-ghost"
         LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
+
+        Binding on screen {
+            when: shelfBridge.ghost_screen.length > 0
+            value: root.screenNamed(shelfBridge.ghost_screen)
+        }
 
         // The same free-area measurement the panel's overlay reports, so a shelf drag
         // calibrates even when the panel was never dragged.
@@ -244,8 +339,8 @@ Window {
         LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
 
         Binding on screen {
-            when: hub.panel_screen.length > 0
-            value: root.screenNamed(hub.panel_screen)
+            when: hub.ghost_screen.length > 0
+            value: root.screenNamed(hub.ghost_screen)
         }
 
         // The mapped overlay is the one honest report of the screen's free area: the
@@ -299,28 +394,26 @@ Window {
         // because the handler never activates on this layer surface under KWin. The panel
         // itself holds still for the whole gesture, so these readings stay clean
         // press-relative offsets; the ghost outline is what follows the hand, and the
-        // release places the panel where the ghost is.
+        // release places the panel where the ghost is. The readings are the window's own:
+        // mapToGlobal answers with the screen's corner on Wayland, not the panel's spot.
         MouseArea {
             id: mover
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
             height: 56
-            property real pressX: 0
-            property real pressY: 0
 
             onPressed: (mouse) => {
-                pressX = mouse.x
-                pressY = mouse.y
                 skin.grabToImage((shot) => root.ghostShot = shot)
-                hub.drag_begun(root.width, root.height)
+                const at = mover.mapToItem(null, mouse.x, mouse.y)
+                hub.drag_begun(Math.round(at.x), Math.round(at.y), root.width, root.height)
             }
             onPositionChanged: (mouse) => {
                 if (!pressed) {
                     return
                 }
-                hub.drag_preview(Math.round(mouse.x - pressX), Math.round(mouse.y - pressY),
-                                 root.width, root.height)
+                const at = mover.mapToItem(null, mouse.x, mouse.y)
+                hub.drag_preview(Math.round(at.x), Math.round(at.y), root.width, root.height)
             }
             onReleased: hub.drag_commit(root.width, root.height)
         }

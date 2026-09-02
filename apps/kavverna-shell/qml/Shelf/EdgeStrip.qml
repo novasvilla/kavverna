@@ -15,10 +15,16 @@ Window {
     required property var shows
     /// The shelf window, which handles any drop the strip itself catches.
     required property var home
+    /// Answers a screen by name, the panel's own lookup.
+    required property var screenNamed
+
+    // A mapped layer surface keeps the output it was created with, so following the shelf
+    // to another screen means making the surface again.
+    property bool remapping: false
 
     width: 16
     height: 220
-    visible: strip.shows("shelf") && strip.shelf.edge_strip
+    visible: strip.shows("shelf") && strip.shelf.edge_strip && !strip.remapping
     color: "transparent"
     // The same transient-of-a-hidden-panel trap the shelf window has.
     transientParent: null
@@ -29,6 +35,25 @@ Window {
     LayerShell.Window.keyboardInteractivity: LayerShell.Window.KeyboardInteractivityNone
     LayerShell.Window.scope: "kavverna-shelf-strip"
     LayerShell.Window.screenConfiguration: LayerShell.Window.ScreenFromQWindow
+
+    Binding on screen {
+        when: strip.shelf.shelf_screen.length > 0
+        value: strip.screenNamed(strip.shelf.shelf_screen)
+    }
+
+    Timer {
+        id: remap
+        interval: 40
+        onTriggered: strip.remapping = false
+    }
+
+    Connections {
+        target: strip.shelf
+        function onShelf_screenChanged() {
+            strip.remapping = true
+            remap.restart()
+        }
+    }
 
     Rectangle {
         anchors.right: strip.shelf.strip_on_left ? undefined : parent.right

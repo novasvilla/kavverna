@@ -41,9 +41,11 @@ pub mod qobject {
         #[qproperty(bool, remove_after_drop)]
         #[qproperty(bool, strip_on_left)]
         #[qproperty(bool, placed)]
+        #[qproperty(QString, shelf_screen)]
         #[qproperty(i32, shelf_left)]
         #[qproperty(i32, shelf_top)]
         #[qproperty(bool, ghost_visible)]
+        #[qproperty(QString, ghost_screen)]
         #[qproperty(i32, ghost_left)]
         #[qproperty(i32, ghost_top)]
         type ShelfView = super::ShelfViewRust;
@@ -90,9 +92,21 @@ pub mod qobject {
         #[qinvokable]
         fn choose_strip_edge(self: Pin<&mut ShelfView>, left: bool);
         #[qinvokable]
-        fn drag_begun(self: Pin<&mut ShelfView>, width: i32, height: i32);
+        fn drag_begun(
+            self: Pin<&mut ShelfView>,
+            pointer_x: i32,
+            pointer_y: i32,
+            width: i32,
+            height: i32,
+        );
         #[qinvokable]
-        fn drag_preview(self: Pin<&mut ShelfView>, dx: i32, dy: i32, width: i32, height: i32);
+        fn drag_preview(
+            self: Pin<&mut ShelfView>,
+            pointer_x: i32,
+            pointer_y: i32,
+            width: i32,
+            height: i32,
+        );
         #[qinvokable]
         fn drag_commit(self: Pin<&mut ShelfView>, width: i32, height: i32);
     }
@@ -123,9 +137,11 @@ pub struct ShelfViewRust {
     remove_after_drop: bool,
     strip_on_left: bool,
     placed: bool,
+    shelf_screen: QString,
     shelf_left: i32,
     shelf_top: i32,
     ghost_visible: bool,
+    ghost_screen: QString,
     ghost_left: i32,
     ghost_top: i32,
 }
@@ -165,17 +181,28 @@ impl Default for ShelfViewRust {
                 settings::SHELF_STRIP_LEFT_DEFAULT,
             ),
             placed: false,
+            shelf_screen: QString::default(),
             shelf_left: 0,
             shelf_top: 0,
             ghost_visible: false,
+            ghost_screen: QString::default(),
             ghost_left: 0,
             ghost_top: 0,
         }
     }
 }
 
-/// Where a shelf drag started from. One drag at a time, on the Qt thread only.
-static SHELF_DRAG_FROM: Mutex<Option<(i32, i32)>> = Mutex::new(None);
+/// The shelf window's width and height cap, restated from the interface's own numbers.
+const SHELF_LARGEST: (i32, i32) = (240, 640);
+
+/// Where a shelf drag started from: the surface's global top-left corner and the press in
+/// surface coordinates, the panel's own arrangement. One drag at a time, on the Qt thread only.
+struct ShelfDragStart {
+    origin: (i32, i32),
+    pressed: (i32, i32),
+}
+
+static SHELF_DRAG_FROM: Mutex<Option<ShelfDragStart>> = Mutex::new(None);
 
 /// "1,7,9" from the interface back into numbers; anything else is dropped rather than guessed.
 fn parse_ids(joined: &QString) -> Vec<u64> {
@@ -196,14 +223,21 @@ impl qobject::ShelfView {
         let screens = crate::panel::screens();
         let entries = settings::texts_at(settings::SHELF_POSITION).unwrap_or_default();
         match crate::panel_anchor::last_remembered(&entries, &screens) {
-            Some(((x, y), _)) => {
+            Some(((x, y), screen)) => {
                 self.as_mut().set_shelf_left(x);
                 self.as_mut().set_shelf_top(y);
+                self.as_mut().set_shelf_screen(QString::from(&screen.name));
                 self.as_mut().set_placed(true);
             }
-            None => self.as_mut().set_placed(false),
+            None => {
+                self.as_mut().set_shelf_screen(QString::from(
+                    screens.first().map(|screen| screen.name.as_str()).unwrap_or(""),
+                ));
+                self.as_mut().set_placed(false);
+            }
         }
 
+        self.as_mut().reconcile_screens();
         self.apply();
     }
 
@@ -214,39 +248,69 @@ impl qobject::ShelfView {
 
     /// The same ghost gesture the panel uses, for the same reason: the surface cannot move
     /// under the pointer without poisoning the pointer's own readings.
-    fn drag_begun(mut self: Pin<&mut Self>, width: i32, height: i32) {
+    fn drag_begun(
+        mut self: Pin<&mut Self>,
+        pointer_x: i32,
+        pointer_y: i32,
+        width: i32,
+        height: i32,
+    ) {
         let screens = crate::panel::screens();
-        let Some(screen) = screens.first() else {
+        let name = self.shelf_screen().to_string();
+        let Some(screen) =
+            screens.iter().find(|screen| screen.name == name).or_else(|| screens.first())
+        else {
             return;
         };
-        let screen = &crate::panel::worked(screen);
+        let worked = crate::panel::worked(screen);
         let from = if *self.placed() {
             (*self.shelf_left(), *self.shelf_top())
         } else {
             let gap = crate::panel::gap();
-            let x = if *self.strip_on_left() { gap } else { screen.width - width - gap };
-            (x, (screen.height - height) / 2)
+            let x = if *self.strip_on_left() { gap } else { worked.width - width - gap };
+            (x, (worked.height - height) / 2)
         };
         if let Ok(mut held) = SHELF_DRAG_FROM.lock() {
-            *held = Some(from);
+            *held = Some(ShelfDragStart {
+                origin: (screen.x + from.0, screen.y + from.1),
+                pressed: (pointer_x, pointer_y),
+            });
         }
+        self.as_mut().set_ghost_screen(QString::from(&screen.name));
         self.as_mut().set_ghost_left(from.0);
         self.as_mut().set_ghost_top(from.1);
     }
 
-    fn drag_preview(mut self: Pin<&mut Self>, dx: i32, dy: i32, width: i32, height: i32) {
-        let Some((x, y)) = SHELF_DRAG_FROM.lock().ok().and_then(|held| *held) else {
+    fn drag_preview(
+        mut self: Pin<&mut Self>,
+        pointer_x: i32,
+        pointer_y: i32,
+        width: i32,
+        height: i32,
+    ) {
+        let Some((origin, pressed)) = SHELF_DRAG_FROM
+            .lock()
+            .ok()
+            .and_then(|held| held.as_ref().map(|drag| (drag.origin, drag.pressed)))
+        else {
             return;
         };
-        if !*self.ghost_visible() && dx.abs() + dy.abs() < 8 {
+        if !*self.ghost_visible()
+            && (pointer_x - pressed.0).abs() + (pointer_y - pressed.1).abs() < 8
+        {
             return;
         }
         let screens = crate::panel::screens();
-        let Some(screen) = screens.first() else {
+        let name = self.ghost_screen().to_string();
+        let Some(screen) =
+            screens.iter().find(|screen| screen.name == name).or_else(|| screens.first())
+        else {
             return;
         };
+        let local =
+            crate::panel_anchor::dragged_local(origin, pressed, (pointer_x, pointer_y), screen);
         let at = crate::panel_anchor::pinned(
-            (x + dx, y + dy),
+            local,
             &crate::panel::worked(screen),
             (width, height),
             crate::panel::gap(),
@@ -265,7 +329,10 @@ impl qobject::ShelfView {
         self.as_mut().set_ghost_visible(false);
 
         let screens = crate::panel::screens();
-        let Some(screen) = screens.first() else {
+        let name = self.ghost_screen().to_string();
+        let Some(screen) =
+            screens.iter().find(|screen| screen.name == name).or_else(|| screens.first())
+        else {
             return;
         };
         let landed = crate::panel_anchor::pinned(
@@ -276,6 +343,7 @@ impl qobject::ShelfView {
         );
         self.as_mut().set_shelf_left(landed.left);
         self.as_mut().set_shelf_top(landed.top);
+        self.as_mut().set_shelf_screen(QString::from(&screen.name));
         self.as_mut().set_placed(true);
 
         // A shelf stays where it was put; there is no mode to ask first.
@@ -492,10 +560,34 @@ impl qobject::ShelfView {
         self.as_mut().set_item_count(count);
         self.as_mut().set_notice(QString::from(&notice));
     }
+
+    /// A shelf whose screen left moves to the first one still here, pinned by its largest
+    /// size so it stays on that screen however much it later grows. The spot remembered for
+    /// the screen that left is kept for its return.
+    fn reconcile_screens(mut self: Pin<&mut Self>) {
+        let screens = crate::panel::screens();
+        let current = self.shelf_screen().to_string();
+        if !screens.is_empty() && !screens.iter().any(|screen| screen.name == current) {
+            let screen = &screens[0];
+            self.as_mut().set_shelf_screen(QString::from(&screen.name));
+            let landed = crate::panel_anchor::pinned(
+                (*self.shelf_left(), *self.shelf_top()),
+                &crate::panel::worked(screen),
+                SHELF_LARGEST,
+                crate::panel::gap(),
+            );
+            self.as_mut().set_shelf_left(landed.left);
+            self.as_mut().set_shelf_top(landed.top);
+        }
+    }
 }
 
 pub fn publish() {
     queue(|view| view.apply());
+}
+
+pub fn screens_changed() {
+    queue(|view| view.reconcile_screens());
 }
 
 /// The shortcut and the tray reach the shelf through here, from their own threads.
