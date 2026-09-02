@@ -1,3 +1,7 @@
+//! What a stream is called and what it is remembered by, worked out from the properties
+//! PipeWire hands over and, where those name only a process, from the process itself.
+
+use app_identity::binary_of_process;
 use std::collections::BTreeMap;
 
 pub type Properties = BTreeMap<String, String>;
@@ -67,80 +71,6 @@ pub fn app_key_resolving(
     }
 
     AppKey("unknown".into())
-}
-
-/// Clients reaching PipeWire through the PulseAudio bridge report the bridge's process, so
-/// naming a stream after one of these would lump every such application together.
-const BRIDGES: [&str; 4] = ["pipewire", "pipewire-pulse", "wireplumber", "pulseaudio"];
-
-/// Names Electron and Chromium hand out for every application built on them, which would
-/// otherwise show one row per framework instead of one per application.
-const GENERIC: [&str; 5] = ["chromium", "electron", "chrome", "app", "unknown"];
-
-pub fn is_generic(name: &str) -> bool {
-    GENERIC.contains(&name.trim().to_lowercase().as_str())
-}
-
-/// Recovers the real application from a framework process's arguments. Electron is told
-/// where to keep its data and which bundle to run, and both name the application.
-pub fn refine_from_cmdline(args: &[String]) -> Option<String> {
-    let from_data_dir =
-        args.iter().find_map(|arg| arg.strip_prefix("--user-data-dir=")).and_then(last_segment);
-
-    let from_bundle = args
-        .iter()
-        .find(|arg| arg.ends_with(".asar"))
-        .and_then(|path| path.rsplit_once('/'))
-        .and_then(|(parent, _)| last_segment(parent));
-
-    from_data_dir.or(from_bundle).filter(|name| !is_generic(name))
-}
-
-fn last_segment(path: &str) -> Option<String> {
-    path.trim_end_matches('/').rsplit('/').find(|part| !part.is_empty()).map(str::to_owned)
-}
-
-/// Steam tells every game it launches which application it is, and the desktop entry Steam
-/// writes for that game names its icon after the same number. That pairs a stream calling
-/// itself SDL Application with the name a person would recognise, for any game rather than for
-/// one that was thought of in advance.
-pub fn steam_icon_of_process(pid: u32) -> Option<String> {
-    let environ = std::fs::read(format!("/proc/{pid}/environ")).ok()?;
-    environ
-        .split(|byte| *byte == 0)
-        .filter_map(|entry| std::str::from_utf8(entry).ok())
-        .find_map(|entry| entry.strip_prefix("SteamAppId="))
-        .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()))
-        .map(|id| format!("steam_icon_{id}"))
-}
-
-pub fn cmdline_of_process(pid: u32) -> Vec<String> {
-    std::fs::read(format!("/proc/{pid}/cmdline"))
-        .map(|raw| {
-            raw.split(|byte| *byte == 0)
-                .filter(|part| !part.is_empty())
-                .map(|part| String::from_utf8_lossy(part).into_owned())
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-/// Turns a directory name into something worth showing in a list.
-pub fn presentable(name: &str) -> String {
-    let mut chars = name.chars();
-    match chars.next() {
-        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-        None => name.to_owned(),
-    }
-}
-
-pub fn binary_of_process(pid: u32) -> Option<String> {
-    let binary = std::fs::read_link(format!("/proc/{pid}/exe"))
-        .ok()?
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())?;
-
-    (!BRIDGES.contains(&binary.as_str())).then_some(binary)
 }
 
 /// The name shown in the mixer, which unlike the key is allowed to change between runs.
@@ -251,53 +181,6 @@ mod tests {
             app_key_resolving(&props(&[("application.name", "  ")]), None, |_| None).as_str(),
             "unknown"
         );
-    }
-
-    /// Every Electron application calls itself Chromium, so a mixer would show several
-    /// identical rows with no way to tell which is which.
-    #[test]
-    fn an_electron_application_is_recovered_from_its_data_directory() {
-        let args: Vec<String> = [
-            "/proc/self/exe",
-            "--type=utility",
-            "--user-data-dir=/home/someone/.config/vesktop",
-            "--standard-schemes=vesktop",
-        ]
-        .iter()
-        .map(|s| (*s).to_owned())
-        .collect();
-
-        assert_eq!(refine_from_cmdline(&args).as_deref(), Some("vesktop"));
-        assert_eq!(presentable("vesktop"), "Vesktop");
-    }
-
-    #[test]
-    fn the_bundle_path_names_the_application_when_the_data_directory_does_not() {
-        let args: Vec<String> = ["/usr/lib/electron39/electron", "/usr/lib/vesktop/app.asar"]
-            .iter()
-            .map(|s| (*s).to_owned())
-            .collect();
-
-        assert_eq!(refine_from_cmdline(&args).as_deref(), Some("vesktop"));
-    }
-
-    #[test]
-    fn a_data_directory_that_names_the_framework_is_no_better_than_what_we_had() {
-        let args = vec!["--user-data-dir=/home/someone/.config/Electron".to_owned()];
-
-        assert_eq!(refine_from_cmdline(&args), None);
-    }
-
-    #[test]
-    fn arguments_that_name_nothing_refine_nothing() {
-        assert_eq!(refine_from_cmdline(&[]), None);
-        assert_eq!(refine_from_cmdline(&["--type=renderer".to_owned()]), None);
-    }
-
-    #[test]
-    fn the_framework_names_are_the_ones_worth_replacing() {
-        assert!(is_generic("Chromium") && is_generic("electron") && is_generic("unknown"));
-        assert!(!is_generic("Vesktop") && !is_generic("Firefox"));
     }
 
     #[test]

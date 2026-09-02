@@ -7,10 +7,10 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+app-identity.workspace = true
 libspa.workspace = true
 pipewire.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-tempfile.workspace = true

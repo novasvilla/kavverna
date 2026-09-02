@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "apps/kavverna-shell",
+    "desktop/app-identity",
     "desktop/kde-bridge",
     "domain/feature-catalog",
     "domain/preferences",
@@ -74,6 +75,7 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 strum = "0.28.0"
 strum_macros = "0.28.0"
 clipboard-history = { path = "features/clipboard-history" }
+app-identity = { path = "desktop/app-identity" }
 feature-catalog = { path = "domain/feature-catalog" }
 kde-bridge = { path = "desktop/kde-bridge" }
 link-cleaner = { path = "features/link-cleaner" }

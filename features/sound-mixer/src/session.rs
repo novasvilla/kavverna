@@ -1,9 +1,10 @@
-use crate::app_identity::{
-    Properties, app_key, cmdline_of_process, display_name, is_generic, presentable,
-    refine_from_cmdline,
-};
+use crate::app_key::{Properties, app_key, display_name};
 use crate::model::{Anchor, AudioDevice, AudioStream, DeviceRole, MixerSnapshot};
 use crate::volume::Volume;
+use app_identity::{
+    DesktopEntry, binary_of_process, cmdline_of_process, is_generic, presentable,
+    refine_from_cmdline, steam_icon_of_process,
+};
 use libspa::param::ParamType;
 use libspa::pod::deserialize::PodDeserializer;
 use libspa::pod::serialize::PodSerializer;
@@ -131,15 +132,14 @@ struct CardRoute {
 fn installed_entry(
     node: &Properties,
     client: Option<&Properties>,
-) -> Option<&'static crate::desktop_entry::Entry> {
+) -> Option<&'static DesktopEntry> {
     let pid = process_id(node, client);
     let reads = |key: &str| {
         [Some(node), client].into_iter().flatten().find_map(|bag| bag.get(key).cloned())
     };
 
-    if let Some(entry) = pid
-        .and_then(crate::steam_icon_of_process)
-        .and_then(|icon| crate::desktop_entry::named_after_icon(&icon))
+    if let Some(entry) =
+        pid.and_then(steam_icon_of_process).and_then(|icon| app_identity::named_after_icon(&icon))
     {
         return Some(entry);
     }
@@ -147,15 +147,14 @@ fn installed_entry(
     if let Some(entry) = ["application.id", "application.name", "node.name"]
         .iter()
         .filter_map(|key| reads(key))
-        .find_map(|identity| crate::desktop_entry::named_after_identity(&identity))
+        .find_map(|identity| app_identity::named_after_identity(&identity))
     {
         return Some(entry);
     }
 
-    let binary =
-        reads("application.process.binary").or_else(|| pid.and_then(crate::binary_of_process))?;
+    let binary = reads("application.process.binary").or_else(|| pid.and_then(binary_of_process))?;
 
-    crate::desktop_entry::named_after_binary(&binary)
+    app_identity::named_after_binary(&binary)
 }
 
 /// The framework process is the one holding the arguments that name the application.

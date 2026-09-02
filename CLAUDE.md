@@ -20,6 +20,8 @@ domain/feature-catalog    Feature enum and descriptors: title, summary, group, i
                           readiness, and the settings keys. Read by the features page and by
                           `settings.rs`. Depends on no feature crate.
 domain/preferences        Settings store: JSON, atomic writes, 0700 dirs and 0600 files.
+desktop/app-identity      What the desktop calls a process: desktop entries by binary, icon
+                          and announced identity, Steam's game id, Electron's arguments.
 desktop/kde-bridge        zbus proxies: KGlobalAccel, logind, ScreenSaver.
 features/*                One crate per feature. No Qt, no display needed to test.
 apps/kavverna-shell       The only crate that knows Qt. QObjects, QML, tray, D-Bus service.
@@ -89,7 +91,7 @@ linted by clippy there, and `cargo build` is the only thing standing between a d
 and a red main. A warning that is a yellow line locally is a failure there.
 
 A discovery function that scans a system directory takes the root as a parameter, with a thin
-wrapper passing the real one. `desktop_entry::build` and `Thermometer::discover_in` are the
+wrapper passing the real one. `app_identity::process_in` and `Thermometer::discover_in` are the
 shape. Fusing the path constant to the walk is what put a test on the machine's own hardware and
 turned main red.
 
