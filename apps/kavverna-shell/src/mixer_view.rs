@@ -132,8 +132,12 @@ impl qobject::MixerView {
     }
 
     fn set_stream_volume(self: Pin<&mut Self>, node_id: i32, percent: i32) {
+        let Some(volume) = Volume::for_application(percent) else {
+            tracing::debug!(node_id, percent, "stream volume outside its range, ignored");
+            return;
+        };
         for sibling in siblings(node_id) {
-            send_volume(sibling, percent);
+            send_volume(sibling, volume);
         }
     }
 
@@ -144,7 +148,10 @@ impl qobject::MixerView {
     }
 
     fn set_output_volume(self: Pin<&mut Self>, node_id: i32, percent: i32) {
-        send_volume(node_id, percent);
+        match Volume::for_device(percent) {
+            Some(volume) => send_volume(node_id, volume),
+            None => tracing::debug!(node_id, percent, "output volume outside its range, ignored"),
+        }
     }
 
     fn mute_output(self: Pin<&mut Self>, node_id: i32, muted: bool) {
@@ -457,12 +464,9 @@ fn every_device_name(output: bool) -> Vec<String> {
     devices.into_iter().map(|device| device.name).collect()
 }
 
-fn send_volume(node_id: i32, percent: i32) {
+fn send_volume(node_id: i32, volume: Volume) {
     if let Ok(node_id) = u32::try_from(node_id) {
-        mixer_state::send(MixerCommand::SetVolume {
-            node_id,
-            volume: Volume::from_percent(percent as f32),
-        });
+        mixer_state::send(MixerCommand::SetVolume { node_id, volume });
     }
 }
 

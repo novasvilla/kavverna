@@ -35,6 +35,9 @@ ColumnLayout {
                 required property int index
                 readonly property bool isDefault:
                     section.mixer.output_ids[index] === section.mixer.default_output_id
+                readonly property int percent:
+                    index < section.mixer.output_volumes.length
+                    ? section.mixer.output_volumes[index] : 0
 
                 Layout.fillWidth: true
                 spacing: 2
@@ -64,10 +67,12 @@ ColumnLayout {
                         }
                     }
 
-                    Label {
-                        text: section.mixer.output_volumes[outputRow.index] + "%"
-                        font.pixelSize: section.theme.textBody
-                        color: section.theme.secondaryText
+                    FigureField {
+                        theme: section.theme
+                        value: outputRow.percent
+                        maximum: 100
+                        onCommitted: (value) => section.mixer.set_output_volume(
+                            section.mixer.output_ids[outputRow.index], value)
                     }
 
                     IconButton {
@@ -85,7 +90,7 @@ ColumnLayout {
                     Layout.fillWidth: true
                     from: 0
                     to: 100
-                    value: section.mixer.output_volumes[outputRow.index]
+                    value: outputRow.percent
                     onMoved: section.mixer.set_output_volume(
                         section.mixer.output_ids[outputRow.index], Math.round(value))
                 }
@@ -117,9 +122,15 @@ ColumnLayout {
             delegate: ColumnLayout {
                 id: streamRow
                 required property int index
-                readonly property int percent: section.mixer.stream_volumes[index]
-                readonly property string anchorReason: section.mixer.stream_anchors[index]
-                readonly property int routedTo: section.mixer.stream_route_device_ids[index]
+                readonly property int percent:
+                    index < section.mixer.stream_volumes.length
+                    ? section.mixer.stream_volumes[index] : 0
+                readonly property string anchorReason:
+                    index < section.mixer.stream_anchors.length
+                    ? section.mixer.stream_anchors[index] : ""
+                readonly property int routedTo:
+                    index < section.mixer.stream_route_device_ids.length
+                    ? section.mixer.stream_route_device_ids[index] : -1
                 property bool routeOpen: false
 
                 /// Follow the default first, every output after, and the unplugged choice
@@ -158,11 +169,14 @@ ColumnLayout {
                         elide: Text.ElideRight
                     }
 
-                    Label {
-                        text: streamRow.percent + "%"
-                        font.pixelSize: section.theme.textBody
+                    FigureField {
+                        theme: section.theme
+                        value: streamRow.percent
+                        maximum: 200
                         color: streamRow.percent > 100 ? section.theme.warm
                                                        : section.theme.secondaryText
+                        onCommitted: (value) => section.mixer.set_stream_volume(
+                            section.mixer.stream_ids[streamRow.index], value)
                     }
                 }
 
@@ -320,8 +334,12 @@ ColumnLayout {
             delegate: ColumnLayout {
                 id: recorderRow
                 required property int index
-                readonly property string anchorReason: section.mixer.recorder_anchors[index]
-                readonly property int routedTo: section.mixer.recorder_route_device_ids[index]
+                readonly property string anchorReason:
+                    index < section.mixer.recorder_anchors.length
+                    ? section.mixer.recorder_anchors[index] : ""
+                readonly property int routedTo:
+                    index < section.mixer.recorder_route_device_ids.length
+                    ? section.mixer.recorder_route_device_ids[index] : -1
                 property bool routeOpen: false
 
                 function sourceChoices() {

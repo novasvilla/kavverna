@@ -15,6 +15,16 @@ impl Volume {
         Self { percent: percent.clamp(0.0, MAX_PERCENT) }
     }
 
+    /// A device stops at unity even though PipeWire would take more: boost belongs on the
+    /// one stream that needs it, since a boosted output amplifies everything at once.
+    pub fn for_device(percent: i32) -> Option<Self> {
+        (0..=UNITY_PERCENT as i32).contains(&percent).then(|| Self::from_percent(percent as f32))
+    }
+
+    pub fn for_application(percent: i32) -> Option<Self> {
+        (0..=MAX_PERCENT as i32).contains(&percent).then(|| Self::from_percent(percent as f32))
+    }
+
     pub fn from_amplitude(amplitude: f32) -> Self {
         Self::from_percent(amplitude.max(0.0).cbrt() * 100.0)
     }
@@ -83,5 +93,15 @@ mod tests {
     fn silence_stays_silent() {
         assert_eq!(Volume::from_percent(0.0).amplitude(), 0.0);
         assert_eq!(Volume::from_amplitude(0.0).percent(), 0.0);
+    }
+
+    #[test]
+    fn a_device_stops_at_unity_and_an_application_at_the_boost_ceiling() {
+        assert_eq!(Volume::for_device(0).unwrap().percent(), 0.0);
+        assert_eq!(Volume::for_device(100).unwrap().percent(), 100.0);
+        assert!(Volume::for_device(101).is_none());
+        assert!(Volume::for_device(-1).is_none());
+        assert_eq!(Volume::for_application(200).unwrap().percent(), 200.0);
+        assert!(Volume::for_application(201).is_none());
     }
 }
