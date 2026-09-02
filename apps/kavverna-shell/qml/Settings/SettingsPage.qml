@@ -15,19 +15,20 @@ ColumnLayout {
     /// A row for a utility that was removed would offer settings for something not
     /// running, so each one answers for the utility that owns it.
     required property var shows
-
+    /// One group open at a time, so the page is an index that unfolds in place rather than a
+    /// column somebody has to scroll past to reach the last setting.
+    property string openSection: ""
 
     Layout.fillWidth: true
     spacing: 12
 
-    SectionLabel {
+    Section {
         theme: page.theme
-        text: "PANEL"
-    }
-
-    Card {
-        theme: page.theme
+        title: "PANEL"
+        detail: "Where it opens, whether it floats over everything"
         spacing: 12
+        open: page.openSection === "PANEL"
+        onToggled: page.openSection = open ? "" : "PANEL"
 
         ChoiceRow {
             theme: page.theme
@@ -46,7 +47,7 @@ ColumnLayout {
         SettingRow {
             theme: page.theme
             title: "Stay above every window"
-            detail: "On, the panel floats over everything, fullscreen included. Off, it sits with ordinary panels and fullscreen applications cover it. Takes hold the next time the panel opens."
+            detail: "On, the panel floats over everything, fullscreen included. Off, it sits with ordinary panels, fullscreen applications cover it, and it closes once another window takes the focus."
             on: page.hub.panel_on_top
             onToggled: (value) => page.hub.choose_panel_on_top(value)
         }
@@ -56,17 +57,17 @@ ColumnLayout {
             text: "Drag the panel by its header to move it."
             font.pixelSize: page.theme.textBody
             color: page.theme.secondaryText
+            wrapMode: Text.WordWrap
         }
     }
 
-    SectionLabel {
+    Section {
         theme: page.theme
-        text: "APPEARANCE"
-    }
-
-    Card {
-        theme: page.theme
+        title: "APPEARANCE"
+        detail: "Theme and light or dark"
         spacing: 12
+        open: page.openSection === "APPEARANCE"
+        onToggled: page.openSection = open ? "" : "APPEARANCE"
 
         ColumnLayout {
             Layout.fillWidth: true
@@ -144,6 +145,31 @@ ColumnLayout {
                                 border.color: page.theme.hairline
                             }
                         }
+
+                        // An inside joke living on the blue theme; the text stays exactly as
+                        // it is. Drawn in the window because a ToolTip popup is unreliable
+                        // over a layer surface, and inside this plain Row so the RowLayout
+                        // around it does not try to lay the bubble out as a cell.
+                        Rectangle {
+                            visible: themeRow.modelData.id === "tide" && rowHover.hovered
+                            anchors.bottom: parent.top
+                            anchors.bottomMargin: 2
+                            anchors.right: parent.right
+                            width: quip.implicitWidth + 16
+                            height: quip.implicitHeight + 10
+                            radius: page.theme.radiusSmall
+                            color: page.theme.surface
+                            border.width: 1
+                            border.color: page.theme.hairline
+
+                            Label {
+                                id: quip
+                                anchors.centerIn: parent
+                                text: "Ian P. Mode ;-)"
+                                font.pixelSize: page.theme.textSmall
+                                color: page.theme.primaryText
+                            }
+                        }
                     }
 
                     TapHandler {
@@ -152,29 +178,6 @@ ColumnLayout {
 
                     HoverHandler { id: rowHover }
 
-                    // An inside joke living on the blue theme; the text stays exactly as it
-                    // is. Drawn in the window because a ToolTip popup is unreliable over a
-                    // layer surface.
-                    Rectangle {
-                        visible: themeRow.modelData.id === "tide" && rowHover.hovered
-                        anchors.bottom: parent.top
-                        anchors.bottomMargin: 2
-                        anchors.right: parent.right
-                        width: quip.implicitWidth + 16
-                        height: quip.implicitHeight + 10
-                        radius: page.theme.radiusSmall
-                        color: page.theme.surface
-                        border.width: 1
-                        border.color: page.theme.hairline
-
-                        Label {
-                            id: quip
-                            anchors.centerIn: parent
-                            text: "Ian P. Mode ;-)"
-                            font.pixelSize: page.theme.textSmall
-                            color: page.theme.primaryText
-                        }
-                    }
                 }
             }
         }
@@ -196,17 +199,17 @@ ColumnLayout {
     FeaturesCard {
         theme: page.theme
         features: page.features
+        open: page.openSection === "UTILITIES"
+        onToggled: page.openSection = open ? "" : "UTILITIES"
     }
 
-    SectionLabel {
+    Section {
         theme: page.theme
-        text: "SOUND"
-        visible: page.shows("microphone-tools") || page.shows("output-switcher")
-    }
-
-    Card {
-        theme: page.theme
+        title: "SOUND"
+        detail: "Preferred microphone, the outputs the shortcut steps through"
         spacing: 14
+        open: page.openSection === "SOUND"
+        onToggled: page.openSection = open ? "" : "SOUND"
         visible: page.shows("microphone-tools") || page.shows("output-switcher")
 
         ColumnLayout {
@@ -238,7 +241,8 @@ ColumnLayout {
                     Layout.fillWidth: true
                     theme: page.theme
                     text: page.mixer.input_names[index]
-                    checked: page.mixer.input_preferred[index]
+                    checked: index < page.mixer.input_preferred.length
+                             && page.mixer.input_preferred[index]
                     onToggled: page.mixer.choose_preferred_input(
                         page.mixer.input_ids[index], checked)
                 }
@@ -282,7 +286,8 @@ ColumnLayout {
                     Layout.fillWidth: true
                     theme: page.theme
                     text: page.mixer.output_names[index]
-                    checked: page.mixer.output_in_cycle[index]
+                    checked: index < page.mixer.output_in_cycle.length
+                             && page.mixer.output_in_cycle[index]
                     onToggled: page.mixer.choose_output_in_cycle(
                         page.mixer.output_ids[index], checked)
                 }
@@ -290,16 +295,13 @@ ColumnLayout {
         }
     }
 
-    SectionLabel {
+    Section {
         theme: page.theme
-        text: "CLIPBOARD"
-        visible: page.shows("clipboard-history") || page.shows("clipboard-auto-clear")
-                 || page.shows("clean-url")
-    }
-
-    Card {
-        theme: page.theme
+        title: "CLIPBOARD"
+        detail: "History, what is skipped, emptying, URL rules"
         spacing: 14
+        open: page.openSection === "CLIPBOARD"
+        onToggled: page.openSection = open ? "" : "CLIPBOARD"
         visible: page.shows("clipboard-history") || page.shows("clipboard-auto-clear")
                  || page.shows("clean-url")
 
@@ -434,15 +436,13 @@ ColumnLayout {
         }
     }
 
-    SectionLabel {
+    Section {
         theme: page.theme
-        text: "SHELF"
-        visible: page.shows("shelf")
-    }
-
-    Card {
-        theme: page.theme
+        title: "SHELF"
+        detail: "Edge strip, where it hangs, what survives a restart"
         spacing: 12
+        open: page.openSection === "SHELF"
+        onToggled: page.openSection = open ? "" : "SHELF"
         visible: page.shows("shelf")
 
         SettingRow {
@@ -482,15 +482,13 @@ ColumnLayout {
         }
     }
 
-    SectionLabel {
+    Section {
         theme: page.theme
-        text: "ENERGY"
-        visible: page.shows("keep-awake")
-    }
-
-    Card {
-        theme: page.theme
+        title: "ENERGY"
+        detail: "How long a hold lasts, what it holds"
         spacing: 14
+        open: page.openSection === "ENERGY"
+        onToggled: page.openSection = open ? "" : "ENERGY"
         visible: page.shows("keep-awake")
 
         SettingRow {
@@ -526,15 +524,13 @@ ColumnLayout {
         }
     }
 
-    SectionLabel {
+    Section {
         theme: page.theme
-        text: "TOOLS"
-        visible: page.shows("mouse-jiggle")
-    }
-
-    Card {
-        theme: page.theme
+        title: "TOOLS"
+        detail: "When the mouse is nudged and with what"
         spacing: 12
+        open: page.openSection === "TOOLS"
+        onToggled: page.openSection = open ? "" : "TOOLS"
         visible: page.shows("mouse-jiggle")
 
         ChoiceRow {
@@ -592,14 +588,13 @@ ColumnLayout {
         }
     }
 
-    SectionLabel {
+    Section {
         theme: page.theme
-        text: "STARTUP"
-    }
-
-    Card {
-        theme: page.theme
+        title: "STARTUP"
+        detail: "Starting with the session, restoring a hold"
         spacing: 12
+        open: page.openSection === "STARTUP"
+        onToggled: page.openSection = open ? "" : "STARTUP"
 
         SettingRow {
             theme: page.theme
@@ -618,14 +613,13 @@ ColumnLayout {
         }
     }
 
-    SectionLabel {
+    Section {
         theme: page.theme
-        text: "ABOUT"
-    }
-
-    Card {
-        theme: page.theme
+        title: "ABOUT"
+        detail: "Version, where the settings live, what this machine offers"
         spacing: 8
+        open: page.openSection === "ABOUT"
+        onToggled: page.openSection = open ? "" : "ABOUT"
 
         RowLayout {
             Layout.fillWidth: true
