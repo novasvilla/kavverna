@@ -75,7 +75,7 @@ pub fn run() -> i32 {
 async fn has_owner(connection: Option<&zbus::Connection>, service: &str) -> bool {
     let probe = async {
         let name = zbus::names::BusName::try_from(service).ok()?;
-        zbus::fdo::DBusProxy::new(connection?).await.ok()?.name_has_owner(name.into()).await.ok()
+        zbus::fdo::DBusProxy::new(connection?).await.ok()?.name_has_owner(name).await.ok()
     };
     probe.await.unwrap_or(false)
 }

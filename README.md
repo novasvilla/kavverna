@@ -125,6 +125,10 @@ not. See [CREDITS.md](CREDITS.md).
 - **Compressed swap** priced by what it really costs in RAM, not by what `free` reports.
 - **Both graphics cards**, never summed: usage, temperature, power and VRAM, with the discrete
   one chosen by default.
+- **Network by interface**, with local upload and download rates and totals since Kavverna
+  started. Container bridge links are left out of the panel.
+- **Local storage**, with free capacity and read/write rates for the system volume and distinct
+  home or removable volumes. Missing kernel counters are shown as unavailable.
 
 ### Clipboard
 
@@ -331,7 +335,7 @@ Being straight about this up front, because these limits are not going away:
 
 In roughly this order. Anything here is a good place to start if you want to help.
 
-- **Network and disk** in the monitor.
+- **Monitor alerts** for sustained load, heat, memory pressure or low storage.
 - **Quick toggles**: dark mode, lock, screens off, night colour, eject removable disks. Nearly
   all one call each, and the tools page has room.
 - **Pasting straight from the picker** into the application you were in, which needs synthetic

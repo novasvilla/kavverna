@@ -23,6 +23,15 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: 12
 
+    Label {
+        Layout.fillWidth: true
+        visible: !page.features.settings_writable
+        text: "The settings file could not be read. Changes cannot be saved; repair it and restart Kavverna."
+        font.pixelSize: page.theme.textBody
+        color: page.theme.ember
+        wrapMode: Text.WordWrap
+    }
+
     Section {
         theme: page.theme
         title: "PANEL"

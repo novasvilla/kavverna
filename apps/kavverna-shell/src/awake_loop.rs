@@ -154,41 +154,6 @@ fn hold_from_record(record: i64, now: i64) -> Option<Hold> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const NOW: i64 = 1_800_000_000;
-
-    #[test]
-    fn a_timed_hold_comes_back_with_what_was_left_of_it() {
-        let record = record_for(true, Some(Duration::from_secs(1800)), NOW);
-
-        assert_eq!(hold_from_record(record, NOW + 120), Some(Hold::For(Duration::from_secs(1680))));
-    }
-
-    #[test]
-    fn a_hold_with_no_end_comes_back_the_same_way() {
-        let record = record_for(true, None, NOW);
-
-        assert_eq!(hold_from_record(record, NOW + 90_000), Some(Hold::Indefinite));
-    }
-
-    #[test]
-    fn nothing_held_puts_nothing_back() {
-        assert_eq!(hold_from_record(record_for(false, None, NOW), NOW), None);
-    }
-
-    /// The case that matters most: a machine left off overnight must not come back holding a
-    /// thirty minute hold that ended hours ago.
-    #[test]
-    fn a_hold_that_ran_out_while_it_was_closed_is_over() {
-        let record = record_for(true, Some(Duration::from_secs(1800)), NOW);
-
-        assert_eq!(hold_from_record(record, NOW + 7200), None);
-    }
-}
-
 fn jiggle_activity() -> (Activity, Keystroke) {
     let read = |key, fallback| i32::try_from(settings::integer_at(key, fallback)).unwrap_or(0);
 
@@ -219,5 +184,38 @@ fn announce_expiry() {
 
     if let Err(err) = outcome {
         tracing::warn!(%err, "could not post the expiry notification");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const NOW: i64 = 1_800_000_000;
+
+    #[test]
+    fn a_timed_hold_comes_back_with_what_was_left_of_it() {
+        let record = record_for(true, Some(Duration::from_secs(1800)), NOW);
+
+        assert_eq!(hold_from_record(record, NOW + 120), Some(Hold::For(Duration::from_secs(1680))));
+    }
+
+    #[test]
+    fn a_hold_with_no_end_comes_back_the_same_way() {
+        let record = record_for(true, None, NOW);
+
+        assert_eq!(hold_from_record(record, NOW + 90_000), Some(Hold::Indefinite));
+    }
+
+    #[test]
+    fn nothing_held_puts_nothing_back() {
+        assert_eq!(hold_from_record(record_for(false, None, NOW), NOW), None);
+    }
+
+    #[test]
+    fn a_hold_that_ran_out_while_it_was_closed_is_over() {
+        let record = record_for(true, Some(Duration::from_secs(1800)), NOW);
+
+        assert_eq!(hold_from_record(record, NOW + 7200), None);
     }
 }

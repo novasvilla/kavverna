@@ -31,9 +31,10 @@ On a normal machine `$XDG_DATA_HOME` is `~/.local/share` and `$XDG_CONFIG_HOME` 
   past what the general rule covers; a key block, recognised by its `-----BEGIN` line, since it
   is mostly line breaks and the general rule rejects anything with one; and a URL of any scheme
   carrying a user name or password, which is what a connection string is.
-- **Anything at all, with the history switched off.** The compositor still reports that a copy
-  happened, which is what the clear timer needs, but the content is not taken. There is a test
-  that copies something with reading off and fails if it arrives.
+- **Anything at all, with both history and link cleaning switched off.** The compositor still
+  reports that a copy happened for the clear timer, but the content is not taken. Link cleaning
+  must read copied text to decide whether a URL needs rewriting. A compositor test covers the
+  no-reading case.
 
 ## Logs
 

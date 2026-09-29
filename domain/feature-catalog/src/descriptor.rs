@@ -109,7 +109,7 @@ impl Feature {
                 group: Group::Monitoring,
                 icon: "network-wired",
                 energy: EnergyProfile::Periodic,
-                readiness: Readiness::Planned,
+                readiness: Readiness::Built,
                 enable_keys: &["network-monitor.enabled"],
             },
             Self::MonitorAlerts => Descriptor {

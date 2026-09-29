@@ -40,7 +40,7 @@ const KEYS: &[(&str, Option<Feature>, &str, i32)] = &[
 /// shortcut that does nothing when pressed.
 fn installed() -> Vec<Shortcut> {
     KEYS.iter()
-        .filter(|(_, feature, _, _)| feature.is_none_or(|feature| settings::is_installed(feature)))
+        .filter(|(_, feature, _, _)| feature.is_none_or(settings::is_installed))
         .map(|&(action, _, friendly, keys)| Shortcut { action, friendly, keys })
         .collect()
 }

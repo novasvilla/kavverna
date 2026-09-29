@@ -59,11 +59,11 @@ pub fn moves_due(
         .filter(|stream| stream.movable)
         .filter_map(|stream| {
             let choice = chosen(entries, &stream.app)?;
-            if !devices_now.iter().any(|name| *name == choice.name) {
+            if !devices_now.contains(&choice.name) {
                 return None;
             }
             let stream_is_new = !known_stream_ids.contains(&stream.node_id);
-            let device_is_back = !devices_before.iter().any(|name| *name == choice.name);
+            let device_is_back = !devices_before.contains(&choice.name);
             (stream_is_new || device_is_back).then_some((stream.node_id, choice.name))
         })
         .collect()

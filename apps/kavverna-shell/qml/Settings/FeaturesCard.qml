@@ -12,7 +12,7 @@ Section {
     required property var features
 
     title: "UTILITIES"
-    detail: card.features.installed_count + " of " + card.features.built_count + " on"
+    detail: card.features.installed_count + " of " + card.features.built_count + " selected"
     spacing: card.theme.gap
 
     Repeater {
@@ -100,6 +100,7 @@ Section {
                     id: entrySwitch
                     theme: card.theme
                     visible: entry.built
+                    enabled: card.features.settings_writable
                     checked: card.features.installed[entry.index]
                     onToggled: card.features.choose_installed(entry.id, checked)
 
@@ -133,9 +134,20 @@ Section {
 
     Label {
         Layout.fillWidth: true
-        text: "A utility switched off here stops watching anything the next time Kavverna starts."
+        visible: card.features.save_notice.length > 0
+        text: card.features.save_notice
         font.pixelSize: card.theme.textBody
-        color: card.theme.mutedText
+        color: card.theme.ember
+        wrapMode: Text.WordWrap
+    }
+
+    Label {
+        Layout.fillWidth: true
+        text: card.features.restart_required
+            ? "Selection saved. Quit Kavverna from the tray and start it again to apply these changes."
+            : "Changes to these utilities take effect the next time Kavverna starts."
+        font.pixelSize: card.theme.textBody
+        color: card.features.restart_required ? card.theme.accent : card.theme.mutedText
         wrapMode: Text.WordWrap
     }
 }

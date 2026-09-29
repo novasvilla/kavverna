@@ -399,7 +399,7 @@ fn choose_default(
         return;
     };
 
-    let value = format!("{{\"name\":\"{name}\"}}");
+    let value = serde_json::json!({ "name": name }).to_string();
     metadata.set_property(0, key, Some("Spa:String:JSON"), Some(&value));
     tracing::info!(key, name, "default device changed");
 }
@@ -901,12 +901,7 @@ fn watch_defaults(
 
 /// The metadata value is JSON of the shape `{"name":"alsa_output..."}`.
 fn parse_default_name(value: &str) -> Option<String> {
-    let start = value.find("\"name\"")?;
-    let rest = &value[start + 6..];
-    let open = rest.find('"')? + 1;
-    let tail = &rest[open..];
-    let close = tail.find('"')?;
-    Some(tail[..close].to_owned())
+    serde_json::from_str::<serde_json::Value>(value).ok()?.get("name")?.as_str().map(str::to_owned)
 }
 
 #[cfg(test)]
@@ -940,6 +935,10 @@ mod tests {
             Some("alsa_output.pci-0000_0c_00.6.iec958-stereo".to_owned())
         );
         assert_eq!(parse_default_name(r#"{ "name" : "headset" }"#), Some("headset".to_owned()));
+        assert_eq!(
+            parse_default_name(r#"{"name":"speaker \"west\""}"#),
+            Some("speaker \"west\"".to_owned())
+        );
     }
 
     #[test]

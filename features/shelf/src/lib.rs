@@ -18,10 +18,13 @@ pub use staging::{Dropped, wanted_image_format};
 
 use std::path::PathBuf;
 
+const MOST_LINK_BYTES: usize = 8 * 1024;
+
 pub struct Shelf {
     dir: PathBuf,
     piles: Vec<Pile>,
     next_id: u64,
+    read_only: bool,
     /// The last refusal, one sentence, cleared by the next accepted drop.
     pub notice: String,
 }
@@ -33,17 +36,31 @@ impl Shelf {
     }
 
     pub fn open(dir: PathBuf, keep_across_restarts: bool) -> Self {
-        if !keep_across_restarts {
-            store::forget(&dir);
-        }
-        let piles = store::load(&dir);
-        store::sweep(&dir, &piles);
+        let (piles, read_only, notice) = match store::load(&dir) {
+            Ok(mut piles) => {
+                if keep_across_restarts {
+                    store::sweep(&dir, &piles);
+                } else {
+                    store::forget(&dir);
+                    piles.clear();
+                }
+                (piles, false, String::new())
+            }
+            Err(err) => {
+                tracing::error!(%err, "the saved shelf could not be read");
+                (
+                    Vec::new(),
+                    true,
+                    "The saved shelf could not be read. Its files were left untouched.".into(),
+                )
+            }
+        };
         let next_id = piles
             .iter()
             .flat_map(|pile| pile.items.iter().map(|item| item.id).chain([pile.id]))
             .max()
             .map_or(1, |seen| seen + 1);
-        Self { dir, piles, next_id, notice: String::new() }
+        Self { dir, piles, next_id, read_only, notice }
     }
 
     pub fn piles(&self) -> &[Pile] {
@@ -73,6 +90,9 @@ impl Shelf {
     /// One drop gesture in: everything it carried becomes one pile, or nothing does. A full
     /// shelf refuses and says so, because what is here was parked on purpose.
     pub fn deposit(&mut self, dropped: &staging::Dropped) -> bool {
+        if self.read_only {
+            return false;
+        }
         let incoming = staging::classify(dropped);
         if incoming.is_empty() {
             self.notice = "Nothing in that drop could be kept.".into();
@@ -82,18 +102,34 @@ impl Shelf {
             self.notice = format!("The shelf is full at {MOST_ITEMS} items.");
             return false;
         }
-        if !dropped.image_bytes.is_empty()
-            && self.staged_bytes() + dropped.image_bytes.len() as u64 > MOST_STAGED_BYTES
-        {
+        if incoming.iter().any(|arrival| match arrival {
+            staging::Incoming::Link { url, label } => {
+                url.len().saturating_add(label.as_ref().map_or(0, String::len)) > MOST_LINK_BYTES
+            }
+            _ => false,
+        }) {
+            self.notice = "That link is too large for the shelf.".into();
+            return false;
+        }
+        let incoming_bytes: u64 = incoming
+            .iter()
+            .map(|arrival| match arrival {
+                staging::Incoming::ImageBytes { .. } => dropped.image_bytes.len() as u64,
+                staging::Incoming::Text(text) => text.len() as u64,
+                _ => 0,
+            })
+            .sum();
+        if self.staged_bytes().saturating_add(incoming_bytes) > MOST_STAGED_BYTES {
             self.notice = "The shelf's staging space is full.".into();
             return false;
         }
 
         let items_dir = store::items_dir(&self.dir);
         let mut items = Vec::new();
+        let mut next_id = self.next_id;
         for arrival in incoming {
-            let id = self.next_id;
-            self.next_id += 1;
+            let id = next_id;
+            next_id += 1;
             let item = match arrival {
                 staging::Incoming::LocalFile(path) => {
                     let bytes = std::fs::metadata(&path).ok().map(|meta| meta.len());
@@ -113,7 +149,8 @@ impl Shelf {
                         },
                         Err(err) => {
                             tracing::warn!(%err, "image bytes could not be staged");
-                            continue;
+                            self.notice = "The shelf could not stage this drop.".into();
+                            return false;
                         }
                     }
                 }
@@ -127,7 +164,8 @@ impl Shelf {
                         },
                         Err(err) => {
                             tracing::warn!(%err, "text could not be staged");
-                            continue;
+                            self.notice = "The shelf could not stage this drop.".into();
+                            return false;
                         }
                     }
                 }
@@ -140,46 +178,73 @@ impl Shelf {
             return false;
         }
 
-        let pile = Pile { id: self.next_id, items };
-        self.next_id += 1;
-        self.piles.push(pile);
-        self.notice.clear();
-        self.persist();
-        true
+        let pile = Pile { id: next_id, items };
+        let mut piles = self.piles.clone();
+        piles.push(pile);
+        if self.save_change(piles) {
+            self.next_id = next_id + 1;
+            true
+        } else {
+            false
+        }
     }
 
     /// Removal on purpose deletes the blobs the shelf owns; nothing else is ever touched.
     pub fn remove(&mut self, id: u64) {
-        for pile in &mut self.piles {
+        if self.read_only {
+            return;
+        }
+        let mut piles = self.piles.clone();
+        let mut removed = None;
+        for pile in &mut piles {
             if let Some(at) = pile.items.iter().position(|item| item.id == id) {
-                let item = pile.items.remove(at);
-                if let Some(blob) = item.owned_blob() {
-                    let _ = std::fs::remove_file(blob);
-                }
+                removed = Some(pile.items.remove(at));
+                break;
             }
         }
-        self.piles.retain(|pile| !pile.items.is_empty());
-        self.persist();
-    }
-
-    pub fn clear(&mut self) {
-        for item in self.piles.iter().flat_map(|pile| pile.items.iter()) {
-            if let Some(blob) = item.owned_blob() {
+        let Some(item) = removed else { return };
+        piles.retain(|pile| !pile.items.is_empty());
+        let orphan = item
+            .owned_blob()
+            .filter(|blob| {
+                !piles
+                    .iter()
+                    .flat_map(|pile| &pile.items)
+                    .any(|remaining| remaining.owned_blob() == Some(*blob))
+            })
+            .map(std::path::Path::to_path_buf);
+        if self.save_change(piles) {
+            if let Some(blob) = orphan {
                 let _ = std::fs::remove_file(blob);
             }
         }
-        self.piles.clear();
-        self.persist();
+    }
+
+    pub fn clear(&mut self) {
+        if self.read_only {
+            return;
+        }
+        let blobs: Vec<PathBuf> =
+            self.items().filter_map(Item::owned_blob).map(std::path::Path::to_path_buf).collect();
+        if self.save_change(Vec::new()) {
+            for blob in blobs {
+                let _ = std::fs::remove_file(blob);
+            }
+        }
     }
 
     /// After a drop somewhere accepted the drag. Items leave; their blobs stay for the next
     /// start's sweep, because the receiving side copies the file after the drag reports done.
     pub fn taken(&mut self, ids: &[u64]) {
-        for pile in &mut self.piles {
+        if self.read_only {
+            return;
+        }
+        let mut piles = self.piles.clone();
+        for pile in &mut piles {
             pile.items.retain(|item| !ids.contains(&item.id));
         }
-        self.piles.retain(|pile| !pile.items.is_empty());
-        self.persist();
+        piles.retain(|pile| !pile.items.is_empty());
+        self.save_change(piles);
     }
 
     pub fn payload_for(&self, ids: &[u64]) -> DragPayload {
@@ -187,9 +252,18 @@ impl Shelf {
         payload::payload_for(&chosen)
     }
 
-    fn persist(&self) {
-        if let Err(err) = store::save(&self.dir, &self.piles) {
-            tracing::error!(%err, "the shelf did not save");
+    fn save_change(&mut self, piles: Vec<Pile>) -> bool {
+        match store::save(&self.dir, &piles) {
+            Ok(()) => {
+                self.piles = piles;
+                self.notice.clear();
+                true
+            }
+            Err(err) => {
+                tracing::error!(%err, "the shelf did not save");
+                self.notice = "The shelf could not save this change.".into();
+                false
+            }
         }
     }
 }
@@ -269,6 +343,79 @@ mod tests {
         shelf.remove(id);
         assert!(!staged.exists());
         assert!(shelf.is_empty());
+    }
+
+    #[test]
+    fn removing_one_of_two_equal_notes_keeps_the_other_alive() {
+        let dir = tempfile::tempdir().expect("a tempdir");
+        let mut shelf = Shelf::open(dir.path().into(), true);
+        assert!(shelf.deposit(&drop_of_text("same note")));
+        assert!(shelf.deposit(&drop_of_text("same note")));
+
+        let ids: Vec<_> = shelf.items().map(|item| item.id).collect();
+        let staged = shelf.item(ids[0]).unwrap().owned_blob().unwrap().to_path_buf();
+        assert_eq!(shelf.item(ids[1]).unwrap().owned_blob(), Some(staged.as_path()));
+
+        shelf.remove(ids[0]);
+        assert!(staged.exists());
+        assert!(shelf.item(ids[1]).unwrap().alive());
+        assert_eq!(
+            shelf.payload_for(&[ids[1]]),
+            DragPayload::Mime { uris: Vec::new(), text: "same note".into() }
+        );
+
+        shelf.remove(ids[1]);
+        assert!(!staged.exists());
+    }
+
+    #[test]
+    fn a_note_larger_than_staging_space_is_refused_before_writing() {
+        let dir = tempfile::tempdir().expect("a tempdir");
+        let mut shelf = Shelf::open(dir.path().into(), true);
+        let note = "x".repeat(MOST_STAGED_BYTES as usize + 1);
+
+        assert!(!shelf.deposit(&drop_of_text(&note)));
+        assert!(shelf.notice.contains("full"));
+        assert!(shelf.is_empty());
+        assert!(!store::items_dir(dir.path()).exists());
+    }
+
+    #[test]
+    fn an_oversized_link_is_refused_before_saving_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut shelf = Shelf::open(dir.path().into(), true);
+        let link = format!("https://example.org/?x={}", "a".repeat(MOST_STAGED_BYTES as usize));
+        assert!(!shelf.deposit(&drop_of_text(&link)));
+        assert!(shelf.notice.contains("too large"));
+        assert!(!dir.path().join("shelf.json").exists());
+    }
+
+    #[test]
+    fn an_unreadable_saved_list_never_sweeps_its_blobs() {
+        let dir = tempfile::tempdir().expect("a tempdir");
+        let staged =
+            staging::stage_blob(&store::items_dir(dir.path()), b"kept", "txt").expect("staged");
+        std::fs::write(dir.path().join("shelf.json"), b"{").expect("broken list");
+
+        let mut shelf = Shelf::open(dir.path().into(), true);
+        assert!(staged.exists());
+        assert!(!shelf.deposit(&drop_of_text("another note")));
+        assert_eq!(std::fs::read(dir.path().join("shelf.json")).unwrap(), b"{");
+    }
+
+    #[test]
+    fn a_newer_saved_list_is_left_for_a_newer_version() {
+        let dir = tempfile::tempdir().expect("a tempdir");
+        let staged =
+            staging::stage_blob(&store::items_dir(dir.path()), b"kept", "txt").expect("staged");
+        let future = br#"{"version":999,"piles":[]}"#;
+        std::fs::write(dir.path().join("shelf.json"), future).unwrap();
+
+        let mut shelf = Shelf::open(dir.path().into(), false);
+        assert!(!shelf.deposit(&drop_of_text("another note")));
+        shelf.clear();
+        assert!(staged.exists());
+        assert_eq!(std::fs::read(dir.path().join("shelf.json")).unwrap(), future);
     }
 
     #[test]

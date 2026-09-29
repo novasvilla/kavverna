@@ -47,10 +47,11 @@ general rule rejects anything carrying one; and a URL of any scheme holding a us
 password, which is what a connection string is.
 
 **Auto clear.** On a timer, on suspend through logind, and on screen lock. Independent of each
-other, working with the history switched off, and never touching a saved entry. The suspend one
-holds a logind delay lock while it works, so the machine waits for the clipboard to be emptied
-rather than racing it. `delay` and never `block`: refusing a suspend outright is not what this
-is for, and the lock is only taken while the setting is on.
+other, working with the history switched off, and never touching a saved entry. On suspend it
+holds a logind delay lock until the compositor answers a sync request placed after the clear, or
+two seconds pass.
+A failed or stalled connection is logged and cannot block suspend indefinitely. Plasma can put
+the content back if Prevent empty clipboard is on; turn that setting off for visible clearing.
 
 **Link cleaning.** Campaign and click parameters removed the moment a link arrives, with the
 rest of the query left byte for byte as it was. Refused outright when the copy carries anything

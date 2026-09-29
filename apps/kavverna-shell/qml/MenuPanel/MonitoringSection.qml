@@ -73,11 +73,13 @@ ColumnLayout {
     SectionLabel {
         theme: section.theme
         text: "PROCESSOR AND MEMORY"
+        visible: section.shows("system-monitor")
     }
 
     Card {
         theme: section.theme
         spacing: 10
+        visible: section.shows("system-monitor")
 
         ColumnLayout {
             Layout.fillWidth: true
@@ -194,11 +196,13 @@ ColumnLayout {
     SectionLabel {
         theme: section.theme
         text: "GRAPHICS"
+        visible: section.shows("system-monitor")
     }
 
     Card {
         theme: section.theme
         spacing: 10
+        visible: section.shows("system-monitor")
 
         RowLayout {
             Layout.fillWidth: true
@@ -237,6 +241,114 @@ ColumnLayout {
             value: section.vitals.vram_text
             fraction: section.vitals.vram_used
             tint: section.vitals.vram_used > 0.9 ? section.theme.ember : section.theme.warm
+        }
+    }
+
+    SectionLabel {
+        theme: section.theme
+        text: "NETWORK"
+        visible: section.shows("network-monitor")
+    }
+
+    Card {
+        theme: section.theme
+        spacing: 10
+        visible: section.shows("network-monitor")
+
+        Label {
+            Layout.fillWidth: true
+            visible: section.vitals.network_status.length > 0
+            text: section.vitals.network_status
+            font.pixelSize: section.theme.textBody
+            color: section.theme.secondaryText
+            wrapMode: Text.WordWrap
+        }
+
+        Repeater {
+            model: section.vitals.network_names.length
+
+            delegate: ColumnLayout {
+                id: interfaceRow
+                required property int index
+                Layout.fillWidth: true
+                spacing: 3
+
+                Label {
+                    text: section.vitals.network_names[interfaceRow.index]
+                    font.pixelSize: section.theme.textStrong
+                    font.bold: true
+                    color: section.theme.primaryText
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label {
+                        text: section.vitals.network_received[interfaceRow.index]
+                        font.pixelSize: section.theme.textBody
+                        color: section.theme.secondaryText
+                    }
+                    Label {
+                        text: section.vitals.network_sent[interfaceRow.index]
+                        font.pixelSize: section.theme.textBody
+                        color: section.theme.secondaryText
+                    }
+                }
+
+                Label {
+                    text: section.vitals.network_totals[interfaceRow.index]
+                    font.pixelSize: section.theme.textSmall
+                    color: section.theme.mutedText
+                }
+            }
+        }
+    }
+
+    SectionLabel {
+        theme: section.theme
+        text: "STORAGE"
+        visible: section.shows("system-monitor")
+    }
+
+    Card {
+        theme: section.theme
+        spacing: 10
+        visible: section.shows("system-monitor")
+
+        Label {
+            Layout.fillWidth: true
+            visible: section.vitals.disk_status.length > 0
+            text: section.vitals.disk_status
+            font.pixelSize: section.theme.textBody
+            color: section.theme.secondaryText
+            wrapMode: Text.WordWrap
+        }
+
+        Repeater {
+            model: section.vitals.disk_names.length
+
+            delegate: ColumnLayout {
+                id: diskRow
+                required property int index
+                Layout.fillWidth: true
+                spacing: 3
+
+                Label {
+                    text: section.vitals.disk_names[diskRow.index]
+                    font.pixelSize: section.theme.textStrong
+                    font.bold: true
+                    color: section.theme.primaryText
+                }
+                Label {
+                    text: section.vitals.disk_spaces[diskRow.index]
+                    font.pixelSize: section.theme.textBody
+                    color: section.theme.secondaryText
+                }
+                Label {
+                    text: section.vitals.disk_rates[diskRow.index]
+                    font.pixelSize: section.theme.textSmall
+                    color: section.theme.mutedText
+                }
+            }
         }
     }
 }

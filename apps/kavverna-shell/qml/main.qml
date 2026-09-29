@@ -36,7 +36,7 @@ Window {
     readonly property var pageNeeds: [
         ["keep-awake"],
         ["volume-mixer", "output-switcher", "microphone-tools"],
-        ["system-monitor"],
+        ["system-monitor", "network-monitor"],
         ["clipboard-history", "clipboard-auto-clear", "clean-url", "clipboard-transform", "shelf"],
         ["mouse-jiggle"]
     ]

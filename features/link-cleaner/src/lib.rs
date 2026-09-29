@@ -28,8 +28,9 @@ pub fn clean(text: &str, rules: &Rules) -> Option<Cleaned> {
     let mut kept = Vec::new();
     let mut removed = Vec::new();
     for pair in query.split('&').filter(|pair| !pair.is_empty()) {
-        let name = pair.split('=').next().unwrap_or(pair);
-        if rules.removes(&host, name) {
+        let name = url::form_urlencoded::parse(pair.as_bytes()).next().map(|(name, _)| name);
+        let Some(name) = name else { continue };
+        if rules.removes(&host, &name) {
             removed.push(name.to_ascii_lowercase());
         } else {
             kept.push(pair);
@@ -56,6 +57,13 @@ mod tests {
     #[test]
     fn a_campaign_link_loses_its_campaign() {
         let cleaned = cleaning("https://example.org/read?utm_source=news&id=7").unwrap();
+        assert_eq!(cleaned.link, "https://example.org/read?id=7");
+        assert_eq!(cleaned.removed, vec!["utm_source"]);
+    }
+
+    #[test]
+    fn an_encoded_campaign_name_is_still_a_campaign() {
+        let cleaned = cleaning("https://example.org/read?utm%5Fsource=news&id=7").unwrap();
         assert_eq!(cleaned.link, "https://example.org/read?id=7");
         assert_eq!(cleaned.removed, vec!["utm_source"]);
     }

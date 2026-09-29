@@ -188,7 +188,7 @@ fn parse(text: &str) -> Option<Found> {
     }
     Some(Found {
         entry: DesktopEntry { name: name?, icon },
-        binary: try_command.or(command).and_then(|line| binary_of_exec(&line)),
+        binary: command.or(try_command).and_then(|line| binary_of_exec(&line)),
         window_class,
     })
 }
@@ -316,6 +316,19 @@ mod tests {
         let found = index.by_binary.get("kate").unwrap();
         assert_eq!(found.name, "Kate");
         assert_eq!(found.icon.as_deref(), Some("kate"));
+    }
+
+    #[test]
+    fn try_exec_does_not_replace_the_binary_the_entry_launches() {
+        let room = tempfile::tempdir().unwrap();
+        written(
+            room.path(),
+            "wrapped.desktop",
+            "[Desktop Entry]\nType=Application\nName=Wrapped\nTryExec=/usr/bin/check-ready\nExec=/usr/bin/actual-app %U\n",
+        );
+        let index = build(&[room.path().to_path_buf()]);
+        assert!(index.by_binary.contains_key("actual-app"));
+        assert!(!index.by_binary.contains_key("check-ready"));
     }
 
     #[test]

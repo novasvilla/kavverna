@@ -6,9 +6,11 @@ use std::path::{Path, PathBuf};
 
 mod private_file;
 
+#[derive(Clone)]
 pub struct Preferences {
     path: PathBuf,
     values: Map<String, Value>,
+    save_blocked: bool,
 }
 
 impl Preferences {
@@ -19,23 +21,33 @@ impl Preferences {
             Some(dirs) => Self::load_from(dirs.config_dir().join("settings.json")),
             None => {
                 tracing::warn!("no config directory, settings will not persist");
-                Self { path: PathBuf::new(), values: Map::new() }
+                Self { path: PathBuf::new(), values: Map::new(), save_blocked: false }
             }
         }
     }
 
     pub fn load_from(path: impl Into<PathBuf>) -> Self {
         let path = path.into();
-        let values = std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-            .and_then(|value| match value {
-                Value::Object(map) => Some(map),
-                _ => None,
-            })
-            .unwrap_or_default();
+        let (values, save_blocked) = match std::fs::read_to_string(&path) {
+            Err(err) if err.kind() == io::ErrorKind::NotFound => (Map::new(), false),
+            Err(err) => {
+                tracing::error!(%err, path = %path.display(), "settings could not be read");
+                (Map::new(), true)
+            }
+            Ok(text) => match serde_json::from_str::<Value>(&text) {
+                Ok(Value::Object(map)) => (map, false),
+                Ok(_) => {
+                    tracing::error!(path = %path.display(), "settings are not a JSON object");
+                    (Map::new(), true)
+                }
+                Err(err) => {
+                    tracing::error!(%err, path = %path.display(), "settings JSON is invalid");
+                    (Map::new(), true)
+                }
+            },
+        };
 
-        Self { path, values }
+        Self { path, values, save_blocked }
     }
 
     pub fn bool(&self, key: &str, fallback: bool) -> bool {
@@ -79,7 +91,17 @@ impl Preferences {
         &self.path
     }
 
+    pub fn can_save(&self) -> bool {
+        !self.save_blocked && !self.path.as_os_str().is_empty()
+    }
+
     pub fn save(&self) -> io::Result<()> {
+        if self.save_blocked {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "saved settings were not readable",
+            ));
+        }
         if self.path.as_os_str().is_empty() {
             return Ok(());
         }

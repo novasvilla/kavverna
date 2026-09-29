@@ -138,18 +138,21 @@ fn hex(byte: u8) -> Option<u8> {
 /// Writes one payload into the items directory, named by its digest so the same bytes never
 /// exist twice, readable by nobody else.
 pub fn stage_blob(items_dir: &Path, bytes: &[u8], extension: &str) -> std::io::Result<PathBuf> {
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+
     std::fs::create_dir_all(items_dir)?;
+    #[cfg(unix)]
+    std::fs::set_permissions(items_dir, std::fs::Permissions::from_mode(0o700))?;
     let path = items_dir.join(format!("{}.{extension}", blake3::hash(bytes).to_hex()));
     if path.exists() {
         return Ok(path);
     }
-    let mut file = std::fs::File::create(&path)?;
-    file.write_all(bytes)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
-    }
+    let mut staging = tempfile::NamedTempFile::new_in(items_dir)?;
+    staging.write_all(bytes)?;
+    staging.as_file().sync_all()?;
+    staging.persist(&path).map_err(|err| err.error)?;
+    std::fs::File::open(items_dir)?.sync_all()?;
     Ok(path)
 }
 

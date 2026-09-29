@@ -62,6 +62,7 @@ fn only_what_is_written_is_offered_as_built() {
         "keep-awake",
         "microphone-tools",
         "mouse-jiggle",
+        "network-monitor",
         "output-switcher",
         "shelf",
         "system-monitor",

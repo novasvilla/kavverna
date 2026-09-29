@@ -1,6 +1,18 @@
 use crate::clipboard_state;
 use clipboard_history::Command;
 use kde_bridge::session::SessionEvent;
+use std::sync::mpsc::sync_channel;
+use std::time::Duration;
+
+const CLEAR_DEADLINE: Duration = Duration::from_secs(2);
+
+fn clear_before_release() -> bool {
+    let (finished, confirmation) = sync_channel(1);
+    if !clipboard_state::send(Command::ClearClipboard { finished: Some(finished) }) {
+        return false;
+    }
+    confirmation.recv_timeout(CLEAR_DEADLINE).unwrap_or(false)
+}
 
 pub fn serve(runtime: tokio::runtime::Handle) {
     let (events, incoming) = std::sync::mpsc::channel();
@@ -20,11 +32,10 @@ pub fn serve(runtime: tokio::runtime::Handle) {
             };
             if wanted {
                 tracing::info!(?event, "emptying the clipboard");
-                clipboard_state::send(Command::ClearClipboard);
+                if !clear_before_release() {
+                    tracing::warn!(?event, "the clipboard clear was not confirmed before release");
+                }
             }
-            // A suspend carries logind's delay lock, and dropping it here is what lets the
-            // machine go. Held until the clear has been asked for rather than released on the
-            // watcher's thread, which is what made this a race.
             drop(event);
         }
     });

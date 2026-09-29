@@ -41,6 +41,15 @@ pub mod qobject {
         #[qproperty(QString, gpu_power_text)]
         #[qproperty(f32, vram_used)]
         #[qproperty(QString, vram_text)]
+        #[qproperty(QStringList, network_names)]
+        #[qproperty(QStringList, network_received)]
+        #[qproperty(QStringList, network_sent)]
+        #[qproperty(QStringList, network_totals)]
+        #[qproperty(QString, network_status)]
+        #[qproperty(QStringList, disk_names)]
+        #[qproperty(QStringList, disk_spaces)]
+        #[qproperty(QStringList, disk_rates)]
+        #[qproperty(QString, disk_status)]
         type VitalsView = super::VitalsViewRust;
     }
 
@@ -83,6 +92,15 @@ pub struct VitalsViewRust {
     gpu_power_text: QString,
     vram_used: f32,
     vram_text: QString,
+    network_names: QStringList,
+    network_received: QStringList,
+    network_sent: QStringList,
+    network_totals: QStringList,
+    network_status: QString,
+    disk_names: QStringList,
+    disk_spaces: QStringList,
+    disk_rates: QStringList,
+    disk_status: QString,
 }
 
 fn as_list(series: &std::collections::VecDeque<f32>) -> QList<f32> {
@@ -99,6 +117,20 @@ fn gib(bytes: u64) -> f64 {
 
 fn mib(bytes: u64) -> f64 {
     bytes as f64 / (1024.0 * 1024.0)
+}
+
+fn bytes_label(bytes: f64) -> String {
+    if bytes >= 1024.0_f64.powi(4) {
+        format!("{:.1} TiB", bytes / 1024.0_f64.powi(4))
+    } else if bytes >= 1024.0_f64.powi(3) {
+        format!("{:.1} GiB", bytes / 1024.0_f64.powi(3))
+    } else if bytes >= 1024.0 * 1024.0 {
+        format!("{:.1} MiB", bytes / (1024.0 * 1024.0))
+    } else if bytes >= 1024.0 {
+        format!("{:.1} KiB", bytes / 1024.0)
+    } else {
+        format!("{bytes:.0} B")
+    }
 }
 
 impl qobject::VitalsView {
@@ -222,6 +254,75 @@ impl qobject::VitalsView {
                     format!("{:.0} of {:.0} MiB", mib(used), mib(total))
                 }),
         ));
+
+        let mut network_names = QStringList::default();
+        let mut network_received = QStringList::default();
+        let mut network_sent = QStringList::default();
+        let mut network_totals = QStringList::default();
+        let status = match vitals.network {
+            None => "Network counters are unavailable.",
+            Some(ref interfaces) if interfaces.is_empty() => "No network interfaces found.",
+            Some(ref interfaces) => {
+                for interface in interfaces {
+                    network_names.append(QString::from(&interface.interface));
+                    network_received.append(QString::from(
+                        &interface
+                            .received_per_second
+                            .map_or("—".into(), |rate| format!("↓ {}/s", bytes_label(rate))),
+                    ));
+                    network_sent.append(QString::from(
+                        &interface
+                            .sent_per_second
+                            .map_or("—".into(), |rate| format!("↑ {}/s", bytes_label(rate))),
+                    ));
+                    network_totals.append(QString::from(&format!(
+                        "This session: ↓ {}  ↑ {}",
+                        bytes_label(interface.received_this_session as f64),
+                        bytes_label(interface.sent_this_session as f64)
+                    )));
+                }
+                ""
+            }
+        };
+        self.as_mut().set_network_names(network_names);
+        self.as_mut().set_network_received(network_received);
+        self.as_mut().set_network_sent(network_sent);
+        self.as_mut().set_network_totals(network_totals);
+        self.as_mut().set_network_status(QString::from(status));
+
+        let mut disk_names = QStringList::default();
+        let mut disk_spaces = QStringList::default();
+        let mut disk_rates = QStringList::default();
+        let disk_status = match vitals.disks {
+            None => "Mounted volumes could not be read.",
+            Some(ref disks) if disks.is_empty() => "No local volumes found.",
+            Some(ref disks) => {
+                for disk in disks {
+                    disk_names.append(QString::from(&disk.name));
+                    disk_spaces.append(QString::from(&match (disk.available, disk.total) {
+                        (Some(available), Some(total)) => format!(
+                            "{} free of {}",
+                            bytes_label(available as f64),
+                            bytes_label(total as f64)
+                        ),
+                        _ => "Capacity unavailable".into(),
+                    }));
+                    let rate = |value: Option<f64>| {
+                        value.map_or("—".into(), |value| format!("{}/s", bytes_label(value)))
+                    };
+                    disk_rates.append(QString::from(&format!(
+                        "Read {}  ·  Write {}",
+                        rate(disk.read_per_second),
+                        rate(disk.written_per_second)
+                    )));
+                }
+                ""
+            }
+        };
+        self.as_mut().set_disk_names(disk_names);
+        self.as_mut().set_disk_spaces(disk_spaces);
+        self.as_mut().set_disk_rates(disk_rates);
+        self.as_mut().set_disk_status(QString::from(disk_status));
     }
 }
 

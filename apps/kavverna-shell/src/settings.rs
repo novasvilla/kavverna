@@ -137,8 +137,8 @@ pub fn any_installed(features: &[Feature]) -> bool {
     features.iter().copied().any(is_installed)
 }
 
-pub fn set_installed(feature: Feature, installed: bool) {
-    put_bool(&feature.availability_key(), installed);
+pub fn set_installed(feature: Feature, installed: bool) -> bool {
+    put_bool(&feature.availability_key(), installed)
 }
 
 /// The setting resolved into a hold. Read from here by the panel switch, the tray menu and
@@ -176,52 +176,51 @@ pub fn bool_at(key: &str, fallback: bool) -> bool {
     store().as_ref().map_or(fallback, |prefs| prefs.bool(key, fallback))
 }
 
+pub fn can_save() -> bool {
+    store().as_ref().is_some_and(Preferences::can_save)
+}
+
 pub fn integer_at(key: &str, fallback: i64) -> i64 {
     store().as_ref().map_or(fallback, |prefs| prefs.integer(key, fallback))
 }
 
-pub fn put_bool(key: &str, value: bool) {
-    let mut guard = store();
-    if let Some(prefs) = guard.as_mut() {
-        prefs.set_bool(key, value);
-        persist(prefs);
-    }
+pub fn put_bool(key: &str, value: bool) -> bool {
+    update(|prefs| prefs.set_bool(key, value))
 }
 
-pub fn put_integer(key: &str, value: i64) {
-    let mut guard = store();
-    if let Some(prefs) = guard.as_mut() {
-        prefs.set_integer(key, value);
-        persist(prefs);
-    }
+pub fn put_integer(key: &str, value: i64) -> bool {
+    update(|prefs| prefs.set_integer(key, value))
 }
 
 pub fn text_at(key: &str, fallback: &str) -> String {
     store().as_ref().map_or_else(|| fallback.to_owned(), |prefs| prefs.text(key, fallback))
 }
 
-pub fn put_text(key: &str, value: &str) {
-    let mut guard = store();
-    if let Some(prefs) = guard.as_mut() {
-        prefs.set_text(key, value);
-        persist(prefs);
-    }
+pub fn put_text(key: &str, value: &str) -> bool {
+    update(|prefs| prefs.set_text(key, value))
 }
 
 pub fn texts_at(key: &str) -> Option<Vec<String>> {
     store().as_ref().and_then(|prefs| prefs.texts(key))
 }
 
-pub fn put_texts(key: &str, values: &[String]) {
-    let mut guard = store();
-    if let Some(prefs) = guard.as_mut() {
-        prefs.set_texts(key, values);
-        persist(prefs);
-    }
+pub fn put_texts(key: &str, values: &[String]) -> bool {
+    update(|prefs| prefs.set_texts(key, values))
 }
 
-fn persist(prefs: &Preferences) {
-    if let Err(err) = prefs.save() {
-        tracing::error!(%err, path = %prefs.path().display(), "settings not saved");
+fn update(change: impl FnOnce(&mut Preferences)) -> bool {
+    let mut guard = store();
+    let Some(current) = guard.as_ref() else { return false };
+    let mut candidate = current.clone();
+    if !candidate.can_save() {
+        tracing::error!(path = %candidate.path().display(), "settings cannot be saved");
+        return false;
     }
+    change(&mut candidate);
+    if let Err(err) = candidate.save() {
+        tracing::error!(%err, path = %candidate.path().display(), "settings not saved");
+        return false;
+    }
+    *guard = Some(candidate);
+    true
 }

@@ -334,7 +334,7 @@ impl qobject::ClipboardView {
         self.as_mut().set_pinned_count(snapshot.pinned as i32);
         self.as_mut().set_recent_count(snapshot.recent as i32);
         self.as_mut().set_available(clipboard_state::is_running());
-        self.as_mut().set_enabled(clipboard_state::wanted());
+        self.as_mut().set_enabled(clipboard_state::keeps_history());
         self.as_mut().set_limit(settings::integer_at(
             settings::CLIPBOARD_LIMIT,
             settings::CLIPBOARD_LIMIT_DEFAULT,

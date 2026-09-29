@@ -6,7 +6,10 @@
 use crate::item::Item;
 use crate::pile::Pile;
 use serde::{Deserialize, Serialize};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+
+const SCHEMA_VERSION: u32 = 1;
 
 #[derive(Serialize, Deserialize)]
 struct Saved {
@@ -22,17 +25,20 @@ fn shelf_file(shelf_dir: &Path) -> PathBuf {
     shelf_dir.join("shelf.json")
 }
 
-pub fn load(shelf_dir: &Path) -> Vec<Pile> {
-    let Ok(bytes) = std::fs::read(shelf_file(shelf_dir)) else {
-        return Vec::new();
+pub fn load(shelf_dir: &Path) -> io::Result<Vec<Pile>> {
+    let bytes = match std::fs::read(shelf_file(shelf_dir)) {
+        Ok(bytes) => bytes,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(err) => return Err(err),
     };
-    match serde_json::from_slice::<Saved>(&bytes) {
-        Ok(saved) => saved.piles,
-        Err(err) => {
-            tracing::warn!(%err, "the shelf file did not read, starting empty");
-            Vec::new()
-        }
+    let saved: Saved = serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+    if saved.version != SCHEMA_VERSION {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("unsupported shelf version {}", saved.version),
+        ));
     }
+    Ok(saved.piles)
 }
 
 pub fn save(shelf_dir: &Path, piles: &[Pile]) -> std::io::Result<()> {
@@ -43,15 +49,14 @@ pub fn save(shelf_dir: &Path, piles: &[Pile]) -> std::io::Result<()> {
         std::fs::set_permissions(shelf_dir, std::fs::Permissions::from_mode(0o700))?;
     }
 
-    let saved = Saved { version: 1, piles: piles.to_vec() };
-    let text = serde_json::to_string_pretty(&saved).unwrap_or_else(|_| "{}".into());
+    let saved = Saved { version: SCHEMA_VERSION, piles: piles.to_vec() };
+    let text = serde_json::to_vec_pretty(&saved).map_err(io::Error::other)?;
     let path = shelf_file(shelf_dir);
-    std::fs::write(&path, text)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
-    }
+    let mut staging = tempfile::NamedTempFile::new_in(shelf_dir)?;
+    staging.write_all(&text)?;
+    staging.as_file().sync_all()?;
+    staging.persist(path).map_err(|err| err.error)?;
+    std::fs::File::open(shelf_dir)?.sync_all()?;
     Ok(())
 }
 
@@ -109,7 +114,7 @@ mod tests {
         };
         save(dir.path(), &[pile_of(1, item.clone())]).expect("saved");
 
-        let back = load(dir.path());
+        let back = load(dir.path()).expect("loaded");
         assert_eq!(back.len(), 1);
         assert_eq!(back[0].items[0], item);
     }
@@ -122,7 +127,7 @@ mod tests {
         save(dir.path(), &[]).expect("saved");
 
         forget(dir.path());
-        assert!(load(dir.path()).is_empty());
+        assert!(load(dir.path()).unwrap().is_empty());
         assert!(!staged.exists());
     }
 
@@ -157,7 +162,9 @@ mod tests {
 
         let file_mode = std::fs::metadata(dir.path().join("shelf.json")).unwrap().permissions();
         let blob_mode = std::fs::metadata(&staged).unwrap().permissions();
+        let items_mode = std::fs::metadata(items_dir(dir.path())).unwrap().permissions();
         assert_eq!(file_mode.mode() & 0o777, 0o600);
         assert_eq!(blob_mode.mode() & 0o777, 0o600);
+        assert_eq!(items_mode.mode() & 0o777, 0o700);
     }
 }

@@ -79,14 +79,17 @@ fn the_file_and_its_directory_are_private() {
 }
 
 #[test]
-fn a_corrupt_file_reads_as_empty_rather_than_failing() {
+fn a_corrupt_file_reads_as_defaults_without_being_overwritten() {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("settings.json");
     std::fs::write(&path, "{ this is not json").expect("write");
 
-    let prefs = Preferences::load_from(&path);
+    let mut prefs = Preferences::load_from(&path);
 
     assert!(prefs.bool("anything", true));
+    prefs.set_bool("anything", false);
+    assert!(prefs.save().is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), b"{ this is not json");
 }
 
 #[test]

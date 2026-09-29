@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+nix = { workspace = true, features = ["fs"] }
 nvml-wrapper.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

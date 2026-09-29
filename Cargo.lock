@@ -2734,6 +2734,7 @@ dependencies = [
  "app-identity",
  "libspa",
  "pipewire",
+ "serde_json",
  "thiserror 2.0.20",
  "tracing",
 ]
@@ -2861,6 +2862,7 @@ dependencies = [
 name = "system-monitor"
 version = "0.5.0"
 dependencies = [
+ "nix",
  "nvml-wrapper",
  "tempfile",
  "thiserror 2.0.20",

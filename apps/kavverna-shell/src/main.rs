@@ -111,7 +111,7 @@ fn main() {
     if settings::any_installed(&clipboard) {
         std::thread::spawn(|| clipboard_state::run(clipboard_view::publish));
     }
-    if settings::is_installed(Feature::SystemMonitor) {
+    if settings::any_installed(&[Feature::SystemMonitor, Feature::NetworkMonitor]) {
         std::thread::spawn(|| {
             vitals_state::run(std::time::Duration::from_secs(2), vitals_view::publish)
         });

@@ -21,10 +21,13 @@ pub fn is_running() -> bool {
     COMMANDS.lock().map(|held| held.is_some()).unwrap_or(false)
 }
 
-pub fn send(command: Command) {
+pub fn send(command: Command) -> bool {
     match COMMANDS.lock().ok().and_then(|held| held.clone()) {
         Some(commands) => commands.send(command),
-        None => tracing::warn!("the clipboard history is not running, change dropped"),
+        None => {
+            tracing::warn!("the clipboard history is not running, change dropped");
+            false
+        }
     }
 }
 

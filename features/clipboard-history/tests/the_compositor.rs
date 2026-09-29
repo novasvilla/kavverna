@@ -7,7 +7,7 @@
 //! stop Kavverna first or their copies land in your real history.
 
 use std::process::{Command, Stdio};
-use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, channel, sync_channel};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
 
@@ -105,6 +105,22 @@ fn a_copy_from_another_application_arrives() {
     copy("kavverna sees this");
 
     assert_eq!(next_copy(&events), Payload::Text("kavverna sees this".into()));
+}
+
+#[test]
+#[ignore = "needs a live compositor offering ext-data-control"]
+fn a_clear_confirmation_follows_the_wayland_write() {
+    let _guard = one_at_a_time();
+    let _restore = RestoredClipboard::save();
+
+    let (watcher, events) = watching();
+    copy("clear this selection");
+    next_copy(&events);
+
+    let (finished, confirmation) = sync_channel(1);
+    watcher.clear(Selection::Clipboard, Some(finished));
+    assert_eq!(confirmation.recv_timeout(PATIENCE), Ok(true));
+    assert!(paste().unwrap_or_default().is_empty(), "the next paste should find no content");
 }
 
 #[test]

@@ -6,6 +6,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use rusqlite::Connection;
 
 use crate::entry::{self, Kind};
+use crate::sensitivity::looks_sensitive;
 use crate::store::{Captured, Store, StoreError};
 
 const DATABASE: &str = "klipper/history3.sqlite";
@@ -25,17 +26,26 @@ pub fn waiting() -> usize {
     read(&path).map(|entries| entries.len()).unwrap_or(0)
 }
 
-pub fn import_into(store: &mut Store) -> Result<usize, StoreError> {
+pub fn import_into(
+    store: &mut Store,
+    skip_sensitive: bool,
+    limit: u32,
+) -> Result<usize, StoreError> {
     let Some(path) = history_path() else {
         return Ok(0);
     };
-    import_from(&path, store)
+    import_from(&path, store, skip_sensitive, limit)
 }
 
 /// Oldest first, so the newest ends up on top as it was in Klipper. Takes the database rather
 /// than looking it up, so a test can hand over one it wrote instead of moving `XDG_DATA_HOME`
 /// out from under every other thread in the binary.
-pub fn import_from(path: &std::path::Path, store: &mut Store) -> Result<usize, StoreError> {
+pub fn import_from(
+    path: &std::path::Path,
+    store: &mut Store,
+    skip_sensitive: bool,
+    limit: u32,
+) -> Result<usize, StoreError> {
     let Some(entries) = read(path) else {
         return Ok(0);
     };
@@ -45,6 +55,9 @@ pub fn import_from(path: &std::path::Path, store: &mut Store) -> Result<usize, S
         let Some(text) = entry::storable_text(&saved.text) else {
             continue;
         };
+        if skip_sensitive && looks_sensitive(&text) {
+            continue;
+        }
         let id = store.remember(Captured {
             kind: Kind::Text,
             text,
@@ -57,6 +70,8 @@ pub fn import_from(path: &std::path::Path, store: &mut Store) -> Result<usize, S
         }
         adopted += 1;
     }
+
+    store.trim_to(entry::sanitized_limit(limit))?;
 
     tracing::info!(adopted, "adopted Plasma's clipboard history");
     Ok(adopted)
@@ -156,8 +171,63 @@ mod tests {
 
         let theirs = theirs.join("history3.sqlite");
         let mut store = Store::open(&room.path().join("ours")).unwrap();
-        assert_eq!(import_from(&theirs, &mut store).unwrap(), 1);
-        assert_eq!(import_from(&theirs, &mut store).unwrap(), 1, "the same entry is adopted once");
+        assert_eq!(import_from(&theirs, &mut store, true, 20).unwrap(), 1);
+        assert_eq!(
+            import_from(&theirs, &mut store, true, 20).unwrap(),
+            1,
+            "the same entry is adopted once"
+        );
         assert_eq!(store.counts().unwrap(), (1, 0), "and it keeps the star it had");
+    }
+
+    #[test]
+    fn adopting_respects_the_secret_filter() {
+        let room = tempfile::tempdir().unwrap();
+        let theirs = room.path().join("history3.sqlite");
+        let db = Connection::open(&theirs).unwrap();
+        db.execute_batch(
+            "CREATE TABLE main (uuid char(40) PRIMARY KEY, added_time REAL NOT NULL,
+                 last_used_time REAL, mimetypes TEXT NOT NULL, text NTEXT, starred BOOLEAN);
+             INSERT INTO main VALUES ('a', 1000.5, NULL, 'text/plain', 'my password is hunter2', 0);
+             INSERT INTO main VALUES ('b', 2000.5, NULL, 'text/plain', 'ordinary note', 0);",
+        )
+        .unwrap();
+        drop(db);
+
+        let mut guarded = Store::open(&room.path().join("guarded")).unwrap();
+        assert_eq!(import_from(&theirs, &mut guarded, true, 20).unwrap(), 1);
+        assert_eq!(guarded.counts().unwrap(), (0, 1));
+
+        let mut unguarded = Store::open(&room.path().join("unguarded")).unwrap();
+        assert_eq!(import_from(&theirs, &mut unguarded, false, 20).unwrap(), 2);
+    }
+
+    #[test]
+    fn adoption_respects_the_history_limit_and_keeps_stars() {
+        let room = tempfile::tempdir().unwrap();
+        let theirs = room.path().join("history3.sqlite");
+        let db = Connection::open(&theirs).unwrap();
+        db.execute_batch(
+            "CREATE TABLE main (uuid char(40) PRIMARY KEY, added_time REAL NOT NULL,
+                 last_used_time REAL, mimetypes TEXT NOT NULL, text NTEXT, starred BOOLEAN);",
+        )
+        .unwrap();
+        for index in 0..25 {
+            db.execute(
+                "INSERT INTO main VALUES (?1, ?2, NULL, 'text/plain', ?3, ?4)",
+                rusqlite::params![
+                    format!("{index}"),
+                    index as f64,
+                    format!("note {index}"),
+                    index == 0
+                ],
+            )
+            .unwrap();
+        }
+        drop(db);
+
+        let mut store = Store::open(&room.path().join("ours")).unwrap();
+        assert_eq!(import_from(&theirs, &mut store, true, 20).unwrap(), 25);
+        assert_eq!(store.counts().unwrap(), (1, 20));
     }
 }

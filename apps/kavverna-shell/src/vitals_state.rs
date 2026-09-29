@@ -1,3 +1,5 @@
+use crate::settings;
+use feature_catalog::Feature;
 use std::collections::VecDeque;
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
@@ -68,7 +70,10 @@ fn record(history: &mut History, reading: &Vitals) {
 /// Samples on a fixed tick. Load is a difference between readings, so the first tick only
 /// establishes a baseline.
 pub fn run(interval: Duration, on_change: impl Fn()) {
-    let mut vitals = Vitalsigns::open();
+    let mut vitals = Vitalsigns::for_features(
+        settings::is_installed(Feature::SystemMonitor),
+        settings::is_installed(Feature::NetworkMonitor),
+    );
     *PROCESSOR.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) =
         Some(vitals.processor().clone());
     tracing::info!(processor = %vitals.processor().name, "vitals sampler started");
@@ -103,8 +108,10 @@ mod tests {
     /// card takes its index.
     #[test]
     fn the_number_of_cards_follows_the_reading() {
-        let mut history = History::default();
-        history.cards = vec![VecDeque::from([0.5]), VecDeque::from([0.9])];
+        let mut history = History {
+            cards: vec![VecDeque::from([0.5]), VecDeque::from([0.9])],
+            ..Default::default()
+        };
 
         history.cards.resize_with(1, VecDeque::new);
 

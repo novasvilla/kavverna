@@ -72,4 +72,41 @@ fn main() {
             }),
         );
     }
+
+    println!("\nNETWORK");
+    match reading.network {
+        None => println!("  counters unavailable"),
+        Some(interfaces) if interfaces.is_empty() => println!("  no interfaces"),
+        Some(interfaces) => {
+            for interface in interfaces {
+                println!(
+                    "  {}  received {:?} B/s  sent {:?} B/s  session {} / {} B",
+                    interface.interface,
+                    interface.received_per_second,
+                    interface.sent_per_second,
+                    interface.received_this_session,
+                    interface.sent_this_session
+                );
+            }
+        }
+    }
+
+    println!("\nSTORAGE");
+    match reading.disks {
+        None => println!("  mounts unavailable"),
+        Some(disks) if disks.is_empty() => println!("  no local volumes"),
+        Some(disks) => {
+            for disk in disks {
+                println!(
+                    "  {} ({})  available {:?} of {:?} B  read {:?} B/s  write {:?} B/s",
+                    disk.name,
+                    disk.mount.display(),
+                    disk.available,
+                    disk.total,
+                    disk.read_per_second,
+                    disk.written_per_second
+                );
+            }
+        }
+    }
 }

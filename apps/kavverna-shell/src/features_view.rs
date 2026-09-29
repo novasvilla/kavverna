@@ -3,6 +3,7 @@
 //! Everything here comes from the catalogue and the settings file rather than from a running
 //! feature, so there is no thread behind it and nothing to publish.
 
+use cxx_qt::CxxQtType;
 use cxx_qt_lib::{QList, QString, QStringList};
 use feature_catalog::Feature;
 use strum::IntoEnumIterator;
@@ -32,6 +33,9 @@ pub mod qobject {
         #[qproperty(QList_bool, built)]
         #[qproperty(i32, installed_count)]
         #[qproperty(i32, built_count)]
+        #[qproperty(bool, restart_required)]
+        #[qproperty(bool, settings_writable)]
+        #[qproperty(QString, save_notice)]
         type FeaturesView = super::FeaturesViewRust;
     }
 
@@ -56,6 +60,10 @@ pub struct FeaturesViewRust {
     built: QList<bool>,
     installed_count: i32,
     built_count: i32,
+    restart_required: bool,
+    settings_writable: bool,
+    save_notice: QString,
+    active: Vec<bool>,
 }
 
 /// Grouped the way the catalogue groups them, and in the panel's own order within a group, so
@@ -68,7 +76,10 @@ fn in_display_order() -> Vec<Feature> {
 
 impl qobject::FeaturesView {
     fn attach(self: Pin<&mut Self>) {
-        self.refresh();
+        let mut this = self;
+        this.as_mut().rust_mut().get_mut().active =
+            in_display_order().into_iter().map(settings::is_installed).collect();
+        this.as_mut().refresh();
     }
 
     fn refresh(mut self: Pin<&mut Self>) {
@@ -104,6 +115,13 @@ impl qobject::FeaturesView {
         self.as_mut().set_built(built);
         self.as_mut().set_installed_count(live as i32);
         self.as_mut().set_built_count(total as i32);
+        self.as_mut().set_settings_writable(settings::can_save());
+        let active = &self.rust().active;
+        let restart_required =
+            in_display_order().into_iter().enumerate().any(|(index, feature)| {
+                active.get(index).is_some_and(|was| *was != settings::is_installed(feature))
+            });
+        self.as_mut().set_restart_required(restart_required);
     }
 
     fn choose_installed(mut self: Pin<&mut Self>, id: &QString, installed: bool) {
@@ -114,7 +132,12 @@ impl qobject::FeaturesView {
         if !feature.is_built() {
             return;
         }
-        settings::set_installed(feature, installed);
+        let saved = settings::set_installed(feature, installed);
+        self.as_mut().set_save_notice(QString::from(if saved {
+            ""
+        } else {
+            "The utility selection could not be saved."
+        }));
         self.as_mut().refresh();
     }
 }

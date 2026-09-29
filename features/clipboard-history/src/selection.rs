@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use nix::fcntl::OFlag;
 use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 use wayland_client::globals::{BindError, GlobalError, GlobalListContents, registry_queue_init};
+use wayland_client::protocol::wl_callback::{self, WlCallback};
 use wayland_client::protocol::wl_registry::WlRegistry;
 use wayland_client::protocol::wl_seat::{self, WlSeat};
 use wayland_client::{
@@ -131,7 +132,10 @@ enum Request {
         selection: Selection,
         payload: Payload,
     },
-    Clear(Selection),
+    Clear {
+        selection: Selection,
+        finished: Option<SyncSender<bool>>,
+    },
     /// What the clipboard offers right now, and one of its types read on demand. This is what
     /// lets a transformation reach the `text/html` of a rich copy without the history ever
     /// storing it.
@@ -184,8 +188,8 @@ impl SelectionWatcher {
         self.send(Request::Offer { selection, payload });
     }
 
-    pub fn clear(&self, selection: Selection) {
-        self.send(Request::Clear(selection));
+    pub fn clear(&self, selection: Selection, finished: Option<SyncSender<bool>>) {
+        self.send(Request::Clear { selection, finished });
     }
 
     /// Asks the thread rather than caching, so the answer is about the selection as it is at
@@ -369,11 +373,19 @@ impl Watcher {
                 };
                 let _ = reply.send(answer);
             }
-            Request::Clear(selection) => {
+            Request::Clear { selection, finished } => {
                 self.forget_source(selection);
                 match selection {
                     Selection::Clipboard => device.set_selection(None),
                     Selection::Primary => device.set_primary_selection(None),
+                }
+                if let Some(finished) = finished {
+                    // A sync callback follows set_selection on the same connection, so its
+                    // Done event proves the compositor processed the clear request first.
+                    let _barrier = conn.display().sync(qh, finished.clone());
+                    if conn.flush().is_err() {
+                        let _ = finished.send(false);
+                    }
                 }
             }
             Request::Offer { selection, payload } => {
@@ -638,6 +650,21 @@ impl Dispatch<WlRegistry, GlobalListContents> for Watcher {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
+    }
+}
+
+impl Dispatch<WlCallback, SyncSender<bool>> for Watcher {
+    fn event(
+        _: &mut Self,
+        _: &WlCallback,
+        event: wl_callback::Event,
+        finished: &SyncSender<bool>,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        if let wl_callback::Event::Done { .. } = event {
+            let _ = finished.send(true);
+        }
     }
 }
 

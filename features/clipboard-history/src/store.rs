@@ -123,12 +123,13 @@ impl Store {
 
     /// Pinned first, then the rest, each newest at the top.
     pub fn summaries(&self) -> Result<Vec<Summary>, StoreError> {
-        let mut statement = self.db.prepare(
-            "SELECT id, kind, body, file_paths, image_digest, image_width, image_height,
+        let query = format!(
+            "SELECT id, kind, substr(body, 1, {}), file_paths, image_digest, image_width, image_height,
                     copied_at, pinned_at
              FROM entry
-             ORDER BY (pinned_at IS NULL), position DESC",
-        )?;
+             ORDER BY (pinned_at IS NULL), position DESC", crate::entry::PREVIEW_CHARACTERS + 1
+        );
+        let mut statement = self.db.prepare(&query)?;
         let rows = statement.query_map([], summary_from)?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
@@ -137,13 +138,14 @@ impl Store {
         let Some(pattern) = match_pattern(query) else {
             return self.summaries();
         };
-        let mut statement = self.db.prepare(
-            "SELECT e.id, e.kind, e.body, e.file_paths, e.image_digest, e.image_width,
+        let query = format!(
+            "SELECT e.id, e.kind, substr(e.body, 1, {}), e.file_paths, e.image_digest, e.image_width,
                     e.image_height, e.copied_at, e.pinned_at
              FROM entry_search s JOIN entry e ON e.id = s.rowid
              WHERE entry_search MATCH ?1
-             ORDER BY e.position DESC",
-        )?;
+             ORDER BY e.position DESC", crate::entry::PREVIEW_CHARACTERS + 1
+        );
+        let mut statement = self.db.prepare(&query)?;
         let rows = statement.query_map(params![pattern], summary_from)?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
     }
@@ -634,6 +636,18 @@ mod tests {
         let found = store.search("brown").unwrap();
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].preview, "the quick brown fox");
+    }
+
+    #[test]
+    fn list_reads_a_short_preview_but_the_entry_keeps_its_full_text() {
+        let (mut store, _room) = store();
+        let long = "x".repeat(crate::entry::PREVIEW_CHARACTERS + 500);
+        let id = store.remember(text(&long)).unwrap();
+
+        let preview = &store.summaries().unwrap()[0].preview;
+        assert_eq!(preview.chars().count(), crate::entry::PREVIEW_CHARACTERS + 1);
+        assert!(preview.ends_with('…'));
+        assert_eq!(store.entry(id).unwrap().unwrap().text, long);
     }
 
     #[test]

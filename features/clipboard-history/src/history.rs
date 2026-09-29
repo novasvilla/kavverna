@@ -64,7 +64,9 @@ pub enum Command {
     },
     Forget(i64),
     ClearUnpinned,
-    ClearClipboard,
+    ClearClipboard {
+        finished: Option<SyncSender<bool>>,
+    },
     /// Works the transformation out and shows the result; the clipboard is not touched.
     PreviewTransform(crate::transform::Transformation),
     /// Puts the last previewed result on the clipboard.
@@ -115,8 +117,8 @@ pub struct History {
 pub struct Commands(Sender<Event>);
 
 impl Commands {
-    pub fn send(&self, command: Command) {
-        let _ = self.0.send(Event::Asked(command));
+    pub fn send(&self, command: Command) -> bool {
+        self.0.send(Event::Asked(command)).is_ok()
     }
 }
 
@@ -238,8 +240,8 @@ fn run(
             }
             Ok(Event::Copied(_)) => false,
             Ok(Event::Asked(Command::Stop)) => break,
-            Ok(Event::Asked(Command::ClearClipboard)) => {
-                empty(&watcher, &mut clearing);
+            Ok(Event::Asked(Command::ClearClipboard { finished })) => {
+                empty(&watcher, &mut clearing, finished);
                 false
             }
             Ok(Event::Asked(Command::PreviewTransform(wanted))) => {
@@ -269,7 +271,7 @@ fn run(
             }
             Err(RecvTimeoutError::Timeout) => {
                 if clearing.due(Instant::now()) {
-                    empty(&watcher, &mut clearing);
+                    empty(&watcher, &mut clearing, None);
                 }
                 false
             }
@@ -314,10 +316,9 @@ fn apply_policy(policy: &CapturePolicy, settings: &Settings) {
     policy.images_and_files.store(settings.images_and_files, Ordering::Relaxed);
 }
 
-fn empty(watcher: &SelectionWatcher, clearing: &mut AutoClear) {
-    watcher.clear(Selection::Clipboard);
+fn empty(watcher: &SelectionWatcher, clearing: &mut AutoClear, finished: Option<SyncSender<bool>>) {
+    watcher.clear(Selection::Clipboard, finished);
     clearing.forget();
-    tracing::info!("the clipboard was emptied");
 }
 
 fn act(
@@ -339,11 +340,13 @@ fn act(
         Command::Rewrite { id, text } => store.rewrite(id, &text).map(|_| ()),
         Command::Forget(id) => store.forget(id),
         Command::ClearUnpinned => store.clear_unpinned(),
-        Command::ClearClipboard
+        Command::ClearClipboard { .. }
         | Command::PreviewTransform(_)
         | Command::ApplyTransform
         | Command::DiscardTransform => return false,
-        Command::AdoptKlipperHistory => crate::klipper::import_into(store).map(|_| ()),
+        Command::AdoptKlipperHistory => {
+            crate::klipper::import_into(store, settings.skip_sensitive, settings.limit).map(|_| ())
+        }
         Command::Apply(wanted) => {
             let limit = wanted.limit;
             *settings = wanted;
