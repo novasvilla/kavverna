@@ -11,6 +11,7 @@ Keywords=clipboard;volume;mixer;monitor;keep awake;tray;
 StartupNotify=false
 X-KDE-autostart-phase=2
 X-GNOME-UsesNotifications=true
+Actions=ShowClipboard;ShowSettings;
 
 [Desktop Action ShowClipboard]
 Name=Clipboard history

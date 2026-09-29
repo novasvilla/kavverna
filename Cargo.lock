@@ -1452,6 +1452,7 @@ dependencies = [
  "kde-bridge",
  "keep-awake",
  "ksni",
+ "libc",
  "link-cleaner",
  "notify-rust",
  "preferences",

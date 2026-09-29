@@ -31,7 +31,7 @@
 - A duplicate Shelf deposit must remain usable after either copy is removed.
 - A damaged or newer Shelf file must not cause loss of staged user content.
 - A suspend-triggered clipboard clear must finish, or report a bounded failure, before its delay lock is released.
-- Removing a feature must stop its owned work and release its runtime state without a restart. Shared workers stay alive only while another installed feature still needs them.
+- Removing a feature must release its owned work and runtime state as part of the automatic shell process replacement, without asking the user to restart it. Shared workers start only when an installed feature needs them.
 - Network and disk counters must handle first sample, reset, disappearance, and long gaps without false spikes.
 
 ## Task 1: Audit the current product
@@ -64,17 +64,17 @@
 - [ ] Verify clear on lock and suspend in a real KDE session without losing clipboard history.
 - [ ] Commit after focused and live verification.
 
-## Task 4: Give feature switches a real lifecycle
+## Task 4: Apply first-party feature selections immediately
 
-**Files:** `apps/kavverna-shell/src/features_view.rs`, `main.rs`, `mixer_state.rs`, `vitals_state.rs`, `clipboard_state.rs`, `shortcuts.rs`, and the features page QML.
+**Files:** `apps/kavverna-shell/src/features_view.rs`, `main.rs`, `settings.rs`, and the features page QML.
 
-- [x] Gate startup work by the installed features. The current restart notice is an interim, truthful state.
-- [ ] Give every owned worker an explicit stop path and clear its snapshots after exit. Remove the `OnceLock` that prevents reconnecting the mixer.
-- [ ] Reconcile feature selections after a successful settings write. Stop a shared worker only after its last installed consumer leaves; start it on the first consumer. Keep the panel, tray, shortcuts and QML state in agreement.
-- [ ] Test on/off/on, rapid toggles, failed dependencies and shutdown for the mixer, monitor, clipboard, Keep Awake, auto-clear and Shelf. Check that disabled workers stop polling and close PipeWire, Wayland, D-Bus and filesystem handles as applicable.
-- [ ] Measure `smaps_rollup`, thread count and open descriptors before/after disable and re-enable on the real desktop. RSS alone can retain freed allocator pages, so also verify worker exit and resource ownership.
-- [ ] Replace the restart notice with immediate status only after those transitions pass live. Until then, the UI must keep telling the truth.
-- [ ] Commit after fresh tests and runtime checks.
+- [x] Gate startup work by the installed features.
+- [x] After a changed selection saves successfully, replace the shell process and reopen settings. A new process drops the old heap and worker threads, then starts only the services still installed. A failed save leaves the running process and selection intact; a failed exec leaves a visible manual-restart notice.
+- [x] Handle an executable replaced during an upgrade by falling back to the launch name. Mark descriptors close-on-exec with a private descriptor table before the replacement; Qt's GPU render descriptor was observed without that flag.
+- [x] In an isolated profile and session bus, turn System Monitor off, then Network off. Confirm three process images under one PID, no sampler after the last restart, both saved selections false, NVML unmapped, and the descriptor count matching a fresh disabled-profile start.
+- [ ] Verify the same transition against the real KDE session while Keep Awake is held, including PowerDevil inhibition count, icons, panel, tray and settings. Leave at least two hours of Keep Awake after any restart.
+- [ ] Exercise on/off/on and save or exec failures for the remaining shared workers and standalone features. A future hot-switch implementation may stop workers individually if avoiding a brief shell restart becomes a user requirement.
+- [ ] Commit and push this follow-up after final tests and a live service check.
 
 ## Task 5: Add network readings
 
@@ -123,7 +123,7 @@ The source inventory contains 116 tracked Rust, QML, manifest, CI and package fi
 | Text bypassed Shelf's 16 MiB limit | `deposit` checked image bytes only; regression test failed before fix | Every staged incoming payload is counted before writing. |
 | Damaged/future Shelf index could destroy user content | `load` silently returned empty and startup swept unreferenced blobs; regression test failed before fix | Invalid index is preserved, Shelf refuses mutations, JSON writes are atomic and private. |
 | Suspend clear released logind delay early | The delay FD was dropped after enqueueing, ahead of the clipboard and Wayland threads | Wait for a bounded compositor sync acknowledgement; live compositor test checks the next paste is empty. |
-| Feature switches hid utilities before resources changed | Services start once in `main`, while feature settings update immediately | Screen now says selection is saved for next start and highlights pending restart; network-only sampler avoids unrelated sensors. Immediate unload remains Task 4. |
+| Feature switches hid utilities before resources changed | Services start once in `main`, while feature settings update immediately | A successful change now restarts the shell automatically with the saved selection. A restart failure shows a manual-restart notice. The network-only sampler avoids unrelated sensors. |
 | Clipboard privacy/UI drift | History switch used aggregate clipboard `wanted`; privacy text ignored link cleaning | Switch reflects history only, privacy text names the link-cleaning exception. |
 | Imported secrets, encoded tracking names | Klipper import skipped the sensitivity rule; URL rules matched encoded query key bytes | Both use the same semantics as ordinary copies. |
 | Corrupt settings, long list reads, malformed PipeWire metadata | Defaults could overwrite damaged JSON; SQL fetched full text for previews; metadata JSON was assembled by interpolation | Preserve invalid settings, fetch bounded previews, serialize/parse metadata as JSON. |
@@ -140,6 +140,9 @@ Remaining reviewed items for a later scoped change: lossless Linux paths through
 - A KDE/Wayland capture of the new monitoring page showed the same three interfaces with changing rates and session totals, plus the system volume's free space and read/write rates. The test build used a temporary initial scroll position to expose those lower cards without sending input to the user's desktop; that QML change was removed, and the final source was rebuilt with `RUSTFLAGS="-D warnings" cargo build --workspace --offline -q`.
 - The user is actively using Kavverna's Keep Awake. A temporary sleep inhibitor protected the live restart; the new build restored the hold, and D-Bus reported `Awake=true` with 3 h 58 min remaining. Do not close or restart it without a temporary inhibit and at least two hours restored in the next instance.
 - The first manual launch lacked the KDE desktop environment, so themed toolbar icons were blank. Relaunching with the session's `XDG_CURRENT_DESKTOP`, `KDE_SESSION_VERSION` and `XDG_DATA_DIRS` restored Sound, Monitoring and Clipboard icons. The Tools tab is hidden by the user's existing `mouse-jiggle.installed=false` selection.
-- The installed `/usr/bin/kavverna-shell` was restored as a user service after the UI test. D-Bus reported `Awake=true` and 3 h 46 min remaining after the temporary inhibitor was released.
+- Restoring the older installed `/usr/bin/kavverna-shell` hid the new Disk card; the user reported it. The service was corrected to run the new `0.5.0` build, with themed icons visible and `Awake=true` with 3 h 28 min remaining. This build must remain the one in use after the lifecycle follow-up.
+- The isolated feature-switch test used a temporary settings directory and private session bus. It switched off System Monitor and Network Monitor in two process replacements; the final process had 28 threads, 68 descriptors and no NVML mapping. A fresh disabled-profile start also had 68 descriptors. A focused test reproduced a descriptor missing `FD_CLOEXEC` and passed after the `close_range` fix.
+- A release `0.5.0` build passed `RUSTFLAGS="-D warnings" cargo build --release -p kavverna-shell --offline -q` and all 13 live `--selftest` dependencies. Its Sound, Monitoring and Clipboard icons rendered, and the lower Network and Disk cards had already been checked in the matching debug build. The verified release binary was copied unchanged to `~/.local/bin/kavverna-shell` (matching SHA-256), and the live user service, autostart entry and local application launcher now use that stable path. An ordinary launch cannot return to the older installed `0.2.3` interface or lose the new cards after `cargo clean`. `desktop-file-validate` also exposed missing declared menu actions in the repository launcher; the declaration was added and validated.
+- After the release service started, `dev.kavverna.Shell` reported `Awake=true` with 3 h 08 min remaining. After the temporary inhibitor was removed it still reported `Awake=true` with 3 h 05 min remaining; PowerDevil listed Kavverna's two policy inhibitions. A second protected replacement launched the stable local copy and restored `Awake=true` with 3 h 04 min remaining. This checks continuity across live service replacements, not a real-session feature toggle.
 
-The implementation and review were committed as `81f6020` and pushed to `origin/main`; local and remote refs matched that SHA. The only untracked file was the user's `AGENTS.md`, which was left outside the commit. A live Shelf drag/drop, actual suspend/lock transition and feature-switch transitions were not exercised while the user was working at the desktop; their focused tests and source review passed, but those full flows remain open acceptance checks. Immediate feature unload and third-party process integration are explicit follow-on tasks, with acceptance criteria above. A checked box requires evidence, not inference.
+The first implementation and review were committed as `81f6020` and pushed to `origin/main`; local and remote refs matched that SHA. The only untracked file was the user's `AGENTS.md`, which was left outside the commit. A live Shelf drag/drop and actual suspend/lock transition were not exercised while the user was working at the desktop; their focused tests and source review passed, but those full flows remain open acceptance checks. Third-party process integration remains Task 8. A checked box requires evidence, not inference.

@@ -48,6 +48,11 @@ pub mod qobject {
 }
 
 use core::pin::Pin;
+use std::ffi::OsString;
+use std::io;
+use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(Default)]
 pub struct FeaturesViewRust {
@@ -132,6 +137,9 @@ impl qobject::FeaturesView {
         if !feature.is_built() {
             return;
         }
+        if settings::is_installed(feature) == installed {
+            return;
+        }
         let saved = settings::set_installed(feature, installed);
         self.as_mut().set_save_notice(QString::from(if saved {
             ""
@@ -139,5 +147,72 @@ impl qobject::FeaturesView {
             "The utility selection could not be saved."
         }));
         self.as_mut().refresh();
+        if saved {
+            let err = relaunch();
+            tracing::error!(%err, "Kavverna could not restart after a utility changed");
+            self.as_mut().set_save_notice(QString::from(
+                "The selection was saved, but Kavverna could not restart.",
+            ));
+        }
+    }
+}
+
+fn relaunch_executable(
+    current: io::Result<PathBuf>,
+    invoked_as: Option<OsString>,
+) -> io::Result<OsString> {
+    match current {
+        Ok(path) if path.is_file() => Ok(path.into_os_string()),
+        _ => invoked_as.ok_or_else(|| {
+            io::Error::new(io::ErrorKind::NotFound, "Kavverna executable is no longer available")
+        }),
+    }
+}
+
+fn relaunch() -> io::Error {
+    let program = match relaunch_executable(std::env::current_exe(), std::env::args_os().next()) {
+        Ok(program) => program,
+        Err(err) => return err,
+    };
+    if let Err(err) = prepare_descriptors_for_restart() {
+        return err;
+    }
+    Command::new(program).arg("--settings").exec()
+}
+
+fn prepare_descriptors_for_restart() -> io::Result<()> {
+    // Qt can leave a GPU render descriptor without CLOEXEC. Isolating this thread's descriptor
+    // table also keeps another worker from opening a new inheritable descriptor before exec.
+    let flags = (libc::CLOSE_RANGE_CLOEXEC | libc::CLOSE_RANGE_UNSHARE) as libc::c_int;
+    let status = unsafe { libc::close_range(3, u32::MAX, flags) };
+    if status == 0 { Ok(()) } else { Err(io::Error::last_os_error()) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_replaced_binary_uses_the_name_that_launched_kavverna() {
+        let old_image = PathBuf::from("/no-longer-present/kavverna-shell (deleted)");
+        let launch = OsString::from("kavverna-shell");
+
+        assert_eq!(relaunch_executable(Ok(old_image), Some(launch.clone())).unwrap(), launch);
+    }
+
+    #[test]
+    fn a_restart_does_not_inherit_open_descriptors() {
+        use std::os::fd::AsRawFd;
+
+        let file = std::fs::File::open("/dev/null").unwrap();
+        let fd = file.as_raw_fd();
+        let original = unsafe { libc::fcntl(fd, libc::F_GETFD) };
+        assert!(original >= 0);
+        assert_eq!(unsafe { libc::fcntl(fd, libc::F_SETFD, original & !libc::FD_CLOEXEC) }, 0);
+        assert_eq!(unsafe { libc::fcntl(fd, libc::F_GETFD) } & libc::FD_CLOEXEC, 0);
+
+        prepare_descriptors_for_restart().unwrap();
+
+        assert_ne!(unsafe { libc::fcntl(fd, libc::F_GETFD) } & libc::FD_CLOEXEC, 0);
     }
 }

@@ -144,8 +144,8 @@ Section {
     Label {
         Layout.fillWidth: true
         text: card.features.restart_required
-            ? "Selection saved. Quit Kavverna from the tray and start it again to apply these changes."
-            : "Changes to these utilities take effect the next time Kavverna starts."
+            ? "Quit Kavverna from the tray and start it again to apply this selection."
+            : "Changing a utility restarts Kavverna so its resources are released or loaded."
         font.pixelSize: card.theme.textBody
         color: card.features.restart_required ? card.theme.accent : card.theme.mutedText
         wrapMode: Text.WordWrap
