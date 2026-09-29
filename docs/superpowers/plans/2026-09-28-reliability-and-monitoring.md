@@ -42,7 +42,7 @@
 - [x] Read each file and trace calls across crate and QML seams.
 - [ ] Record confirmed findings with file, line, effect, and the smallest correction.
 - [ ] Reconcile `ROADMAP.md` claims with the current code; correct stale claims in a separate documentation change.
-- [ ] Run baseline formatting, workspace tests, Clippy, and warning-free build; record exact commands and results.
+- [x] Run baseline formatting, workspace tests, Clippy, and warning-free build; record exact commands and results.
 
 ## Task 2: Protect Shelf content
 
@@ -74,7 +74,7 @@
 - [x] In an isolated profile and session bus, turn System Monitor off, then Network off. Confirm three process images under one PID, no sampler after the last restart, both saved selections false, NVML unmapped, and the descriptor count matching a fresh disabled-profile start.
 - [ ] Verify the same transition against the real KDE session while Keep Awake is held, including PowerDevil inhibition count, icons, panel, tray and settings. Leave at least two hours of Keep Awake after any restart.
 - [ ] Exercise on/off/on and save or exec failures for the remaining shared workers and standalone features. A future hot-switch implementation may stop workers individually if avoiding a brief shell restart becomes a user requirement.
-- [ ] Commit and push this follow-up after final tests and a live service check.
+- [x] Commit and push this follow-up after final tests and a live service check.
 
 ## Task 5: Add network readings
 
@@ -145,4 +145,4 @@ Remaining reviewed items for a later scoped change: lossless Linux paths through
 - A release `0.5.0` build passed `RUSTFLAGS="-D warnings" cargo build --release -p kavverna-shell --offline -q` and all 13 live `--selftest` dependencies. Its Sound, Monitoring and Clipboard icons rendered, and the lower Network and Disk cards had already been checked in the matching debug build. The verified release binary was copied unchanged to `~/.local/bin/kavverna-shell` (matching SHA-256), and the live user service, autostart entry and local application launcher now use that stable path. An ordinary launch cannot return to the older installed `0.2.3` interface or lose the new cards after `cargo clean`. `desktop-file-validate` also exposed missing declared menu actions in the repository launcher; the declaration was added and validated.
 - After the release service started, `dev.kavverna.Shell` reported `Awake=true` with 3 h 08 min remaining. After the temporary inhibitor was removed it still reported `Awake=true` with 3 h 05 min remaining; PowerDevil listed Kavverna's two policy inhibitions. A second protected replacement launched the stable local copy and restored `Awake=true` with 3 h 04 min remaining. This checks continuity across live service replacements, not a real-session feature toggle.
 
-The first implementation and review were committed as `81f6020` and pushed to `origin/main`; local and remote refs matched that SHA. The only untracked file was the user's `AGENTS.md`, which was left outside the commit. A live Shelf drag/drop and actual suspend/lock transition were not exercised while the user was working at the desktop; their focused tests and source review passed, but those full flows remain open acceptance checks. Third-party process integration remains Task 8. A checked box requires evidence, not inference.
+The first implementation and review were committed as `81f6020`; the lifecycle follow-up was committed as `b5906bb`. Both were pushed to `origin/main`. The only untracked file was the user's `AGENTS.md`, which was left outside the commits. A live Shelf drag/drop and actual suspend/lock transition were not exercised while the user was working at the desktop; their focused tests and source review passed, but those full flows remain open acceptance checks. Third-party process integration remains Task 8. A checked box requires evidence, not inference.
