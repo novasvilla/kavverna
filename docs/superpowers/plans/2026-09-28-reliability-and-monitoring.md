@@ -102,7 +102,7 @@
 - [x] Have an independent adversarial reviewer compare the changed implementation with this plan and the reference behavior; fix confirmed gaps.
 - [x] Run formatting, workspace tests, Clippy, a warning-free Rust build, a live monitor smoke test, and the relevant ignored compositor test after the last production edit.
 - [ ] Verify no dead controls, stale notices, raw IDs, lost user data, privacy regressions, or unsupported claims.
-- [ ] Review the diff, commit, push to `origin/main`, and compare local and remote SHAs and clean status.
+- [x] Review the diff, commit, push to `origin/main`, and compare local and remote SHAs and clean tracked status.
 
 ## Task 8: Design third-party tools after the first-party lifecycle is proven
 
@@ -142,4 +142,4 @@ Remaining reviewed items for a later scoped change: lossless Linux paths through
 - The first manual launch lacked the KDE desktop environment, so themed toolbar icons were blank. Relaunching with the session's `XDG_CURRENT_DESKTOP`, `KDE_SESSION_VERSION` and `XDG_DATA_DIRS` restored Sound, Monitoring and Clipboard icons. The Tools tab is hidden by the user's existing `mouse-jiggle.installed=false` selection.
 - The installed `/usr/bin/kavverna-shell` was restored as a user service after the UI test. D-Bus reported `Awake=true` and 3 h 46 min remaining after the temporary inhibitor was released.
 
-Pending for this Git delivery: final diff review, commit, push and remote SHA comparison. A live Shelf drag/drop, actual suspend/lock transition and feature-switch transitions were not exercised while the user was working at the desktop; their focused tests and source review passed, but those full flows remain open acceptance checks. Immediate feature unload and third-party process integration are explicit follow-on tasks, with acceptance criteria above. A checked box requires evidence, not inference.
+The implementation and review were committed as `81f6020` and pushed to `origin/main`; local and remote refs matched that SHA. The only untracked file was the user's `AGENTS.md`, which was left outside the commit. A live Shelf drag/drop, actual suspend/lock transition and feature-switch transitions were not exercised while the user was working at the desktop; their focused tests and source review passed, but those full flows remain open acceptance checks. Immediate feature unload and third-party process integration are explicit follow-on tasks, with acceptance criteria above. A checked box requires evidence, not inference.
