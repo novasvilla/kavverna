@@ -11,8 +11,8 @@ use system_monitor::{Processor, Vitals, Vitalsigns};
 /// is not drawing an hour of readings into three hundred pixels.
 const KEPT: usize = 60;
 
-/// The tick while nobody is looking. Slow enough that the graphics cards are hardly asked, and
-/// under the ten seconds beyond which `system-monitor` refuses to work out a network or disk
+/// The tick while nobody is looking. The graphics cards are not read at all at this cadence, and
+/// it stays under the ten seconds beyond which `system-monitor` refuses to work out a network or disk
 /// rate, so the reading shown the moment the panel opens still carries its rates.
 const HIDDEN: Duration = Duration::from_secs(8);
 
@@ -31,7 +31,8 @@ pub struct History {
     pub cpu: VecDeque<f32>,
     pub memory: VecDeque<f32>,
     /// One per graphics card, indexed the way the cards themselves are, so switching between
-    /// them shows that card's own past rather than a line spliced from both.
+    /// them shows that card's own past rather than a line spliced from both. Emptied while the
+    /// panel is hidden, since the cards are not read then.
     pub cards: Vec<VecDeque<f32>>,
 }
 
@@ -72,7 +73,10 @@ fn ticks_spanned(gap: Duration, tick: Duration) -> usize {
     (ticks.round() as usize).clamp(1, KEPT)
 }
 
-fn record(history: &mut History, reading: &Vitals, ticks: usize) {
+fn record(history: &mut History, reading: &Vitals, ticks: usize, cards_read: bool) {
+    if !cards_read {
+        history.cards.clear();
+    }
     for _ in 0..ticks {
         // The first tick has no load yet, since load is the difference between two readings.
         // Recording it as zero would draw a dip that never happened.
@@ -80,9 +84,16 @@ fn record(history: &mut History, reading: &Vitals, ticks: usize) {
             push_capped(&mut history.cpu, load);
         }
         push_capped(&mut history.memory, reading.memory.used_fraction());
-
-        history.cards.resize_with(reading.graphics.cards.len(), VecDeque::new);
-        for (series, card) in history.cards.iter_mut().zip(&reading.graphics.cards) {
+    }
+    if !cards_read {
+        return;
+    }
+    // A card's trace that restarted after the panel was hidden begins at this reading, once:
+    // stretching it back across the hidden stretch would draw minutes nobody measured.
+    history.cards.resize_with(reading.graphics.cards.len(), VecDeque::new);
+    for (series, card) in history.cards.iter_mut().zip(&reading.graphics.cards) {
+        let times = if series.is_empty() { 1 } else { ticks };
+        for _ in 0..times {
             push_capped(series, card.reading.utilisation.unwrap_or(0.0));
         }
     }
@@ -127,9 +138,10 @@ pub fn run(tick: Duration, on_change: impl Fn()) {
             }
         }
 
-        let reading = vitals.sample();
+        let open = panel::is_open();
+        let reading = if open { vitals.sample() } else { vitals.sample_without_graphics() };
         let ticks = last.map_or(1, |at| ticks_spanned(now.duration_since(at), tick));
-        record(history_lock().get_or_insert_with(History::default), &reading, ticks);
+        record(history_lock().get_or_insert_with(History::default), &reading, ticks, open);
         last = Some(now);
         *lock() = Some(reading);
         if panel::is_open() {
@@ -170,10 +182,45 @@ mod tests {
         let mut history = History::default();
         let reading = Vitals { cpu_load: Some(0.5), ..Default::default() };
 
-        record(&mut history, &reading, 4);
+        record(&mut history, &reading, 4, true);
 
         assert_eq!(history.cpu.len(), 4);
         assert_eq!(history.memory.len(), 4);
+    }
+
+    fn with_one_card(utilisation: f32) -> Vitals {
+        Vitals {
+            cpu_load: Some(0.5),
+            graphics: system_monitor::GraphicsReading {
+                cards: vec![system_monitor::Gpu {
+                    role: system_monitor::GpuRole::Discrete,
+                    reading: system_monitor::GpuReading {
+                        name: "card".into(),
+                        utilisation: Some(utilisation),
+                        ..Default::default()
+                    },
+                }],
+            },
+            ..Default::default()
+        }
+    }
+
+    /// The cards are not read while hidden, so their traces restart rather than carrying a
+    /// flat line, or zeros, across minutes nobody measured.
+    #[test]
+    fn a_hidden_reading_restarts_the_card_traces_and_keeps_the_rest() {
+        let mut history = History::default();
+        record(&mut history, &with_one_card(0.4), 1, true);
+        record(&mut history, &with_one_card(0.4), 1, true);
+
+        record(&mut history, &with_one_card(0.0), 4, false);
+        assert!(history.cards.is_empty());
+        assert_eq!(history.cpu.len(), 6);
+
+        record(&mut history, &with_one_card(0.7), 4, true);
+        assert_eq!(history.cards[0], VecDeque::from([0.7]), "a restarted trace begins once");
+        record(&mut history, &with_one_card(0.6), 2, true);
+        assert_eq!(history.cards[0].len(), 3);
     }
 
     /// A card unplugged between samples must not leave its old readings attached to whatever
