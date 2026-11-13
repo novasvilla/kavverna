@@ -1,10 +1,10 @@
 use crate::settings;
-use clipboard_history::{Command, Commands, History, Settings, Snapshot};
+use clipboard_history::{Command, Commands, Entry, History, Kind, Settings, Snapshot};
 use feature_catalog::Feature;
 use preferences::Preferences;
-use std::sync::mpsc::{Receiver, RecvTimeoutError};
-use std::sync::{Mutex, MutexGuard};
-use std::time::Duration;
+use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
+use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::time::{Duration, Instant};
 
 static SNAPSHOT: Mutex<Option<Snapshot>> = Mutex::new(None);
 static COMMANDS: Mutex<Option<Commands>> = Mutex::new(None);
@@ -23,8 +23,12 @@ pub fn is_running() -> bool {
     COMMANDS.lock().map(|held| held.is_some()).unwrap_or(false)
 }
 
+fn commands() -> Option<Commands> {
+    COMMANDS.lock().ok().and_then(|held| held.clone())
+}
+
 pub fn send(command: Command) -> bool {
-    match COMMANDS.lock().ok().and_then(|held| held.clone()) {
+    match commands() {
         Some(commands) => commands.send(command),
         None => {
             tracing::warn!("the clipboard history is not running, change dropped");
@@ -33,9 +37,109 @@ pub fn send(command: Command) -> bool {
     }
 }
 
-// These read the switches as stored, which is what the clipboard page shows and writes back.
-// Whether anything runs is decided by `wanted_in` and `settings_in`, which put each feature's
-// availability above its switch.
+/// Blocks for up to two seconds, so never on the Qt thread.
+pub fn read(id: i64) -> Option<Entry> {
+    commands()?.read(id)
+}
+
+/// Waits this long after the last keystroke, so typing a word runs one query rather than one
+/// per letter.
+const SEARCH_QUIET: Duration = Duration::from_millis(150);
+
+/// What was typed, held until the typing stops.
+#[derive(Debug)]
+struct Debounce {
+    quiet: Duration,
+    pending: Option<(String, Instant)>,
+}
+
+impl Debounce {
+    fn new(quiet: Duration) -> Self {
+        Self { quiet, pending: None }
+    }
+
+    fn typed(&mut self, text: String, now: Instant) {
+        self.pending = Some((text, now + self.quiet));
+    }
+
+    /// How long until something is due. `None` when nothing is waiting.
+    fn wait(&self, now: Instant) -> Option<Duration> {
+        self.pending.as_ref().map(|(_, due)| due.saturating_duration_since(now))
+    }
+
+    fn due(&mut self, now: Instant) -> Option<String> {
+        match &self.pending {
+            Some((_, due)) if *due <= now => self.pending.take().map(|(text, _)| text),
+            _ => None,
+        }
+    }
+}
+
+/// Searches once the typing settles. The thread starts on the first keystroke and then lives
+/// as long as the process, idle on its channel.
+pub fn search(text: String) {
+    static TYPED: OnceLock<Option<Sender<String>>> = OnceLock::new();
+    let typed = TYPED.get_or_init(|| {
+        let (typed, keystrokes) = channel();
+        std::thread::Builder::new()
+            .name("kavverna-search".into())
+            .spawn(move || settle_searches(keystrokes))
+            .map_err(|err| tracing::error!(%err, "no thread to settle searches on"))
+            .ok()?;
+        Some(typed)
+    });
+    match typed {
+        Some(typed) => {
+            let _ = typed.send(text);
+        }
+        None => {
+            send(Command::Search(text));
+        }
+    }
+}
+
+fn settle_searches(keystrokes: Receiver<String>) {
+    let mut debounce = Debounce::new(SEARCH_QUIET);
+    loop {
+        let next = match debounce.wait(Instant::now()) {
+            None => keystrokes.recv().map_err(|_| RecvTimeoutError::Disconnected),
+            Some(wait) => keystrokes.recv_timeout(wait),
+        };
+        match next {
+            Ok(text) => debounce.typed(text, Instant::now()),
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => return,
+        }
+        if let Some(text) = debounce.due(Instant::now()) {
+            send(Command::Search(text));
+        }
+    }
+}
+
+/// The kind a person would name: a text that is one web address is a link. Judged on the
+/// preview, which keeps the start of the text, and a link longer than the cut is still one
+/// address with no spaces in it.
+pub fn kind_name(kind: Kind, preview: &str) -> &'static str {
+    let address = preview.trim().trim_end_matches('\u{2026}');
+    let link = (address.starts_with("https://") || address.starts_with("http://"))
+        && !address.contains(char::is_whitespace);
+    if kind == Kind::Text && link { "link" } else { kind.as_str() }
+}
+
+/// What reading an entry whole gives back: the text itself, a list of files one path a line,
+/// and for a picture its size, having no text of its own.
+pub fn full_text(entry: &Entry) -> String {
+    match entry.kind {
+        Kind::Text => entry.text.clone(),
+        Kind::Files => entry
+            .file_paths
+            .iter()
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+            .join("\n"),
+        Kind::Image => entry.preview(),
+    }
+}
 
 pub fn keeps_history() -> bool {
     settings::bool_at(settings::CLIPBOARD_ENABLED, settings::CLIPBOARD_ENABLED_DEFAULT)
@@ -271,6 +375,35 @@ mod tests {
 
         removed(&mut prefs, Feature::ClipboardTransform);
         assert!(!wanted_in(&prefs), "with Transform gone too, nothing is left to hold it open");
+    }
+
+    #[test]
+    fn typing_settles_into_one_search_for_the_last_text() {
+        let start = Instant::now();
+        let at = |millis| start + Duration::from_millis(millis);
+        let mut debounce = Debounce::new(SEARCH_QUIET);
+        assert_eq!(debounce.wait(start), None);
+
+        debounce.typed("a".into(), start);
+        debounce.typed("ap".into(), at(100));
+        assert_eq!(debounce.due(at(200)), None, "still within the quiet after the last key");
+        assert_eq!(debounce.wait(at(200)), Some(Duration::from_millis(50)));
+
+        assert_eq!(debounce.due(at(250)).as_deref(), Some("ap"));
+        assert_eq!(debounce.due(at(400)), None, "asked once, not once per key");
+        assert_eq!(debounce.wait(at(400)), None);
+    }
+
+    #[test]
+    fn a_link_is_one_address_and_nothing_else() {
+        assert_eq!(kind_name(Kind::Text, "https://example.org/a?b=c"), "link");
+        assert_eq!(kind_name(Kind::Text, "  http://example.org "), "link");
+        let long = format!("https://example.org/{}\u{2026}", "x".repeat(200));
+        assert_eq!(kind_name(Kind::Text, &long), "link");
+        assert_eq!(kind_name(Kind::Text, "see https://example.org"), "text");
+        assert_eq!(kind_name(Kind::Text, "https://example.org and more"), "text");
+        assert_eq!(kind_name(Kind::Files, "https://example.org"), "files");
+        assert_eq!(kind_name(Kind::Image, "1920\u{d7}1080"), "image");
     }
 
     #[test]

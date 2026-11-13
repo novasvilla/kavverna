@@ -89,6 +89,9 @@ pub const CLIPBOARD_LIMIT_DEFAULT: i64 = 50;
 /// Zero keeps entries until the count limit pushes them out, which is how every earlier
 /// release behaved.
 pub const CLIPBOARD_KEEP_DAYS_DEFAULT: i64 = 0;
+/// The ages the panel offers. A write is held to these because a stray number here deletes
+/// history, and a hand-edited value is still honoured on read.
+pub const CLIPBOARD_KEEP_DAYS_CHOICES: [i64; 5] = [0, 1, 7, 30, 90];
 pub const CLIPBOARD_IMAGES_AND_FILES_DEFAULT: bool = true;
 pub const CLIPBOARD_SKIP_SENSITIVE_DEFAULT: bool = true;
 
