@@ -69,7 +69,7 @@ Window {
     readonly property var pageNeeds: [
         ["keep-awake"],
         ["volume-mixer", "output-switcher", "microphone-tools"],
-        ["system-monitor", "network-monitor"],
+        ["system-monitor", "network-monitor", "agent-usage"],
         ["clipboard-history", "clipboard-auto-clear", "clean-url", "clipboard-transform", "shelf"],
         ["mouse-jiggle"]
     ]
@@ -278,6 +278,11 @@ Window {
 
     VitalsView {
         id: vitals
+        Component.onCompleted: attach()
+    }
+
+    AgentUsageView {
+        id: agents
         Component.onCompleted: attach()
     }
 
@@ -691,6 +696,7 @@ Window {
                     theme: theme
                     shows: root.shows
                     vitals: vitals
+                    agents: agents
                     visible: !hub.showing_settings && root.page === root.monitoringPage
                              && root.pageShown(root.monitoringPage)
                 }
