@@ -7,6 +7,7 @@ pub mod klipper;
 pub mod selection;
 pub mod sensitivity;
 pub mod store;
+pub mod thumbnail;
 pub mod transform;
 
 pub use auto_clear::AutoClear;
