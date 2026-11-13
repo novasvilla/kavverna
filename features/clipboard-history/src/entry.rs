@@ -5,7 +5,9 @@ use std::time::SystemTime;
 
 pub const MAX_CHARACTERS: usize = 1_000_000;
 
-pub const PREVIEW_CHARACTERS: usize = 2_000;
+/// Two full lines of the panel's list and a little over, which is all a row shows. The full
+/// text is read by id when somebody opens the entry.
+pub const PREVIEW_CHARACTERS: usize = 200;
 
 /// Beyond this a copy is a folder operation, not an entry.
 pub const MAX_FILES: usize = 100;
@@ -63,6 +65,11 @@ impl StoredImage {
 
     pub fn file_name(&self) -> String {
         format!("{}.png", self.digest)
+    }
+
+    /// The size the picture is drawn at in the list, known without decoding anything.
+    pub fn thumbnail_size(&self) -> (u32, u32) {
+        crate::thumbnail::size(self.width, self.height)
     }
 }
 

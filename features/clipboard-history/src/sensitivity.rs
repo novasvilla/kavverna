@@ -72,8 +72,14 @@ fn is_a_web_address(text: &str) -> bool {
     url::Url::parse(text.trim()).map(|address| address.host().is_some()).unwrap_or(false)
 }
 
-/// An identifier has the shape the guess below rejects, and is nobody's secret.
+/// An identifier has the shape the guess below rejects, and is nobody's secret. Accepted bare,
+/// braced as Windows writes it, or as the `urn:uuid:` form XML and RDF carry.
 fn is_an_identifier(text: &str) -> bool {
+    let text = text.trim();
+    let text = match text.get(..9) {
+        Some(prefix) if prefix.eq_ignore_ascii_case("urn:uuid:") => &text[9..],
+        _ => text,
+    };
     let trimmed = text.trim_start_matches('{').trim_end_matches('}');
     let groups: Vec<&str> = trimmed.split('-').collect();
     let lengths = [8, 4, 4, 4, 12];
@@ -109,6 +115,15 @@ mod tests {
     fn an_identifier_is_not_a_secret() {
         assert!(!looks_sensitive("6ba7b810-9dad-11d1-80b4-00c04fd430c8"));
         assert!(!looks_sensitive("{6ba7b810-9dad-11d1-80b4-00c04fd430c8}"));
+        assert!(!looks_sensitive("6BA7B810-9DAD-11D1-80B4-00C04FD430C8"));
+        assert!(!looks_sensitive("urn:uuid:6ba7b810-9dad-11d1-80b4-00c04fd430c8"));
+    }
+
+    /// The exemption is for the identifier's exact shape, not for anything with dashes in it.
+    #[test]
+    fn something_merely_near_an_identifier_is_still_judged() {
+        assert!(looks_sensitive("6ba7b810-9dad-11d1-80b4-00c04fd430c8-x9!"));
+        assert!(looks_sensitive("urn:uuid:not-an-identifier-4f9a2b71c8e0"));
     }
 
     #[test]

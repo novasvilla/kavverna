@@ -8,6 +8,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::entry::{Entry, Kind, MAX_FILES, StoredImage};
+use crate::thumbnail;
 
 /// Raised whenever the shape below changes, with a step added to `migrate` for it. Without
 /// this an upgrade would meet a database it does not understand and there would be nothing to
@@ -81,19 +82,64 @@ pub struct Summary {
     pub pinned: bool,
     pub copied_at: SystemTime,
     pub image: Option<StoredImage>,
+    /// What to draw for a picture: its small copy, or the picture itself when it is already
+    /// small. Absent until the file exists, so the list never points at nothing.
+    pub thumbnail: Option<PathBuf>,
     pub file_count: usize,
+}
+
+/// Which slice of the list to read. Offset rather than a key: the order is pin group then
+/// position, which no single column carries, and a history is thousands of rows, not millions.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Window {
+    pub offset: usize,
+    pub limit: usize,
+}
+
+impl Window {
+    /// More than a panel shows at once, few enough that a snapshot stays small.
+    pub const DEFAULT_LIMIT: usize = 100;
+    /// Whatever the caller asks for, one read never carries more than this.
+    pub const MAX_LIMIT: usize = 500;
+
+    pub fn first(limit: usize) -> Self {
+        Self { offset: 0, limit }.clamped()
+    }
+
+    pub fn clamped(self) -> Self {
+        Self { offset: self.offset, limit: self.limit.clamp(1, Self::MAX_LIMIT) }
+    }
+}
+
+impl Default for Window {
+    fn default() -> Self {
+        Self::first(Self::DEFAULT_LIMIT)
+    }
+}
+
+/// One window of the list and how many rows there are in all, so the shell can say "120 of
+/// 3,400" and ask for the next slice.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct Page {
+    pub rows: Vec<Summary>,
+    pub total: usize,
 }
 
 pub struct Store {
     db: Connection,
     images: PathBuf,
+    thumbnails: PathBuf,
 }
 
 impl Store {
     pub fn open(root: &Path) -> Result<Self, StoreError> {
         let images = root.join("clipboard-images");
+        // Inside the pictures directory so it travels with them, in its own directory so the
+        // sweep below cannot mistake a thumbnail for a picture nobody holds.
+        let thumbnails = images.join("thumbnails");
         make_directory(root)?;
         make_directory(&images)?;
+        make_directory(&thumbnails)?;
 
         let file = root.join("clipboard.db");
         let db = Connection::open(&file)?;
@@ -106,48 +152,96 @@ impl Store {
         db.pragma_update(None, "foreign_keys", "ON")?;
         migrate(&db)?;
 
-        Ok(Self { db, images })
+        Ok(Self { db, images, thumbnails })
     }
 
     #[cfg(test)]
     fn in_memory(images: PathBuf) -> Result<Self, StoreError> {
         let db = Connection::open_in_memory()?;
         migrate(&db)?;
+        let thumbnails = images.join("thumbnails");
         make_directory(&images)?;
-        Ok(Self { db, images })
+        make_directory(&thumbnails)?;
+        Ok(Self { db, images, thumbnails })
     }
 
     pub fn image_path(&self, digest: &str) -> PathBuf {
         self.images.join(format!("{digest}.png"))
     }
 
-    /// Pinned first, then the rest, each newest at the top.
-    pub fn summaries(&self) -> Result<Vec<Summary>, StoreError> {
-        let query = format!(
-            "SELECT id, kind, substr(body, 1, {}), file_paths, image_digest, image_width, image_height,
-                    copied_at, pinned_at
-             FROM entry
-             ORDER BY (pinned_at IS NULL), position DESC", crate::entry::PREVIEW_CHARACTERS + 1
-        );
-        let mut statement = self.db.prepare(&query)?;
-        let rows = statement.query_map([], summary_from)?;
-        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+    /// Where the small copy of a picture lives. A picture already within the thumbnail size is
+    /// its own thumbnail, so nothing is written for it.
+    pub fn thumbnail_path(&self, image: &StoredImage) -> PathBuf {
+        if thumbnail::needed(image.width, image.height) {
+            self.thumbnails.join(image.file_name())
+        } else {
+            self.image_path(&image.digest)
+        }
     }
 
-    pub fn search(&self, query: &str) -> Result<Vec<Summary>, StoreError> {
-        let Some(pattern) = match_pattern(query) else {
-            return self.summaries();
+    /// One window of the list. An empty query is the whole history, pinned first and then the
+    /// rest, each newest at the top; anything else is a search, newest first.
+    pub fn page(&self, query: &str, window: Window) -> Result<Page, StoreError> {
+        let window = window.clamped();
+        // The preview is cut in the query, so only the head of a copied novel reaches this
+        // process. SQLite still reads the whole value to cut it, which the window bounds to a
+        // page of rows rather than the history.
+        let head = crate::entry::PREVIEW_CHARACTERS + 1;
+        let (rows, total) = match match_pattern(query) {
+            None => {
+                let sql = format!(
+                    "SELECT id, kind, substr(body, 1, {head}), file_paths, image_digest,
+                            image_width, image_height, copied_at, pinned_at
+                     FROM entry
+                     ORDER BY (pinned_at IS NULL), position DESC
+                     LIMIT ?1 OFFSET ?2"
+                );
+                let mut statement = self.db.prepare(&sql)?;
+                let rows = statement
+                    .query_map(params![window.limit as i64, window.offset as i64], summary_from)?
+                    .collect::<Result<Vec<_>, _>>()?;
+                let total: i64 =
+                    self.db.query_row("SELECT COUNT(*) FROM entry", [], |row| row.get(0))?;
+                (rows, total)
+            }
+            Some(pattern) => {
+                let sql = format!(
+                    "SELECT e.id, e.kind, substr(e.body, 1, {head}), e.file_paths, e.image_digest,
+                            e.image_width, e.image_height, e.copied_at, e.pinned_at
+                     FROM entry_search s JOIN entry e ON e.id = s.rowid
+                     WHERE entry_search MATCH ?1
+                     ORDER BY e.position DESC
+                     LIMIT ?2 OFFSET ?3"
+                );
+                let mut statement = self.db.prepare(&sql)?;
+                let rows = statement
+                    .query_map(
+                        params![pattern, window.limit as i64, window.offset as i64],
+                        summary_from,
+                    )?
+                    .collect::<Result<Vec<_>, _>>()?;
+                let total: i64 = self.db.query_row(
+                    "SELECT COUNT(*) FROM entry_search s JOIN entry e ON e.id = s.rowid
+                     WHERE entry_search MATCH ?1",
+                    params![pattern],
+                    |row| row.get(0),
+                )?;
+                (rows, total)
+            }
         };
-        let query = format!(
-            "SELECT e.id, e.kind, substr(e.body, 1, {}), e.file_paths, e.image_digest, e.image_width,
-                    e.image_height, e.copied_at, e.pinned_at
-             FROM entry_search s JOIN entry e ON e.id = s.rowid
-             WHERE entry_search MATCH ?1
-             ORDER BY e.position DESC", crate::entry::PREVIEW_CHARACTERS + 1
-        );
-        let mut statement = self.db.prepare(&query)?;
-        let rows = statement.query_map(params![pattern], summary_from)?;
-        Ok(rows.collect::<Result<Vec<_>, _>>()?)
+
+        let rows = rows
+            .into_iter()
+            .map(|mut row| {
+                row.thumbnail = row
+                    .image
+                    .as_ref()
+                    .map(|image| self.thumbnail_path(image))
+                    .filter(|path| path.exists());
+                row
+            })
+            .collect();
+        Ok(Page { rows, total: total as usize })
     }
 
     pub fn entry(&self, id: i64) -> Result<Option<Entry>, StoreError> {
@@ -173,6 +267,7 @@ impl Store {
                     .map_err(|source| StoreError::Directory { path: path.clone(), source })?;
                 keep_to_yourself(&path);
             }
+            self.make_thumbnail(image, bytes);
         }
 
         let paths = join_paths(&captured.file_paths);
@@ -247,18 +342,164 @@ impl Store {
         Ok(())
     }
 
+    /// Replaces a text entry's words. Editing is not copying, so the entry keeps its id, its
+    /// pin, its place in the list and the time it was copied: it stays where the person was
+    /// looking when they changed it, and expiry still counts from the copy. If the new words
+    /// are already another entry's, that other row is folded into this one, because `remember`
+    /// finds a repeat by its text and two rows with the same text would leave it guessing; a
+    /// pin on either survives the fold. `false` when there was nothing to change: no such
+    /// entry, not text, or text that would never have been saved (blank or oversized).
     pub fn rewrite(&mut self, id: i64, text: &str) -> Result<bool, StoreError> {
-        let changed = self.db.execute(
-            "UPDATE entry SET body = ?2 WHERE id = ?1 AND kind = 'text'",
-            params![id, text],
-        )?;
-        if changed == 0 {
+        let Some(text) = crate::entry::storable_text(text) else {
             return Ok(false);
+        };
+        let edit = self.db.transaction()?;
+        let Some(pinned_at) = edit
+            .query_row(
+                "SELECT pinned_at FROM entry WHERE id = ?1 AND kind = 'text'",
+                params![id],
+                |row| row.get::<_, Option<i64>>(0),
+            )
+            .optional()?
+        else {
+            return Ok(false);
+        };
+
+        let twin: Option<(i64, Option<i64>)> = edit
+            .query_row(
+                "SELECT id, pinned_at FROM entry WHERE kind = 'text' AND body = ?1 AND id != ?2
+                 LIMIT 1",
+                params![text, id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        if let Some((twin, twin_pinned_at)) = twin {
+            edit.execute("DELETE FROM entry WHERE id = ?1", params![twin])?;
+            edit.execute("DELETE FROM entry_search WHERE rowid = ?1", params![twin])?;
+            if pinned_at.is_none() && twin_pinned_at.is_some() {
+                edit.execute(
+                    "UPDATE entry SET pinned_at = ?2 WHERE id = ?1",
+                    params![id, twin_pinned_at],
+                )?;
+            }
         }
-        self.db.execute("DELETE FROM entry_search WHERE rowid = ?1", params![id])?;
-        self.db
-            .execute("INSERT INTO entry_search(rowid, body) VALUES (?1, ?2)", params![id, text])?;
+
+        edit.execute("UPDATE entry SET body = ?2 WHERE id = ?1", params![id, text])?;
+        edit.execute("DELETE FROM entry_search WHERE rowid = ?1", params![id])?;
+        edit.execute("INSERT INTO entry_search(rowid, body) VALUES (?1, ?2)", params![id, text])?;
+        edit.commit()?;
         Ok(true)
+    }
+
+    /// The chosen text entries as one text, in the order given, with `separator` between them.
+    /// Pictures and file lists have no text to join and are passed over, as are ids that no
+    /// longer exist. `None` when nothing was left to join.
+    pub fn joined(&self, ids: &[i64], separator: &str) -> Result<Option<String>, StoreError> {
+        let mut pieces = Vec::with_capacity(ids.len());
+        for id in ids {
+            let body: Option<String> = self
+                .db
+                .query_row(
+                    "SELECT body FROM entry WHERE id = ?1 AND kind = 'text'",
+                    params![id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            pieces.extend(body);
+        }
+        Ok((!pieces.is_empty()).then(|| pieces.join(separator)))
+    }
+
+    /// Forgets every unpinned entry last copied before `now - age`. Age counts from the last
+    /// copy, so something copied again or put back starts over; an entry adopted from Klipper
+    /// carries its original time and can go on the first sweep. Unpinning does not start it
+    /// over either, since the time shown on the row is when it was copied and stays true, so
+    /// an old entry unpinned goes on the next sweep. Returns how many went.
+    pub fn expire(&mut self, age: Duration, now: SystemTime) -> Result<usize, StoreError> {
+        let cutoff = millis(now.checked_sub(age).unwrap_or(UNIX_EPOCH));
+        let sweep = self.db.transaction()?;
+        sweep.execute(
+            "DELETE FROM entry_search WHERE rowid IN
+                 (SELECT id FROM entry WHERE pinned_at IS NULL AND copied_at < ?1)",
+            params![cutoff],
+        )?;
+        let removed = sweep.execute(
+            "DELETE FROM entry WHERE pinned_at IS NULL AND copied_at < ?1",
+            params![cutoff],
+        )?;
+        sweep.commit()?;
+        if removed > 0 {
+            self.sweep_images()?;
+        }
+        Ok(removed)
+    }
+
+    /// Writes the small copies that pictures saved before thumbnails existed never got, at most
+    /// `at_most` per call, so a long history of screenshots is worked through a few at a time
+    /// instead of holding the thread. Returns how many were written; zero means caught up.
+    pub fn backfill_thumbnails(&self, at_most: usize) -> Result<usize, StoreError> {
+        let mut statement = self.db.prepare(
+            "SELECT DISTINCT image_digest, image_width, image_height FROM entry
+             WHERE image_digest IS NOT NULL",
+        )?;
+        let images: Vec<StoredImage> = statement
+            .query_map([], |row| {
+                Ok(StoredImage {
+                    digest: row.get(0)?,
+                    width: row.get::<_, Option<u32>>(1)?.unwrap_or_default(),
+                    height: row.get::<_, Option<u32>>(2)?.unwrap_or_default(),
+                })
+            })?
+            .collect::<Result<_, _>>()?;
+
+        let mut written = 0;
+        for image in images {
+            if written == at_most {
+                break;
+            }
+            if self.thumbnail_path(&image).exists() {
+                continue;
+            }
+            let Ok(bytes) = fs::read(self.image_path(&image.digest)) else {
+                continue;
+            };
+            if self.make_thumbnail(&image, &bytes) {
+                written += 1;
+            }
+        }
+        Ok(written)
+    }
+
+    /// Best effort: a thumbnail that cannot be made leaves the row drawn without one, never
+    /// the copy unsaved. Written beside its final name and renamed into place, so a reader
+    /// never meets half a file. Returns whether a file was written.
+    fn make_thumbnail(&self, image: &StoredImage, png: &[u8]) -> bool {
+        if !thumbnail::needed(image.width, image.height) {
+            return false;
+        }
+        let path = self.thumbnail_path(image);
+        if path.exists() {
+            return false;
+        }
+        let Some(small) = thumbnail::downscale(png) else {
+            tracing::debug!(digest = %image.digest, "a saved picture would not shrink");
+            return false;
+        };
+        // A temporary file is created readable by its owner only, which is what it keeps.
+        let written = tempfile::NamedTempFile::new_in(&self.thumbnails).and_then(|mut file| {
+            std::io::Write::write_all(&mut file, &small)?;
+            file.persist(&path).map_err(|failed| failed.error)
+        });
+        match written {
+            Ok(_) => {
+                keep_to_yourself(&path);
+                true
+            }
+            Err(err) => {
+                tracing::warn!(%err, "could not write a thumbnail");
+                false
+            }
+        }
     }
 
     pub fn set_pinned(&mut self, id: i64, pinned: bool) -> Result<(), StoreError> {
@@ -372,17 +613,19 @@ impl Store {
         let kept: Vec<String> =
             statement.query_map([], |row| row.get(0))?.collect::<Result<_, _>>()?;
 
-        let Ok(listing) = fs::read_dir(&self.images) else {
-            return Ok(());
-        };
-        for file in listing.flatten() {
-            let name = file.file_name();
-            let name = name.to_string_lossy();
-            let Some(digest) = name.strip_suffix(".png") else {
+        for directory in [&self.images, &self.thumbnails] {
+            let Ok(listing) = fs::read_dir(directory) else {
                 continue;
             };
-            if !kept.iter().any(|held| held == digest) {
-                let _ = fs::remove_file(file.path());
+            for file in listing.flatten() {
+                let name = file.file_name();
+                let name = name.to_string_lossy();
+                let Some(digest) = name.strip_suffix(".png") else {
+                    continue;
+                };
+                if !kept.iter().any(|held| held == digest) {
+                    let _ = fs::remove_file(file.path());
+                }
             }
         }
         Ok(())
@@ -409,6 +652,7 @@ fn summary_from(row: &rusqlite::Row<'_>) -> rusqlite::Result<Summary> {
         pinned: entry.is_pinned(),
         copied_at: entry.copied_at,
         image: entry.image.clone(),
+        thumbnail: None,
         file_count: entry.file_paths.len(),
     })
 }
@@ -490,6 +734,14 @@ mod tests {
         (store, room)
     }
 
+    fn everything(store: &Store) -> Vec<Summary> {
+        store.page("", Window::first(Window::MAX_LIMIT)).unwrap().rows
+    }
+
+    fn found(store: &Store, query: &str) -> Vec<Summary> {
+        store.page(query, Window::first(Window::MAX_LIMIT)).unwrap().rows
+    }
+
     fn text(body: &str) -> Captured {
         Captured { kind: Kind::Text, text: body.into(), file_paths: Vec::new(), image: None }
     }
@@ -534,7 +786,7 @@ mod tests {
         }
 
         let reopened = Store::open(room.path()).unwrap();
-        assert_eq!(reopened.summaries().unwrap()[0].preview, "saved by an older build");
+        assert_eq!(everything(&reopened)[0].preview, "saved by an older build");
         let stamped: i64 =
             reopened.db.query_row("PRAGMA user_version", [], |row| row.get(0)).unwrap();
         assert_eq!(stamped, SCHEMA_VERSION);
@@ -552,8 +804,8 @@ mod tests {
 
         let reopened = Store::open(room.path()).unwrap();
         assert_eq!(reopened.counts().unwrap(), (1, 1));
-        assert_eq!(reopened.summaries().unwrap()[0].preview, "pinned across restarts");
-        assert!(reopened.summaries().unwrap()[0].pinned);
+        assert_eq!(everything(&reopened)[0].preview, "pinned across restarts");
+        assert!(everything(&reopened)[0].pinned);
     }
 
     #[test]
@@ -562,8 +814,7 @@ mod tests {
         store.remember(text("first")).unwrap();
         store.remember(text("second")).unwrap();
 
-        let previews: Vec<String> =
-            store.summaries().unwrap().into_iter().map(|row| row.preview).collect();
+        let previews: Vec<String> = everything(&store).into_iter().map(|row| row.preview).collect();
         assert_eq!(previews, vec!["second", "first"]);
     }
 
@@ -576,7 +827,7 @@ mod tests {
 
         assert_eq!(first, again, "the entry keeps its identity");
         assert_eq!(store.counts().unwrap(), (0, 2));
-        assert_eq!(store.summaries().unwrap()[0].preview, "keep me");
+        assert_eq!(everything(&store)[0].preview, "keep me");
     }
 
     #[test]
@@ -586,7 +837,7 @@ mod tests {
         store.set_pinned(id, true).unwrap();
         store.remember(text("kept")).unwrap();
 
-        assert!(store.summaries().unwrap()[0].pinned);
+        assert!(everything(&store)[0].pinned);
         assert_eq!(store.counts().unwrap(), (1, 0));
     }
 
@@ -597,8 +848,7 @@ mod tests {
         store.remember(text("new")).unwrap();
         store.set_pinned(old, true).unwrap();
 
-        let previews: Vec<String> =
-            store.summaries().unwrap().into_iter().map(|row| row.preview).collect();
+        let previews: Vec<String> = everything(&store).into_iter().map(|row| row.preview).collect();
         assert_eq!(previews, vec!["old", "new"]);
     }
 
@@ -633,7 +883,7 @@ mod tests {
         store.remember(text("the quick brown fox")).unwrap();
         store.remember(text("nothing to see")).unwrap();
 
-        let found = store.search("brown").unwrap();
+        let found = found(&store, "brown");
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].preview, "the quick brown fox");
     }
@@ -644,7 +894,7 @@ mod tests {
         let long = "x".repeat(crate::entry::PREVIEW_CHARACTERS + 500);
         let id = store.remember(text(&long)).unwrap();
 
-        let preview = &store.summaries().unwrap()[0].preview;
+        let preview = &everything(&store)[0].preview;
         assert_eq!(preview.chars().count(), crate::entry::PREVIEW_CHARACTERS + 1);
         assert!(preview.ends_with('…'));
         assert_eq!(store.entry(id).unwrap().unwrap().text, long);
@@ -654,15 +904,15 @@ mod tests {
     fn search_matches_a_word_that_has_only_been_started() {
         let (mut store, _room) = store();
         store.remember(text("kavverna")).unwrap();
-        assert_eq!(store.search("kavv").unwrap().len(), 1);
+        assert_eq!(found(&store, "kavv").len(), 1);
     }
 
     #[test]
     fn search_treats_its_own_operators_as_ordinary_text() {
         let (mut store, _room) = store();
         store.remember(text("this AND that")).unwrap();
-        assert_eq!(store.search("\"quote").unwrap().len(), 0);
-        assert!(!store.search("AND").unwrap().is_empty());
+        assert_eq!(found(&store, "\"quote").len(), 0);
+        assert!(!found(&store, "AND").is_empty());
     }
 
     #[test]
@@ -670,7 +920,7 @@ mod tests {
         let (mut store, _room) = store();
         let id = store.remember(text("findable")).unwrap();
         store.forget(id).unwrap();
-        assert!(store.search("findable").unwrap().is_empty());
+        assert!(found(&store, "findable").is_empty());
     }
 
     #[test]
@@ -710,8 +960,8 @@ mod tests {
         let id = store.remember(text("before")).unwrap();
         assert!(store.rewrite(id, "after").unwrap());
 
-        assert!(store.search("before").unwrap().is_empty());
-        assert_eq!(store.search("after").unwrap().len(), 1);
+        assert!(found(&store, "before").is_empty());
+        assert_eq!(found(&store, "after").len(), 1);
         assert_eq!(store.entry(id).unwrap().unwrap().text, "after");
     }
 
@@ -738,7 +988,7 @@ mod tests {
         store.remember(text("newer")).unwrap();
 
         assert_eq!(
-            store.summaries().unwrap().into_iter().map(|row| row.preview).collect::<Vec<_>>(),
+            everything(&store).into_iter().map(|row| row.preview).collect::<Vec<_>>(),
             vec!["pinned", "newer", "older"]
         );
 
@@ -746,8 +996,239 @@ mod tests {
         assert!(store.move_entry(older, true).unwrap());
 
         assert_eq!(
-            store.summaries().unwrap().into_iter().map(|row| row.preview).collect::<Vec<_>>(),
+            everything(&store).into_iter().map(|row| row.preview).collect::<Vec<_>>(),
             vec!["pinned", "older", "newer"]
         );
+    }
+
+    fn previews(rows: &[Summary]) -> Vec<&str> {
+        rows.iter().map(|row| row.preview.as_str()).collect()
+    }
+
+    #[test]
+    fn a_window_reads_one_slice_and_counts_them_all() {
+        let (mut store, _room) = store();
+        for index in 0..7 {
+            store.remember(text(&format!("entry {index}"))).unwrap();
+        }
+
+        let page = store.page("", Window { offset: 2, limit: 3 }).unwrap();
+        assert_eq!(page.total, 7);
+        assert_eq!(previews(&page.rows), vec!["entry 4", "entry 3", "entry 2"]);
+
+        let past_the_end = store.page("", Window { offset: 7, limit: 3 }).unwrap();
+        assert!(past_the_end.rows.is_empty());
+        assert_eq!(past_the_end.total, 7);
+    }
+
+    #[test]
+    fn a_search_takes_the_same_window_and_counts_only_its_matches() {
+        let (mut store, _room) = store();
+        for index in 0..5 {
+            store.remember(text(&format!("apple {index}"))).unwrap();
+            store.remember(text(&format!("pear {index}"))).unwrap();
+        }
+
+        let page = store.page("apple", Window { offset: 1, limit: 2 }).unwrap();
+        assert_eq!(page.total, 5);
+        assert_eq!(previews(&page.rows), vec!["apple 3", "apple 2"]);
+    }
+
+    #[test]
+    fn no_window_is_empty_or_unbounded() {
+        assert_eq!(Window { offset: 0, limit: 0 }.clamped().limit, 1);
+        assert_eq!(Window::first(usize::MAX).limit, Window::MAX_LIMIT);
+    }
+
+    const DAY: Duration = Duration::from_secs(24 * 60 * 60);
+
+    #[test]
+    fn expiry_forgets_old_copies_and_never_a_pinned_one() {
+        let (mut store, _room) = store();
+        let now = SystemTime::now();
+        let old = store.remember(text("old")).unwrap();
+        store.backdate(old, now - 40 * DAY).unwrap();
+        let old_pinned = store.remember(text("old but pinned")).unwrap();
+        store.backdate(old_pinned, now - 400 * DAY).unwrap();
+        store.set_pinned(old_pinned, true).unwrap();
+        let fresh = store.remember(text("fresh")).unwrap();
+        store.backdate(fresh, now - 29 * DAY).unwrap();
+
+        assert_eq!(store.expire(30 * DAY, now).unwrap(), 1);
+        assert!(store.entry(old).unwrap().is_none());
+        assert!(store.entry(old_pinned).unwrap().is_some());
+        assert!(store.entry(fresh).unwrap().is_some());
+        assert!(found(&store, "old").iter().all(|row| row.id != old), "and leaves the index");
+    }
+
+    #[test]
+    fn an_old_entry_unpinned_is_old_again() {
+        let (mut store, _room) = store();
+        let now = SystemTime::now();
+        let id = store.remember(text("kept a year")).unwrap();
+        store.backdate(id, now - 400 * DAY).unwrap();
+        store.set_pinned(id, true).unwrap();
+        store.set_pinned(id, false).unwrap();
+
+        assert_eq!(store.expire(30 * DAY, now).unwrap(), 1);
+    }
+
+    #[test]
+    fn copying_an_old_entry_again_starts_its_age_over() {
+        let (mut store, _room) = store();
+        let now = SystemTime::now();
+        let id = store.remember(text("again")).unwrap();
+        store.backdate(id, now - 40 * DAY).unwrap();
+        store.remember(text("again")).unwrap();
+
+        assert_eq!(store.expire(30 * DAY, now).unwrap(), 0);
+    }
+
+    #[test]
+    fn an_expired_picture_takes_its_files_with_it() {
+        let (mut store, _room) = store();
+        let now = SystemTime::now();
+        let (captured, image) = picture(600, 300);
+        let id = store.remember(captured).unwrap();
+        store.backdate(id, now - 10 * DAY).unwrap();
+        assert!(store.thumbnail_path(&image).exists());
+
+        store.expire(DAY, now).unwrap();
+        assert!(!store.image_path(&image.digest).exists());
+        assert!(!store.thumbnail_path(&image).exists());
+    }
+
+    #[test]
+    fn an_edit_keeps_the_entry_where_it_was_and_as_it_was() {
+        let (mut store, _room) = store();
+        let edited = store.remember(text("first draft")).unwrap();
+        store.set_pinned(edited, true).unwrap();
+        store.remember(text("newer")).unwrap();
+        let before = store.entry(edited).unwrap().unwrap();
+
+        assert!(store.rewrite(edited, "  second draft \n").unwrap());
+
+        let after = store.entry(edited).unwrap().unwrap();
+        assert_eq!(after.text, "second draft", "trimmed the way a copy would be");
+        assert_eq!(after.pinned_at, before.pinned_at);
+        assert_eq!(after.copied_at, before.copied_at);
+        assert_eq!(previews(&everything(&store)), vec!["second draft", "newer"]);
+    }
+
+    #[test]
+    fn an_edit_to_nothing_is_refused() {
+        let (mut store, _room) = store();
+        let id = store.remember(text("keep me")).unwrap();
+        assert!(!store.rewrite(id, "  \n ").unwrap());
+        assert!(!store.rewrite(id + 100, "no such entry").unwrap());
+        assert_eq!(store.entry(id).unwrap().unwrap().text, "keep me");
+    }
+
+    #[test]
+    fn an_edit_matching_another_entry_folds_them_into_one() {
+        let (mut store, _room) = store();
+        let twin = store.remember(text("same words")).unwrap();
+        store.set_pinned(twin, true).unwrap();
+        let edited = store.remember(text("different words")).unwrap();
+
+        assert!(store.rewrite(edited, "same words").unwrap());
+        assert!(store.entry(twin).unwrap().is_none());
+        assert!(store.entry(edited).unwrap().unwrap().is_pinned(), "the pin is not lost");
+        assert_eq!(found(&store, "same").len(), 1);
+
+        assert_eq!(store.remember(text("same words")).unwrap(), edited);
+        assert_eq!(store.counts().unwrap(), (1, 0));
+    }
+
+    #[test]
+    fn a_selection_joins_in_the_order_given_and_adds_nothing() {
+        let (mut store, _room) = store();
+        let one = store.remember(text("one")).unwrap();
+        let two = store.remember(text("two")).unwrap();
+        let (captured, _) = picture(2, 2);
+        let image = store.remember(captured).unwrap();
+
+        let joined = store.joined(&[two, image, one, 999], "\n").unwrap();
+        assert_eq!(joined.as_deref(), Some("two\none"));
+        assert_eq!(store.joined(&[image], "\n").unwrap(), None);
+        assert_eq!(store.counts().unwrap(), (0, 3));
+    }
+
+    fn picture(width: u32, height: u32) -> (Captured, StoredImage) {
+        let mut png = Vec::new();
+        image::RgbaImage::from_pixel(width, height, image::Rgba([200, 10, 10, 255]))
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .expect("a picture we just made should encode");
+        let image = StoredImage { digest: blake3::hash(&png).to_hex().to_string(), width, height };
+        let captured = Captured {
+            kind: Kind::Image,
+            text: String::new(),
+            file_paths: Vec::new(),
+            image: Some((image.clone(), png)),
+        };
+        (captured, image)
+    }
+
+    #[test]
+    fn a_large_picture_gets_a_small_copy_kept_to_yourself() {
+        let (mut store, _room) = store();
+        let (captured, image) = picture(1000, 500);
+        store.remember(captured).unwrap();
+
+        let row = &everything(&store)[0];
+        let thumbnail = row.thumbnail.as_ref().expect("the list carries the small copy");
+        assert_eq!(thumbnail, &store.thumbnail_path(&image));
+        let decoded = image::open(thumbnail).unwrap();
+        assert_eq!((decoded.width(), decoded.height()), image.thumbnail_size());
+        let mode = fs::metadata(thumbnail).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, FILE_MODE);
+    }
+
+    #[test]
+    fn a_small_picture_is_its_own_thumbnail() {
+        let (mut store, _room) = store();
+        let (captured, image) = picture(40, 30);
+        store.remember(captured).unwrap();
+        assert_eq!(everything(&store)[0].thumbnail, Some(store.image_path(&image.digest)));
+    }
+
+    #[test]
+    fn forgetting_a_picture_removes_its_thumbnail() {
+        let (mut store, _room) = store();
+        let (captured, image) = picture(800, 800);
+        let id = store.remember(captured).unwrap();
+        store.forget(id).unwrap();
+        assert!(!store.thumbnail_path(&image).exists());
+    }
+
+    /// Pictures saved before thumbnails existed sit in `clipboard-images/` with no small copy
+    /// and no thumbnails directory. Reopening must keep every one, and the pin on them, and
+    /// make the copies a few at a time.
+    #[test]
+    fn pictures_saved_before_thumbnails_get_theirs_after_a_restart() {
+        let room = tempfile::tempdir().expect("a temporary directory");
+        let mut images = Vec::new();
+        {
+            let mut store = Store::open(room.path()).unwrap();
+            for edge in [300, 400, 500] {
+                let (captured, image) = picture(edge, edge);
+                let id = store.remember(captured).unwrap();
+                store.set_pinned(id, true).unwrap();
+                images.push(image);
+            }
+        }
+        fs::remove_dir_all(room.path().join("clipboard-images/thumbnails")).unwrap();
+
+        let reopened = Store::open(room.path()).unwrap();
+        assert_eq!(reopened.counts().unwrap(), (3, 0));
+        assert!(everything(&reopened).iter().all(|row| row.thumbnail.is_none() && row.pinned));
+
+        assert_eq!(reopened.backfill_thumbnails(2).unwrap(), 2);
+        assert_eq!(reopened.backfill_thumbnails(2).unwrap(), 1);
+        assert_eq!(reopened.backfill_thumbnails(2).unwrap(), 0, "caught up");
+        for image in &images {
+            assert!(reopened.image_path(&image.digest).exists(), "the picture itself is kept");
+            assert!(reopened.thumbnail_path(image).exists());
+        }
     }
 }
