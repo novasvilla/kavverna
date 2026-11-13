@@ -14,21 +14,37 @@ pub mod qobject {
         type QStringList = cxx_qt_lib::QStringList;
         include!("cxx-qt-lib/qlist.h");
         type QList_i32 = cxx_qt_lib::QList<i32>;
-        type QList_i64 = cxx_qt_lib::QList<i64>;
         type QList_bool = cxx_qt_lib::QList<bool>;
+        include!("cxx-qt-lib/qvector.h");
+        type QVector_i32 = cxx_qt_lib::QVector<i32>;
+        include!("cxx-qt-lib/qmodelindex.h");
+        type QModelIndex = cxx_qt_lib::QModelIndex;
+        include!("cxx-qt-lib/qvariant.h");
+        type QVariant = cxx_qt_lib::QVariant;
+        include!("cxx-qt-lib/qhash.h");
+        type QHash_i32_QByteArray = cxx_qt_lib::QHash<cxx_qt_lib::QHashPair_i32_QByteArray>;
+        include!(<QtCore/QAbstractListModel>);
+        type QAbstractListModel;
     }
 
     unsafe extern "RustQt" {
         #[qobject]
         #[qml_element]
+        #[base = QAbstractListModel]
         #[qproperty(bool, available)]
         #[qproperty(bool, enabled)]
         #[qproperty(QString, query)]
-        #[qproperty(QList_i32, row_ids)]
-        #[qproperty(QStringList, row_previews)]
-        #[qproperty(QStringList, row_kinds)]
-        #[qproperty(QList_bool, row_pinned)]
-        #[qproperty(QList_i64, row_times)]
+        #[qproperty(i32, total)]
+        #[qproperty(i32, offset)]
+        #[qproperty(bool, has_more)]
+        #[qproperty(bool, has_earlier)]
+        #[qproperty(i32, selected_count)]
+        #[qproperty(QString, notice)]
+        #[qproperty(i32, full_text_id)]
+        #[qproperty(QString, full_text)]
+        #[qproperty(bool, full_text_ready)]
+        #[qproperty(i32, keep_days)]
+        #[qproperty(QList_i32, keep_days_choices)]
         #[qproperty(i32, pinned_count)]
         #[qproperty(i32, recent_count)]
         #[qproperty(i32, limit)]
