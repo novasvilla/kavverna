@@ -17,5 +17,5 @@ pub use selection::{
     CONCEALED_HINT, CapturePolicy, Payload, Selection, SelectionEvent, SelectionWatcher, WatchError,
 };
 pub use sensitivity::looks_sensitive;
-pub use store::{Captured, Store, StoreError, Summary};
+pub use store::{Captured, Page, Store, StoreError, Summary, Window};
 pub use transform::Transformation;

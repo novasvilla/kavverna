@@ -17,7 +17,7 @@ use crate::selection::{
     CapturePolicy, Payload, Selection, SelectionEvent, SelectionWatcher, WatchError,
 };
 use crate::sensitivity::looks_sensitive;
-use crate::store::{Captured, Store, StoreError, Summary};
+use crate::store::{Captured, Store, StoreError, Summary, Window};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Settings {
@@ -30,6 +30,16 @@ pub struct Settings {
     pub clear_after: Option<Duration>,
     pub clean_links: bool,
     pub rules: link_cleaner::Rules,
+    /// Unpinned entries last copied more than this many days ago are forgotten. `None`, or
+    /// zero from a hand-edited file, keeps them until the count limit pushes them out.
+    pub keep_days: Option<u32>,
+}
+
+impl Settings {
+    pub fn expiry_age(&self) -> Option<Duration> {
+        const DAY: u64 = 24 * 60 * 60;
+        self.keep_days.filter(|days| *days > 0).map(|days| Duration::from_secs(days as u64 * DAY))
+    }
 }
 
 impl Default for Settings {
@@ -42,14 +52,30 @@ impl Default for Settings {
             clear_after: None,
             clean_links: false,
             rules: link_cleaner::Rules::default(),
+            keep_days: None,
         }
     }
 }
 
 #[derive(Debug)]
 pub enum Command {
+    /// Starts a new query and returns to the top of its results.
     Search(String),
+    /// Moves the published rows to another slice of the same query.
+    Page(Window),
+    /// Answers with the whole entry, full text included, which the list never carries.
+    Read {
+        id: i64,
+        answer: SyncSender<Option<Entry>>,
+    },
     PutBack(i64),
+    /// Puts the chosen text entries on the clipboard as one text, in the order given. The
+    /// pieces stay where they are in the list and the joined text is not saved as an entry of
+    /// its own: it is our own write, which the watcher does not report back as a copy.
+    PutBackJoined {
+        ids: Vec<i64>,
+        separator: String,
+    },
     Pin {
         id: i64,
         pinned: bool,
@@ -58,6 +84,7 @@ pub enum Command {
         id: i64,
         towards_top: bool,
     },
+    /// Edits a text entry; `Store::rewrite` says what the entry keeps.
     Rewrite {
         id: i64,
         text: String,
@@ -79,7 +106,11 @@ pub enum Command {
 
 #[derive(Clone, Debug, Default)]
 pub struct Snapshot {
+    /// The rows inside `window`, not the whole history.
     pub rows: Vec<Summary>,
+    /// How many rows the query matches in all, of which `rows` is one window.
+    pub total: usize,
+    pub window: Window,
     pub query: String,
     pub pinned: usize,
     pub recent: usize,
@@ -120,7 +151,20 @@ impl Commands {
     pub fn send(&self, command: Command) -> bool {
         self.0.send(Event::Asked(command)).is_ok()
     }
+
+    /// The whole entry, asked of the history thread. `None` for an entry that is gone, and
+    /// also for a thread that does not answer in time, so a caller on the interface thread is
+    /// never held for long.
+    pub fn read(&self, id: i64) -> Option<Entry> {
+        let (answer, reply) = sync_channel(1);
+        if !self.send(Command::Read { id, answer }) {
+            return None;
+        }
+        reply.recv_timeout(READ_PATIENCE).ok().flatten()
+    }
 }
+
+const READ_PATIENCE: Duration = Duration::from_secs(2);
 
 impl History {
     pub fn commands(&self) -> Commands {
@@ -151,6 +195,10 @@ impl History {
 
     pub fn send(&self, command: Command) {
         let _ = self.commands.send(Event::Asked(command));
+    }
+
+    pub fn read(&self, id: i64) -> Option<Entry> {
+        self.commands().read(id)
     }
 }
 
@@ -203,7 +251,7 @@ fn run(
     let _ = ready.send(Ok(()));
 
     let mut settings = settings;
-    let mut query = String::new();
+    let mut view = View::default();
     let mut notice = String::new();
     // The previewed transformation, waiting for Use it. A new copy discards it: the thing it
     // was made from is gone.
@@ -211,7 +259,9 @@ fn run(
     let mut cleaned = Vec::new();
     let mut clearing = AutoClear::default();
     clearing.set_delay(settings.clear_after);
-    publish(&store, &watcher, &query, &notice, &cleaned, staged.as_deref(), &snapshots);
+    let mut due = Upkeep::starting(Instant::now());
+    keep_up(&mut store, &settings, &mut due, Instant::now());
+    publish(&store, &watcher, &view, &notice, &cleaned, staged.as_deref(), &snapshots);
 
     loop {
         let changed = match events_in.recv_timeout(TICK) {
@@ -263,8 +313,17 @@ fn run(
                 notice.clear();
                 true
             }
+            Ok(Event::Asked(Command::PutBackJoined { ids, separator })) => {
+                notice = put_back_joined(&store, &watcher, &ids, &separator);
+                true
+            }
             Ok(Event::Asked(command)) => {
-                let changed = act(&mut store, &watcher, &mut settings, &mut query, command);
+                if matches!(command, Command::Apply(_) | Command::AdoptKlipperHistory) {
+                    // A shorter age, or entries adopted with their old times, should not wait
+                    // an hour to take effect.
+                    due.expire_now();
+                }
+                let changed = act(&mut store, &watcher, &mut settings, &mut view, command);
                 clearing.set_delay(settings.clear_after);
                 apply_policy(&policy, &settings);
                 changed
@@ -278,10 +337,71 @@ fn run(
             Err(RecvTimeoutError::Disconnected) => break,
         };
 
-        if changed {
-            publish(&store, &watcher, &query, &notice, &cleaned, staged.as_deref(), &snapshots);
+        let kept_up = keep_up(&mut store, &settings, &mut due, Instant::now());
+        if changed || kept_up {
+            publish(&store, &watcher, &view, &notice, &cleaned, staged.as_deref(), &snapshots);
         }
     }
+}
+
+/// What the list shows: the query and which slice of its results.
+#[derive(Default)]
+struct View {
+    query: String,
+    window: Window,
+}
+
+/// Work the thread does on its own schedule rather than in answer to anything.
+struct Upkeep {
+    expire_at: Instant,
+    thumbnails_owed: bool,
+}
+
+/// Expiry is measured in days, so an hour late is nothing, and checking once an hour keeps
+/// the delete off every copy.
+const EXPIRY_INTERVAL: Duration = Duration::from_secs(60 * 60);
+
+/// Decoding a screenshot takes tens of milliseconds; a few per pass keeps a copy that lands
+/// meanwhile from waiting behind a whole backlog.
+const THUMBNAILS_PER_PASS: usize = 4;
+
+impl Upkeep {
+    fn starting(now: Instant) -> Self {
+        Self { expire_at: now, thumbnails_owed: true }
+    }
+
+    fn expire_now(&mut self) {
+        self.expire_at = Instant::now();
+    }
+}
+
+/// Returns whether anything the list shows changed.
+fn keep_up(store: &mut Store, settings: &Settings, due: &mut Upkeep, now: Instant) -> bool {
+    let mut changed = false;
+    if now >= due.expire_at {
+        due.expire_at = now + EXPIRY_INTERVAL;
+        if let Some(age) = settings.expiry_age() {
+            match store.expire(age, std::time::SystemTime::now()) {
+                Ok(0) => {}
+                Ok(removed) => {
+                    tracing::info!(removed, "forgot clipboard entries past their age");
+                    changed = true;
+                }
+                Err(err) => tracing::error!(%err, "could not forget old clipboard entries"),
+            }
+        }
+    }
+    if due.thumbnails_owed {
+        match store.backfill_thumbnails(THUMBNAILS_PER_PASS) {
+            Ok(0) => due.thumbnails_owed = false,
+            Ok(_) => changed = true,
+            Err(err) => {
+                tracing::error!(%err, "could not make the missing thumbnails");
+                due.thumbnails_owed = false;
+            }
+        }
+    }
+    changed
 }
 
 /// Short enough that a five second delay is not noticeably late, and idle the rest of the time.
@@ -325,25 +445,45 @@ fn act(
     store: &mut Store,
     watcher: &SelectionWatcher,
     settings: &mut Settings,
-    query: &mut String,
+    view: &mut View,
     command: Command,
 ) -> bool {
+    match command {
+        Command::PutBack(id) => put_back(store, watcher, id),
+        other => change(store, settings, view, other),
+    }
+}
+
+/// The commands that need only the store, kept apart from the clipboard so they can be tested
+/// without a compositor. Returns whether the list should be published again.
+fn change(store: &mut Store, settings: &mut Settings, view: &mut View, command: Command) -> bool {
     let outcome = match command {
-        Command::Stop => return false,
         Command::Search(wanted) => {
-            *query = wanted;
+            view.query = wanted;
+            view.window.offset = 0;
             return true;
         }
-        Command::PutBack(id) => return put_back(store, watcher, id),
+        Command::Page(window) => {
+            view.window = window.clamped();
+            return true;
+        }
+        Command::Read { id, answer } => {
+            let found = store.entry(id).unwrap_or_else(|err| {
+                tracing::error!(%err, "could not read a clipboard entry");
+                None
+            });
+            let _ = answer.try_send(found);
+            return false;
+        }
         Command::Pin { id, pinned } => store.set_pinned(id, pinned),
         Command::Move { id, towards_top } => store.move_entry(id, towards_top).map(|_| ()),
-        Command::Rewrite { id, text } => store.rewrite(id, &text).map(|_| ()),
+        Command::Rewrite { id, text } => store.rewrite(id, &text).map(|done| {
+            if !done {
+                tracing::info!(id, "left an entry as it was: gone, not text, or blank");
+            }
+        }),
         Command::Forget(id) => store.forget(id),
         Command::ClearUnpinned => store.clear_unpinned(),
-        Command::ClearClipboard { .. }
-        | Command::PreviewTransform(_)
-        | Command::ApplyTransform
-        | Command::DiscardTransform => return false,
         Command::AdoptKlipperHistory => {
             crate::klipper::import_into(store, settings.skip_sensitive, settings.limit).map(|_| ())
         }
@@ -352,6 +492,13 @@ fn act(
             *settings = wanted;
             store.trim_to(entry::sanitized_limit(limit))
         }
+        Command::Stop
+        | Command::PutBack(_)
+        | Command::PutBackJoined { .. }
+        | Command::ClearClipboard { .. }
+        | Command::PreviewTransform(_)
+        | Command::ApplyTransform
+        | Command::DiscardTransform => return false,
     };
 
     if let Err(err) = outcome {
@@ -359,6 +506,27 @@ fn act(
         return false;
     }
     true
+}
+
+/// Answers with the sentence the panel shows, since a selection of pictures alone joins into
+/// nothing and a button that silently does nothing looks broken.
+fn put_back_joined(
+    store: &Store,
+    watcher: &SelectionWatcher,
+    ids: &[i64],
+    separator: &str,
+) -> String {
+    match store.joined(ids, separator) {
+        Ok(Some(text)) => {
+            watcher.offer(Selection::Clipboard, Payload::Text(text));
+            "On the clipboard; the next paste is the selection joined.".into()
+        }
+        Ok(None) => "Nothing in that selection is text to join.".into(),
+        Err(err) => {
+            tracing::error!(%err, "could not join the selection");
+            "The selection could not be read.".into()
+        }
+    }
 }
 
 /// A stale entry leaves the clipboard untouched rather than emptying it.
@@ -461,14 +629,14 @@ fn measure(png: &[u8]) -> Option<(u32, u32)> {
 fn publish(
     store: &Store,
     watcher: &SelectionWatcher,
-    query: &str,
+    view: &View,
     notice: &str,
     cleaned: &[String],
     staged: Option<&str>,
     snapshots: &Sender<Snapshot>,
 ) {
-    let rows = match store.search(query) {
-        Ok(rows) => rows,
+    let page = match store.page(&view.query, view.window) {
+        Ok(page) => page,
         Err(err) => {
             tracing::error!(%err, "could not read the clipboard history");
             return;
@@ -477,8 +645,10 @@ fn publish(
     let (pinned, recent) = store.counts().unwrap_or_default();
     let offered = watcher.ask_current(None).types;
     let _ = snapshots.send(Snapshot {
-        rows,
-        query: query.to_string(),
+        rows: page.rows,
+        total: page.total,
+        window: view.window,
+        query: view.query.clone(),
         pinned,
         recent,
         notice: notice.to_string(),
@@ -635,6 +805,88 @@ mod tests {
         let name = |captured: &Captured| captured.image.as_ref().unwrap().0.digest.clone();
         assert_eq!(name(&first), name(&again));
         assert_eq!(first.image.unwrap().0.width, 2);
+    }
+
+    #[test]
+    fn an_identifier_is_kept_and_a_key_is_still_skipped() {
+        let kept = |copied: &str| worth_keeping(Payload::Text(copied.into()), &Settings::default());
+        assert!(kept("6ba7b810-9dad-11d1-80b4-00c04fd430c8").is_some());
+        assert!(kept("  urn:uuid:6BA7B810-9DAD-11D1-80B4-00C04FD430C8\n").is_some());
+        assert!(kept("ghp_9fT2kLq8Zx4mN7pR1sV6wY3bC5dE0aH2jK4").is_none());
+    }
+
+    #[test]
+    fn zero_days_and_no_days_both_keep_forever() {
+        let with = |keep_days| Settings { keep_days, ..Settings::default() };
+        assert_eq!(with(None).expiry_age(), None);
+        assert_eq!(with(Some(0)).expiry_age(), None);
+        assert_eq!(with(Some(2)).expiry_age(), Some(Duration::from_secs(2 * 24 * 60 * 60)));
+    }
+
+    fn text(body: &str) -> Captured {
+        Captured { kind: Kind::Text, text: body.into(), file_paths: Vec::new(), image: None }
+    }
+
+    #[test]
+    fn upkeep_forgets_by_age_on_its_first_pass_and_then_waits() {
+        let room = tempfile::tempdir().expect("a temporary directory");
+        let mut store = Store::open(room.path()).unwrap();
+        let now = std::time::SystemTime::now();
+        let old = store.remember(text("from last month")).unwrap();
+        store.backdate(old, now - Duration::from_secs(40 * 24 * 60 * 60)).unwrap();
+        let pinned = store.remember(text("pinned last year")).unwrap();
+        store.backdate(pinned, now - Duration::from_secs(400 * 24 * 60 * 60)).unwrap();
+        store.set_pinned(pinned, true).unwrap();
+
+        let settings = Settings { keep_days: Some(30), ..Settings::default() };
+        let started = Instant::now();
+        let mut due = Upkeep::starting(started);
+        assert!(keep_up(&mut store, &settings, &mut due, started));
+        assert_eq!(store.counts().unwrap(), (1, 0));
+        assert!(due.expire_at >= started + EXPIRY_INTERVAL);
+
+        let again = store.remember(text("also old")).unwrap();
+        store.backdate(again, now - Duration::from_secs(40 * 24 * 60 * 60)).unwrap();
+        assert!(!keep_up(&mut store, &settings, &mut due, started + TICK), "not due yet");
+        assert_eq!(store.counts().unwrap(), (1, 1));
+    }
+
+    /// The path the panel's edit button takes, short of the clipboard itself.
+    #[test]
+    fn an_edit_sent_as_a_command_lands_in_the_store_and_the_index() {
+        let room = tempfile::tempdir().expect("a temporary directory");
+        let mut store = Store::open(room.path()).unwrap();
+        let mut settings = Settings::default();
+        let mut view = View::default();
+        let id = store.remember(text("teh typo")).unwrap();
+        store.remember(text("something newer")).unwrap();
+
+        let rewrite = Command::Rewrite { id, text: "the fix".into() };
+        assert!(change(&mut store, &mut settings, &mut view, rewrite));
+
+        let (answer, reply) = sync_channel(1);
+        assert!(!change(&mut store, &mut settings, &mut view, Command::Read { id, answer }));
+        assert_eq!(reply.recv().unwrap().unwrap().text, "the fix");
+
+        change(&mut store, &mut settings, &mut view, Command::Search("fix".into()));
+        let page = store.page(&view.query, view.window).unwrap();
+        assert_eq!(page.rows.iter().map(|row| row.id).collect::<Vec<_>>(), vec![id]);
+        assert!(store.page("typo", view.window).unwrap().rows.is_empty());
+    }
+
+    #[test]
+    fn a_new_search_starts_at_the_top_of_its_results() {
+        let room = tempfile::tempdir().expect("a temporary directory");
+        let mut store = Store::open(room.path()).unwrap();
+        let mut settings = Settings::default();
+        let mut view = View::default();
+
+        let further = Command::Page(Window { offset: 40, limit: 20 });
+        change(&mut store, &mut settings, &mut view, further);
+        assert_eq!(view.window, Window { offset: 40, limit: 20 });
+
+        change(&mut store, &mut settings, &mut view, Command::Search("x".into()));
+        assert_eq!(view.window, Window { offset: 0, limit: 20 });
     }
 
     fn tiny_png() -> Vec<u8> {
