@@ -412,7 +412,9 @@ impl Store {
 
     /// Forgets every unpinned entry last copied before `now - age`. Age counts from the last
     /// copy, so something copied again or put back starts over; an entry adopted from Klipper
-    /// carries its original time and can go on the first sweep. Returns how many went.
+    /// carries its original time and can go on the first sweep. Unpinning does not start it
+    /// over either, since the time shown on the row is when it was copied and stays true, so
+    /// an old entry unpinned goes on the next sweep. Returns how many went.
     pub fn expire(&mut self, age: Duration, now: SystemTime) -> Result<usize, StoreError> {
         let cutoff = millis(now.checked_sub(age).unwrap_or(UNIX_EPOCH));
         let sweep = self.db.transaction()?;
@@ -1057,6 +1059,18 @@ mod tests {
         assert!(store.entry(old_pinned).unwrap().is_some());
         assert!(store.entry(fresh).unwrap().is_some());
         assert!(found(&store, "old").iter().all(|row| row.id != old), "and leaves the index");
+    }
+
+    #[test]
+    fn an_old_entry_unpinned_is_old_again() {
+        let (mut store, _room) = store();
+        let now = SystemTime::now();
+        let id = store.remember(text("kept a year")).unwrap();
+        store.backdate(id, now - 400 * DAY).unwrap();
+        store.set_pinned(id, true).unwrap();
+        store.set_pinned(id, false).unwrap();
+
+        assert_eq!(store.expire(30 * DAY, now).unwrap(), 1);
     }
 
     #[test]
