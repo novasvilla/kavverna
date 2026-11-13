@@ -215,6 +215,18 @@ ColumnLayout {
                             }
                         }
 
+                        // What the provider says about the window itself, such as how much of
+                        // the weekly limit a model's own cap may take.
+                        LongLabel {
+                            theme: usage.theme
+                            Layout.fillWidth: true
+                            visible: text.length > 0
+                            opacity: reading.stale ? 0.6 : 1
+                            text: usage.agents.window_notes[reading.index] ?? ""
+                            font.pixelSize: usage.theme.textSmall
+                            color: usage.theme.mutedText
+                        }
+
                         Rectangle {
                             Layout.fillWidth: true
                             visible: !reading.expired

@@ -1,6 +1,7 @@
-//! Prints what the meter reads on this machine: percentages, ages and reset times, nothing else.
+//! Prints what the meter reads on this machine: labels, percentages, ages and reset times,
+//! nothing else.
 
-use agent_usage::{Freshness, Usage, WindowKind};
+use agent_usage::{Freshness, Usage, UsageMeter, WindowKind};
 use std::time::{Duration, SystemTime};
 
 fn span(duration: Duration) -> String {
@@ -14,22 +15,30 @@ fn span(duration: Duration) -> String {
 }
 
 fn main() {
+    let mut meter = UsageMeter::new();
+    // Asks the installed Claude Code, which contacts its account with its own sign-in.
+    meter.keep_claude_answer(agent_usage::ask_claude_code());
     let now = SystemTime::now();
-    let snapshot = agent_usage::discover(now);
+    let snapshot = meter.read(now);
     if snapshot.agents.is_empty() {
         println!("no agents found");
     }
 
     for found in &snapshot.agents {
-        println!("{}", found.agent.title().to_uppercase());
+        let source = found.source.map(|s| format!(" (from {})", s.id())).unwrap_or_default();
+        println!("{}{source}", found.agent.title().to_uppercase());
+        if let Some(problem) = found.problem {
+            println!("  {}", problem.message());
+        }
         match &found.usage {
             Usage::NoReading => println!("  no reading yet"),
             Usage::Allowance(windows) => {
                 for window in windows {
-                    let name = match window.kind {
-                        WindowKind::Session => "session".to_owned(),
-                        WindowKind::Weekly => "weekly".to_owned(),
-                        WindowKind::Other => format!("{:?} min", window.minutes),
+                    let name = match (&window.scope, window.kind) {
+                        (Some(model), _) => model.clone(),
+                        (None, WindowKind::Session) => "session".to_owned(),
+                        (None, WindowKind::Weekly) => "weekly".to_owned(),
+                        (None, WindowKind::Other) => format!("{:?} min", window.minutes),
                     };
                     let state = match window.state {
                         Freshness::Fresh => "fresh",
@@ -46,6 +55,9 @@ fn main() {
                         window.used_percent,
                         span(window.age(now)),
                     );
+                    if let Some(note) = &window.note {
+                        println!("             {note}");
+                    }
                 }
             }
             Usage::Totals(totals) => {
