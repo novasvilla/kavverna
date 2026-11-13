@@ -218,6 +218,12 @@ pub(crate) fn parse_answer(answer: &Value, observed_at: SystemTime) -> Option<Cl
         };
         (l.scope.is_some(), length)
     });
+    // Claude Code that cannot reach its account still answers, from the copy it saved last,
+    // without the list. That copy's breakdown says when it was fetched, which is when the figures
+    // were true; stamping them with the moment of asking would show old figures as current.
+    let fetched =
+        rate.pointer("/seven_day_breakdown/as_of").and_then(Value::as_str).and_then(timestamp);
+    let observed_at = fetched.map_or(observed_at, |fetched| fetched.min(observed_at));
     (!limits.is_empty()).then_some(ClaudeAnswer { observed_at, limits })
 }
 
@@ -478,7 +484,10 @@ pub fn ask_claude_code() -> Result<ClaudeAnswer, AskError> {
     let settings = std::fs::read(config.join("settings.json"))
         .ok()
         .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
-    let environment = claude_code_environment(std::env::vars(), settings.as_ref());
+    // `vars` panics on a variable that is not UTF-8, which would end the reader thread.
+    let inherited = std::env::vars_os()
+        .filter_map(|(key, value)| Some((key.into_string().ok()?, value.into_string().ok()?)));
+    let environment = claude_code_environment(inherited, settings.as_ref());
     ask_with(usage_command(&executable, &environment), ASK_TIMEOUT)
 }
 
@@ -590,6 +599,20 @@ mod tests {
         assert_eq!(windows[0].kind, WindowKind::Session);
         assert_eq!(windows[0].resets_at, None);
         assert_eq!(windows[1].used_percent, 41.0);
+    }
+
+    #[test]
+    fn a_saved_copy_is_dated_when_it_was_fetched() {
+        let offline = r#"{"rate_limits": {
+            "seven_day": {"utilization": 70, "resets_at": "2027-01-08T15:00:00Z"},
+            "seven_day_breakdown": {"as_of": "2027-01-01T00:00:00Z"}}}"#;
+        let answer = parse_answer(&serde_json::from_str(offline).unwrap(), at(1_798_761_960));
+        assert_eq!(answer.unwrap().observed_at, at(1_798_761_600));
+
+        // A fetch time ahead of our clock is not taken as newer than the moment of asking.
+        let ahead = offline.replace("2027-01-01T00:00:00Z", "2027-01-02T00:00:00Z");
+        let answer = parse_answer(&serde_json::from_str(&ahead).unwrap(), at(1_798_761_960));
+        assert_eq!(answer.unwrap().observed_at, at(1_798_761_960));
     }
 
     #[test]
