@@ -57,7 +57,7 @@ image = "0.25.10"
 url = "2.5.8"
 directories = "6.0.0"
 tempfile = "3.27.0"
-# Codex compresses a rollout once its session closes. A pure Rust decoder keeps a C library
+# Codex keeps most of its session rollouts zstd-compressed. A pure Rust decoder keeps a C library
 # out of the build for the one thing it is used for.
 ruzstd = "0.9.1"
 

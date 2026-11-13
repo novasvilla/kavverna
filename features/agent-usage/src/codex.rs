@@ -1,6 +1,6 @@
 //! Codex writes its allowance into the session rollout after every reply, as a `token_count`
-//! event carrying `rate_limits`, and the rollout outlives the session. Once a session closes,
-//! Codex may compress its rollout to `.jsonl.zst`, so both forms are read.
+//! event carrying `rate_limits`, and the rollout outlives the session. On a desktop install most
+//! older rollouts sit compressed as `.jsonl.zst` beside the plain ones, so both forms are read.
 
 use crate::{Window, epoch_seconds};
 use serde_json::Value;
@@ -54,8 +54,8 @@ pub(crate) struct Rollouts {
 
 impl Rollouts {
     /// The newest allowance across rollouts, judged by the time written on the record rather
-    /// than by which file changed last: Codex sometimes rewrites old rollouts, and a newer
-    /// session can carry `"rate_limits": null` throughout.
+    /// than by which file changed last: a compressed or imported rollout can be newer on disk
+    /// than what it records, and a newer session can carry `"rate_limits": null` throughout.
     pub(crate) fn latest(&mut self, codex_home: &Path, now: SystemTime) -> Option<Vec<Window>> {
         let mut rollouts = rollout_files(codex_home);
         rollouts.sort_by_key(|r| std::cmp::Reverse(r.modified));
@@ -180,8 +180,8 @@ fn last_record_plain(path: &Path, modified: SystemTime) -> io::Result<Option<Rec
     Ok(if floor == 0 { parse_line(&carried, modified) } else { None })
 }
 
-/// A compressed rollout cannot be entered from the end, so it is decoded once in full. It is
-/// closed and never changes again, which is why the meter remembers the answer.
+/// A compressed rollout cannot be entered from the end, so it is decoded in full. The meter
+/// remembers the answer until the file's size or modification time changes.
 fn last_record_compressed(path: &Path, modified: SystemTime) -> io::Result<Option<Record>> {
     let file = BufReader::new(File::open(path)?);
     let decoder = ruzstd::decoding::StreamingDecoder::new(file).map_err(io::Error::other)?;
