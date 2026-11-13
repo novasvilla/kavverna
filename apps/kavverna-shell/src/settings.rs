@@ -67,6 +67,18 @@ pub const PLACEMENT_REMEMBERED: &str = "placement.remembered";
 /// Off, it sits on the ordinary panel layer and fullscreen applications cover it.
 pub const PANEL_ON_TOP: &str = "panel.on-top";
 pub const HOLD_UNTIL: &str = "keep-awake.hold-until";
+/// The cards on the Monitoring page, top to bottom, by the ids in `MONITORING_CARDS`.
+pub const MONITORING_CARD_ORDER: &str = "monitoring.card-order";
+/// The Monitoring cards folded down to their header line, by the same ids.
+pub const MONITORING_COLLAPSED: &str = "monitoring.collapsed-cards";
+
+/// Every card the Monitoring page can show, in the order a fresh install shows them. These ids
+/// are written to the settings file, so they are never renamed.
+pub const MONITORING_CARDS: [&str; 6] =
+    ["processor", "graphics", "network", "storage", "agents", "ports"];
+/// The listening ports start folded because opening them scans every socket, which is how that
+/// card behaved before folding was remembered.
+pub const MONITORING_COLLAPSED_DEFAULT: [&str; 1] = ["ports"];
 
 pub const PANEL_ON_TOP_DEFAULT: bool = true;
 pub const ALLOW_DISPLAY_SLEEP_DEFAULT: bool = true;
@@ -151,6 +163,66 @@ pub fn any_installed(features: &[Feature]) -> bool {
 
 pub fn set_installed(feature: Feature, installed: bool) -> bool {
     put_bool(&feature.availability_key(), installed)
+}
+
+fn known_card(id: &str) -> Option<&'static str> {
+    MONITORING_CARDS.iter().copied().find(|card| *card == id)
+}
+
+/// The stored order made whole: an id this build does not know is dropped, a repeat is dropped,
+/// and a card the list leaves out joins the end in its default place, so neither a card added
+/// by a later release nor a hand-edited file can make a card disappear.
+pub fn card_order_from(stored: Option<&[String]>) -> Vec<&'static str> {
+    let mut order: Vec<&'static str> = Vec::with_capacity(MONITORING_CARDS.len());
+    for card in stored.unwrap_or_default().iter().filter_map(|id| known_card(id)) {
+        if !order.contains(&card) {
+            order.push(card);
+        }
+    }
+    for card in MONITORING_CARDS {
+        if !order.contains(&card) {
+            order.push(card);
+        }
+    }
+    order
+}
+
+/// Absent means never chosen, which folds what folds by default. A stored list is taken as
+/// it is, less unknown ids and repeats, so unfolding the ports card is remembered too.
+pub fn collapsed_cards_from(stored: Option<&[String]>) -> Vec<&'static str> {
+    let Some(stored) = stored else {
+        return MONITORING_COLLAPSED_DEFAULT.to_vec();
+    };
+    let mut folded: Vec<&'static str> = Vec::new();
+    for card in stored.iter().filter_map(|id| known_card(id)) {
+        if !folded.contains(&card) {
+            folded.push(card);
+        }
+    }
+    folded
+}
+
+/// `card` taken out and put back in front of `before`, or at the end when `before` is not a
+/// card. Moving a card in front of itself changes nothing.
+pub fn card_placed(order: &[&'static str], card: &str, before: &str) -> Vec<&'static str> {
+    let Some(card) = known_card(card) else {
+        return order.to_vec();
+    };
+    if card == before {
+        return order.to_vec();
+    }
+    let mut placed: Vec<&'static str> = order.iter().copied().filter(|id| *id != card).collect();
+    let at = placed.iter().position(|id| *id == before).unwrap_or(placed.len());
+    placed.insert(at, card);
+    placed
+}
+
+pub fn card_order() -> Vec<&'static str> {
+    card_order_from(texts_at(MONITORING_CARD_ORDER).as_deref())
+}
+
+pub fn collapsed_cards() -> Vec<&'static str> {
+    collapsed_cards_from(texts_at(MONITORING_COLLAPSED).as_deref())
 }
 
 /// The setting resolved into a hold. Read from here by the panel switch, the tray menu and
@@ -314,6 +386,55 @@ mod tests {
         assert!(!holds_text(&prefs, "t", "x"));
         assert!(holds_texts(&prefs, "l", &[]));
         assert!(!holds_texts(&prefs, "l", &["x".to_owned()]));
+    }
+
+    fn ids(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_owned()).collect()
+    }
+
+    #[test]
+    fn the_monitoring_page_starts_with_the_processor() {
+        assert_eq!(
+            card_order_from(None),
+            ["processor", "graphics", "network", "storage", "agents", "ports"]
+        );
+    }
+
+    #[test]
+    fn a_stored_order_never_hides_a_card() {
+        let stored = ids(&["ports", "weather", "agents", "ports", "processor"]);
+        assert_eq!(
+            card_order_from(Some(&stored)),
+            ["ports", "agents", "processor", "graphics", "network", "storage"]
+        );
+        assert_eq!(card_order_from(Some(&[])), MONITORING_CARDS);
+    }
+
+    #[test]
+    fn folded_cards_default_to_the_ports_and_keep_what_was_chosen() {
+        assert_eq!(collapsed_cards_from(None), ["ports"]);
+        assert!(collapsed_cards_from(Some(&[])).is_empty());
+        let stored = ids(&["agents", "weather", "agents", "graphics"]);
+        assert_eq!(collapsed_cards_from(Some(&stored)), ["agents", "graphics"]);
+    }
+
+    #[test]
+    fn a_card_lands_in_front_of_the_one_it_was_dropped_on() {
+        let order = card_order_from(None);
+        assert_eq!(
+            card_placed(&order, "agents", "processor"),
+            ["agents", "processor", "graphics", "network", "storage", "ports"]
+        );
+        assert_eq!(
+            card_placed(&order, "processor", "storage"),
+            ["graphics", "network", "processor", "storage", "agents", "ports"]
+        );
+        assert_eq!(
+            card_placed(&order, "processor", ""),
+            ["graphics", "network", "storage", "agents", "ports", "processor"]
+        );
+        assert_eq!(card_placed(&order, "storage", "storage"), order);
+        assert_eq!(card_placed(&order, "weather", "processor"), order);
     }
 
     #[test]

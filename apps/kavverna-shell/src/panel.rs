@@ -2,7 +2,7 @@ use crate::command::{self, Command};
 use crate::panel_anchor::{self, Placement};
 use crate::{launch_at_login, settings};
 use cxx_qt::{CxxQtType, Threading};
-use cxx_qt_lib::QString;
+use cxx_qt_lib::{QString, QStringList};
 use keep_awake::{Hold, format_duration};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -13,6 +13,8 @@ pub mod qobject {
     unsafe extern "C++" {
         include!("cxx-qt-lib/qstring.h");
         type QString = cxx_qt_lib::QString;
+        include!("cxx-qt-lib/qstringlist.h");
+        type QStringList = cxx_qt_lib::QStringList;
     }
 
     unsafe extern "RustQt" {
@@ -55,6 +57,10 @@ pub mod qobject {
         #[qproperty(QString, ghost_screen)]
         #[qproperty(i32, ghost_left)]
         #[qproperty(i32, ghost_top)]
+        #[qproperty(QStringList, monitoring_order)]
+        #[qproperty(QStringList, monitoring_titles)]
+        #[qproperty(QStringList, monitoring_needs)]
+        #[qproperty(QStringList, monitoring_collapsed)]
         type KavvernaPanel = super::KavvernaPanelRust;
     }
 
@@ -127,6 +133,12 @@ pub mod qobject {
         fn drag_commit(self: Pin<&mut KavvernaPanel>, width: i32, height: i32);
         #[qinvokable]
         fn report_work_area(self: Pin<&mut KavvernaPanel>, name: &QString, width: i32, height: i32);
+        #[qinvokable]
+        fn place_monitoring_card(self: Pin<&mut KavvernaPanel>, card: &QString, before: &QString);
+        #[qinvokable]
+        fn reset_monitoring_order(self: Pin<&mut KavvernaPanel>);
+        #[qinvokable]
+        fn fold_monitoring_card(self: Pin<&mut KavvernaPanel>, card: &QString, folded: bool);
     }
 }
 
@@ -241,6 +253,12 @@ pub struct KavvernaPanelRust {
     ghost_screen: QString,
     ghost_left: i32,
     ghost_top: i32,
+    /// Card ids top to bottom, with each card's heading and the utility it belongs to in the
+    /// same positions, so QML never keeps a second copy of which card is which.
+    monitoring_order: QStringList,
+    monitoring_titles: QStringList,
+    monitoring_needs: QStringList,
+    monitoring_collapsed: QStringList,
 }
 
 impl Default for KavvernaPanelRust {
@@ -315,8 +333,44 @@ impl Default for KavvernaPanelRust {
             ghost_screen: QString::default(),
             ghost_left: 0,
             ghost_top: 0,
+            monitoring_order: card_list(&settings::card_order(), card_id),
+            monitoring_titles: card_list(&settings::card_order(), card_title),
+            monitoring_needs: card_list(&settings::card_order(), card_need),
+            monitoring_collapsed: card_list(&settings::collapsed_cards(), card_id),
         }
     }
+}
+
+fn card_id(card: &str) -> &str {
+    card
+}
+
+fn card_title(card: &str) -> &'static str {
+    match card {
+        "processor" => "Processor and memory",
+        "graphics" => "Graphics",
+        "network" => "Network",
+        "storage" => "Storage",
+        "agents" => "AI agents",
+        _ => "Listening ports",
+    }
+}
+
+/// The utility whose removal hides the card.
+fn card_need(card: &str) -> &'static str {
+    match card {
+        "network" => feature_catalog::Feature::NetworkMonitor.id(),
+        "agents" => feature_catalog::Feature::AgentUsage.id(),
+        _ => feature_catalog::Feature::SystemMonitor.id(),
+    }
+}
+
+fn card_list<'a>(cards: &[&'a str], show: impl Fn(&'a str) -> &'a str) -> QStringList {
+    let mut list = QStringList::default();
+    for card in cards {
+        list.append(QString::from(show(card)));
+    }
+    list
 }
 
 /// Where a drag started from. `origin` is the surface's top-left corner in global desktop
@@ -398,6 +452,43 @@ impl qobject::KavvernaPanel {
         if let Ok(mut panel) = PANEL.lock() {
             *panel = Some(thread);
         }
+    }
+
+    /// The drag on the Monitoring page and the arrows in Settings both land here, naming the card
+    /// to go in front of rather than a position, so a card hidden between two visible ones can
+    /// never swallow a move.
+    fn place_monitoring_card(self: Pin<&mut Self>, card: &QString, before: &QString) {
+        let order =
+            settings::card_placed(&settings::card_order(), &card.to_string(), &before.to_string());
+        self.keep_card_order(&order);
+    }
+
+    fn reset_monitoring_order(self: Pin<&mut Self>) {
+        self.keep_card_order(&settings::MONITORING_CARDS);
+    }
+
+    fn keep_card_order(mut self: Pin<&mut Self>, order: &[&str]) {
+        let stored: Vec<String> = order.iter().map(|card| (*card).to_owned()).collect();
+        settings::put_texts(settings::MONITORING_CARD_ORDER, &stored);
+        // Read back rather than trusting the list just built, so the page shows what the file
+        // holds even when the write failed.
+        let order = settings::card_order();
+        self.as_mut().set_monitoring_order(card_list(&order, card_id));
+        self.as_mut().set_monitoring_titles(card_list(&order, card_title));
+        self.as_mut().set_monitoring_needs(card_list(&order, card_need));
+    }
+
+    fn fold_monitoring_card(mut self: Pin<&mut Self>, card: &QString, folded: bool) {
+        let card = card.to_string();
+        let mut stored: Vec<String> =
+            settings::collapsed_cards().iter().map(|id| (*id).to_owned()).collect();
+        stored.retain(|id| *id != card);
+        if folded {
+            stored.push(card);
+        }
+        settings::put_texts(settings::MONITORING_COLLAPSED, &stored);
+        let folded = settings::collapsed_cards();
+        self.as_mut().set_monitoring_collapsed(card_list(&folded, card_id));
     }
 
     fn dismiss(mut self: Pin<&mut Self>) {

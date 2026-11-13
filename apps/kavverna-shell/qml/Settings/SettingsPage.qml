@@ -680,6 +680,107 @@ ColumnLayout {
     }
 
     Section {
+        id: monitoringOrder
+        theme: page.theme
+        title: "MONITORING PAGE"
+        detail: "The order of its cards"
+        spacing: page.theme.gapSnug
+        open: page.openSection === "MONITORING PAGE"
+        onToggled: page.openSection = open ? "" : "MONITORING PAGE"
+        visible: page.shows("system-monitor") || page.shows("network-monitor")
+                 || page.shows("agent-usage")
+
+        /// The card just moved, and which way, so the keyboard stays on its arrow when the
+        /// list is rebuilt in the new order.
+        property string moved: ""
+        property int movedWay: 0
+
+        function move(card, way) {
+            const order = page.hub.monitoring_order
+            const at = order.indexOf(card)
+            monitoringOrder.moved = card
+            monitoringOrder.movedWay = way
+            page.hub.place_monitoring_card(card, way < 0 ? order[at - 1] : (order[at + 2] ?? ""))
+        }
+
+        Label {
+            Layout.fillWidth: true
+            text: "Top to bottom. Cards can also be dragged by their heading on the page, "
+                  + "or moved with Alt and the arrow keys."
+            font.pixelSize: page.theme.textBody
+            color: page.theme.secondaryText
+            wrapMode: Text.WordWrap
+        }
+
+        Repeater {
+            model: page.hub.monitoring_order
+
+            delegate: RowLayout {
+                id: orderRow
+
+                required property int index
+                required property string modelData
+                readonly property bool present: page.shows(page.hub.monitoring_needs[orderRow.index] ?? "")
+
+                Layout.fillWidth: true
+                spacing: page.theme.gapTight
+
+                Component.onCompleted: {
+                    if (orderRow.modelData !== monitoringOrder.moved) {
+                        return
+                    }
+                    const button = monitoringOrder.movedWay < 0 && up.enabled ? up
+                                 : down.enabled ? down : up
+                    button.forceActiveFocus(Qt.TabFocusReason)
+                    monitoringOrder.moved = ""
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: page.hub.monitoring_titles[orderRow.index] ?? orderRow.modelData
+                    font.pixelSize: page.theme.textBody
+                    color: orderRow.present ? page.theme.primaryText : page.theme.mutedText
+                    elide: Text.ElideRight
+                }
+
+                Label {
+                    visible: !orderRow.present
+                    text: "removed"
+                    font.pixelSize: page.theme.textSmall
+                    color: page.theme.mutedText
+                }
+
+                IconButton {
+                    id: up
+                    theme: page.theme
+                    source: "go-up-symbolic"
+                    size: page.theme.iconSmall
+                    text: "Move " + (page.hub.monitoring_titles[orderRow.index] ?? "") + " up"
+                    enabled: orderRow.index > 0
+                    onClicked: monitoringOrder.move(orderRow.modelData, -1)
+                }
+
+                IconButton {
+                    id: down
+                    theme: page.theme
+                    source: "go-down-symbolic"
+                    size: page.theme.iconSmall
+                    text: "Move " + (page.hub.monitoring_titles[orderRow.index] ?? "") + " down"
+                    enabled: orderRow.index < page.hub.monitoring_order.length - 1
+                    onClicked: monitoringOrder.move(orderRow.modelData, 1)
+                }
+            }
+        }
+
+        PillButton {
+            theme: page.theme
+            Layout.fillWidth: true
+            text: "Reset order"
+            onClicked: page.hub.reset_monitoring_order()
+        }
+    }
+
+    Section {
         theme: page.theme
         title: "ENERGY"
         detail: "How long a hold lasts, what it holds"
