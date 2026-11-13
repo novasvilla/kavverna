@@ -32,6 +32,16 @@ pub enum Agent {
 }
 
 impl Agent {
+    /// Stable across releases, for scripts and agents that read the snapshot; the title is for
+    /// people and may change.
+    pub fn id(self) -> &'static str {
+        match self {
+            Agent::ClaudeCode => "claude-code",
+            Agent::Codex => "codex",
+            Agent::OpenCode => "opencode",
+        }
+    }
+
     pub fn title(self) -> &'static str {
         match self {
             Agent::ClaudeCode => "Claude Code",
@@ -171,8 +181,15 @@ impl UsageMeter {
         Self::default()
     }
 
-    /// `cache_dir` is Kavverna's own cache directory, where the Claude Code passthrough writes.
-    pub fn read_in(&mut self, home: &Path, cache_dir: &Path, now: SystemTime) -> Snapshot {
+    /// `data_dir` is the user's data home, where OpenCode keeps its database, and `cache_dir` is
+    /// Kavverna's own cache directory, where the Claude Code passthrough writes.
+    pub fn read_in(
+        &mut self,
+        home: &Path,
+        data_dir: &Path,
+        cache_dir: &Path,
+        now: SystemTime,
+    ) -> Snapshot {
         let mut agents = Vec::new();
 
         if home.join(".claude").is_dir() {
@@ -192,7 +209,7 @@ impl UsageMeter {
             agents.push(AgentUsage { agent: Agent::Codex, usage });
         }
 
-        let opencode_db = opencode::database(home);
+        let opencode_db = opencode::database(data_dir);
         if opencode_db.is_file() {
             let usage = match opencode::totals(&opencode_db, now) {
                 Some(totals) => Usage::Totals(totals),
@@ -205,15 +222,17 @@ impl UsageMeter {
     }
 
     pub fn read(&mut self, now: SystemTime) -> Snapshot {
-        match (home_dir(), cache_dir()) {
-            (Some(home), Some(cache)) => self.read_in(&home, &cache, now),
+        match (directories::BaseDirs::new(), cache_dir()) {
+            (Some(base), Some(cache)) => {
+                self.read_in(base.home_dir(), base.data_dir(), &cache, now)
+            }
             _ => Snapshot { taken_at: now, agents: Vec::new() },
         }
     }
 }
 
-pub fn discover_in(home: &Path, cache_dir: &Path, now: SystemTime) -> Snapshot {
-    UsageMeter::new().read_in(home, cache_dir, now)
+pub fn discover_in(home: &Path, data_dir: &Path, cache_dir: &Path, now: SystemTime) -> Snapshot {
+    UsageMeter::new().read_in(home, data_dir, cache_dir, now)
 }
 
 pub fn discover(now: SystemTime) -> Snapshot {
@@ -223,10 +242,6 @@ pub fn discover(now: SystemTime) -> Snapshot {
 /// Kavverna's own cache directory, the same one the settings store's project names.
 pub fn cache_dir() -> Option<PathBuf> {
     directories::ProjectDirs::from("dev", "", "kavverna").map(|dirs| dirs.cache_dir().to_path_buf())
-}
-
-fn home_dir() -> Option<PathBuf> {
-    directories::BaseDirs::new().map(|dirs| dirs.home_dir().to_path_buf())
 }
 
 fn epoch_seconds(seconds: f64) -> Option<SystemTime> {
@@ -284,15 +299,36 @@ mod tests {
     fn only_agents_present_in_home_are_listed() {
         let home = tempfile::tempdir().unwrap();
         let cache = tempfile::tempdir().unwrap();
-        assert!(discover_in(home.path(), cache.path(), at(1)).agents.is_empty());
+        assert!(discover_in(home.path(), home.path(), cache.path(), at(1)).agents.is_empty());
 
         std::fs::create_dir(home.path().join(".codex")).unwrap();
         std::fs::create_dir(home.path().join(".claude")).unwrap();
-        let snapshot = discover_in(home.path(), cache.path(), at(1));
+        let snapshot = discover_in(home.path(), home.path(), cache.path(), at(1));
         let listed: Vec<_> = snapshot.agents.iter().map(|a| (a.agent, a.usage.clone())).collect();
         assert_eq!(
             listed,
             vec![(Agent::ClaudeCode, Usage::NoReading), (Agent::Codex, Usage::NoReading)]
         );
+    }
+
+    /// OpenCode follows the XDG data home, so a database at the default location is not the one
+    /// in use once the data home has been moved.
+    #[test]
+    fn opencode_is_looked_for_in_the_data_home_given() {
+        let home = tempfile::tempdir().unwrap();
+        let data = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        let default = home.path().join(".local/share/opencode");
+        std::fs::create_dir_all(&default).unwrap();
+        std::fs::write(default.join("opencode.db"), b"").unwrap();
+
+        let snapshot = discover_in(home.path(), data.path(), cache.path(), at(1));
+        assert!(snapshot.agents.is_empty(), "found a database outside the data home");
+
+        std::fs::create_dir_all(data.path().join("opencode")).unwrap();
+        std::fs::write(data.path().join("opencode/opencode.db"), b"").unwrap();
+        let snapshot = discover_in(home.path(), data.path(), cache.path(), at(1));
+        let listed: Vec<_> = snapshot.agents.iter().map(|a| a.agent).collect();
+        assert_eq!(listed, vec![Agent::OpenCode]);
     }
 }
