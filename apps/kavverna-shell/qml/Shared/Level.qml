@@ -12,26 +12,50 @@ Slider {
     property real unity: to > 100 ? 100 : to
 
     implicitHeight: 18
-    // The sliders sit in a scrolling page, and a page scrolled past them must never change a
-    // volume, so the wheel only adjusts one while Ctrl is held. Anything else falls through to
-    // the page. Two per notch: fine enough to land on an exact figure, quick enough to cross
-    // the range. Drags stay free because no snap mode is set.
+    /// Points per wheel notch. Volume is moved fast with the wheel, so a notch is a step a
+    /// person can hear; the arrow keys keep the finer stepSize for landing on an exact figure.
+    property real wheelStep: 5
+
+    // The wheel over the slider itself changes the volume with no modifier; anywhere else on
+    // the row it falls through and scrolls the page. Drags stay free because no snap mode is
+    // set.
     wheelEnabled: false
     stepSize: 2
 
+    // A touchpad reports a notch in many small deltas, so they are summed and a step is taken
+    // for each whole notch, the remainder carried into the next event.
+    property real wheelCarry: 0
+
     WheelHandler {
-        acceptedModifiers: Qt.ControlModifier
         target: null
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: (event) => {
-            const notch = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
-            if (notch > 0) {
+            const across = event.angleDelta.y === 0
+            const delta = across ? -event.angleDelta.x
+                                 : (event.inverted ? -event.angleDelta.y : event.angleDelta.y)
+            level.wheelCarry += delta
+            const notches = level.wheelCarry > 0 ? Math.floor(level.wheelCarry / 120)
+                                                 : Math.ceil(level.wheelCarry / 120)
+            if (notches === 0) {
+                return
+            }
+            level.wheelCarry -= notches * 120
+            const before = level.value
+            const keyStep = level.stepSize
+            // increase() and decrease() step the value without breaking the binding that
+            // feeds it from the mixer, which a plain assignment would, so the step is widened
+            // for the call rather than the value written.
+            level.stepSize = Math.abs(notches) * level.wheelStep
+            if (notches > 0) {
                 level.increase()
-            } else if (notch < 0) {
+            } else {
                 level.decrease()
             }
-            // increase() and decrease() move the value without a drag, which reports
-            // nothing; the call sites listen for moved.
-            level.moved()
+            level.stepSize = keyStep
+            // A drag reports moved and a step does not; the call sites listen for moved.
+            if (level.value !== before) {
+                level.moved()
+            }
         }
     }
 

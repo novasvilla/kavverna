@@ -740,6 +740,8 @@ Window {
 
                 MonitoringSection {
                     theme: theme
+                    hub: hub
+                    flick: scroller.contentItem
                     shows: root.shows
                     vitals: vitals
                     agents: agents
