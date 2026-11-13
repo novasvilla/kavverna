@@ -1,7 +1,9 @@
 use crate::command::{self, Command};
-use crate::{awake_state, panel};
+use crate::{awake_state, panel, process_state};
+use feature_catalog::Feature;
 use keep_awake::Hold;
 use keep_awake::{format_compact, format_duration};
+use std::sync::OnceLock;
 use std::time::Duration;
 use zbus::fdo::{RequestNameFlags, RequestNameReply};
 use zbus::interface;
@@ -9,6 +11,30 @@ use zbus::interface;
 pub const SERVICE: &str = "dev.kavverna.Shell";
 const INTERFACE: &str = "dev.kavverna.Shell";
 const PATH: &str = "/dev/kavverna/Shell";
+
+/// The runtime the bus was claimed on. zbus answers calls on an executor of its own, and a
+/// reading that waits a second for a rate has to wait somewhere other than there, or every
+/// other call on the interface waits with it.
+static RUNTIME: OnceLock<tokio::runtime::Handle> = OnceLock::new();
+
+/// Runs a blocking read on the bus runtime's blocking pool and waits for it without holding
+/// up the interface.
+async fn off_the_bus<T: Send + 'static>(
+    read: impl FnOnce() -> T + Send + 'static,
+) -> zbus::fdo::Result<T> {
+    let runtime = RUNTIME
+        .get()
+        .ok_or_else(|| zbus::fdo::Error::Failed("the bus runtime is not running".into()))?;
+    runtime.spawn_blocking(read).await.map_err(|err| zbus::fdo::Error::Failed(err.to_string()))
+}
+
+fn system_monitor_installed() -> zbus::fdo::Result<()> {
+    if crate::settings::is_installed(Feature::SystemMonitor) {
+        Ok(())
+    } else {
+        Err(zbus::fdo::Error::NotSupported("the system monitor is not installed".into()))
+    }
+}
 
 struct Shell;
 
@@ -64,6 +90,27 @@ impl Shell {
         crate::agent_usage_state::reading_as_json().await
     }
 
+    /// The applications spending a resource most, as JSON, so what a fold on the monitoring
+    /// page shows can be checked. `resource` is cpu, memory, disk, gpu (the discrete card) or
+    /// gpu:<card name>; `limit` 0 means the eight a fold shows. Measured now on a sampler of its
+    /// own, over one second where the figure is a rate, and ordered by the figure alone.
+    async fn top_applications(&self, resource: String, limit: u32) -> zbus::fdo::Result<String> {
+        system_monitor_installed()?;
+        let limit = match limit {
+            0 => process_state::SHOWN,
+            limit => usize::try_from(limit).unwrap_or(usize::MAX),
+        };
+        off_the_bus(move || process_state::top_applications_json(&resource, limit))
+            .await?
+            .map_err(zbus::fdo::Error::InvalidArgs)
+    }
+
+    /// The ports this user's programs listen on, as JSON, the list the panel shows.
+    async fn listening_ports(&self) -> zbus::fdo::Result<String> {
+        system_monitor_installed()?;
+        off_the_bus(process_state::listening_ports_json).await
+    }
+
     #[zbus(property)]
     fn default_output(&self) -> String {
         crate::mixer_state::get()
@@ -110,6 +157,7 @@ pub enum Claim {
 /// The name is requested with `DoNotQueue`: the default would leave a second launch waiting
 /// in line for the name and running a full second copy of the app in the meantime.
 pub async fn claim(wanted: &Wanted) -> zbus::Result<Claim> {
+    let _ = RUNTIME.set(tokio::runtime::Handle::current());
     let connection = zbus::connection::Builder::session()?.serve_at(PATH, Shell)?.build().await?;
 
     // The bus reports a taken name as an error rather than a reply variant, so both have to

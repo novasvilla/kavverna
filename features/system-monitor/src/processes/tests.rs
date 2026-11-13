@@ -80,6 +80,39 @@ fn the_first_cpu_request_primes_and_the_second_reconciles_with_the_machine() {
 }
 
 #[test]
+fn a_terminal_surface_is_named_after_its_busiest_command_and_its_terminal() {
+    let tree = desktop();
+    tree.machine(1000, 1000);
+    let mut sampler = sampler(&tree);
+    sampler.resolve_host = |id| {
+        (id == "terminal")
+            .then(|| DesktopEntry { name: "Terminal".into(), icon: Some("terminal-icon".into()) })
+    };
+    sampler.cpu(10);
+    tree.machine(1600, 1400);
+    tree.process(201, "toolchain", 200, 100, 201);
+    let fold = ready(sampler.cpu(10));
+    let surface = fold
+        .applications
+        .iter()
+        .find(|app| app.key == ApplicationKey::Unit("app-terminal-surface-7.scope".into()))
+        .unwrap();
+    assert_eq!(surface.name, "toolchain · Terminal");
+    assert_eq!(surface.icon.as_deref(), Some("terminal-icon"));
+}
+
+#[test]
+fn every_member_of_an_application_is_found_for_an_action() {
+    let tree = desktop();
+    let mut sampler = sampler(&tree);
+    let browser = ApplicationKey::Entry("org.example.browser".into());
+    let mut pids: Vec<u32> = sampler.members_of(&browser).iter().map(|key| key.pid).collect();
+    pids.sort_unstable();
+    assert_eq!(pids, vec![100, 101, 102]);
+    assert!(sampler.members_of(&ApplicationKey::Named("nobody".into())).is_empty());
+}
+
+#[test]
 fn processes_cannot_add_up_to_more_than_the_machine_did() {
     let tree = desktop();
     tree.machine(0, 1000);

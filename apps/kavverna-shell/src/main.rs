@@ -20,6 +20,8 @@ mod mixer_state;
 mod mixer_view;
 mod panel;
 mod panel_anchor;
+mod process_state;
+mod process_view;
 mod remote;
 mod routes;
 mod selftest;
@@ -130,6 +132,11 @@ fn main() {
     }
     if settings::is_installed(Feature::AgentUsage) {
         std::thread::spawn(|| agent_usage_state::run(agent_usage_view::publish));
+    }
+    if settings::is_installed(Feature::SystemMonitor) {
+        std::thread::spawn(|| {
+            process_state::run(std::time::Duration::from_secs(2), process_view::publish)
+        });
     }
     if settings::is_installed(Feature::Shelf) {
         shelf_state::prepare();
