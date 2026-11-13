@@ -2863,11 +2863,14 @@ dependencies = [
 name = "system-monitor"
 version = "0.5.0"
 dependencies = [
+ "app-identity",
+ "libc",
  "nix",
  "nvml-wrapper",
  "tempfile",
  "thiserror 2.0.20",
  "tracing",
+ "zbus",
 ]
 
 [[package]]
