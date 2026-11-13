@@ -4,18 +4,15 @@ import QtQuick.Controls
 /// A check box in the panel's own colours, for the same reason Toggle exists: the stock one
 /// takes the desktop's accent and would be the only blue thing on the page. Like Toggle it
 /// shows `on`, what the backend holds, and a click only asks for the other value.
-AbstractButton {
+Pressable {
     id: tick
 
-    required property var theme
     property bool on: false
 
     signal switched(bool wanted)
 
     font.pixelSize: theme.textBody
-    padding: 0
     spacing: theme.gapSnug
-    hoverEnabled: true
     implicitHeight: Math.max(indicator.implicitHeight, contentItem.implicitHeight)
 
     Accessible.role: Accessible.CheckBox

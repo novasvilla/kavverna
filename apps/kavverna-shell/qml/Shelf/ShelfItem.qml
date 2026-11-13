@@ -196,8 +196,7 @@ Rectangle {
                         implicitWidth: 22
                         implicitHeight: 22
                         enabled: row.alive
-                        ToolTip.visible: hovered
-                        ToolTip.text: "Open"
+                        text: "Open"
                         onClicked: Qt.openUrlExternally(row.shelf.open_target(row.entryId))
                     }
 
@@ -209,8 +208,7 @@ Rectangle {
                         implicitHeight: 22
                         visible: row.shelf.row_kinds[row.at] !== "link"
                         enabled: row.alive
-                        ToolTip.visible: hovered
-                        ToolTip.text: "Reveal in the file manager"
+                        text: "Reveal in the file manager"
                         onClicked: row.shelf.reveal(row.entryId)
                     }
 
@@ -220,8 +218,7 @@ Rectangle {
                         size: 11
                         implicitWidth: 22
                         implicitHeight: 22
-                        ToolTip.visible: hovered
-                        ToolTip.text: row.shelf.row_kinds[row.at] === "link"
+                        text: row.shelf.row_kinds[row.at] === "link"
                                       ? "Copy the address" : "Copy the path"
                         onClicked: row.home.copyText(row.shelf.path_of(row.entryId))
                     }
@@ -234,8 +231,7 @@ Rectangle {
                         size: 11
                         implicitWidth: 22
                         implicitHeight: 22
-                        ToolTip.visible: hovered
-                        ToolTip.text: "Take it off the shelf"
+                        text: "Take it off the shelf"
                         onClicked: {
                             row.home.picked = []
                             row.shelf.remove(row.entryId)

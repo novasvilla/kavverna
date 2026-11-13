@@ -141,6 +141,10 @@ QtObject {
     readonly property color secondaryText: shade.secondaryText
     readonly property color mutedText: shade.mutedText
 
+    /// Where the keyboard is. Drawn only for keyboard focus, never after a click.
+    readonly property color focusRing: accent
+    readonly property int focusWidth: 2
+
     // Only what is genuinely repeated. A one-off pixel value doing a local job, the seven pixel
     // dot or the one pixel gap between a title and its detail, is geometry rather than scale and
     // stays where it is used.
@@ -152,6 +156,10 @@ QtObject {
 
     readonly property int radiusSmall: 6
     readonly property int radius: 10
+
+    readonly property int iconSmall: 12
+    readonly property int iconMedium: 16
+    readonly property int iconLarge: 18
 
     readonly property int textFine: 9
     readonly property int textSmall: 10

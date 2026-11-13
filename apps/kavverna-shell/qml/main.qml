@@ -20,6 +20,35 @@ Window {
     property int page: hub.page
     property bool panelHadFocus: false
 
+    /// A footer link: an icon from the desktop theme and the word for what it does.
+    component FooterAction: Pressable {
+        id: footerLink
+
+        required property string source
+
+        padding: footerLink.theme.gapTight
+        fill: footerLink.down ? footerLink.theme.controlDown
+            : footerLink.hovered ? footerLink.theme.control : "transparent"
+
+        contentItem: RowLayout {
+            spacing: footerLink.theme.gapSnug
+
+            Kirigami.Icon {
+                source: footerLink.source
+                implicitWidth: 16
+                implicitHeight: 16
+                isMask: true
+                color: footerLink.theme.secondaryText
+            }
+
+            Label {
+                text: footerLink.text
+                font.pixelSize: 12
+                color: footerLink.theme.secondaryText
+            }
+        }
+    }
+
     /// True while the utility is in the features list. Reading `features.installed` here is what
     /// makes every binding below re-evaluate the moment one is switched off.
     function shows(id) {
@@ -517,43 +546,50 @@ Window {
                               needs: root.pageNeeds[root.energyPage] }
                         ]
 
-                        delegate: Rectangle {
+                        // Left enabled while its utility is not ready, so the pointer still
+                        // finds the hint that says why; the press is what waits.
+                        delegate: Pressable {
+                            id: tab
                             required property var modelData
                             readonly property bool current: root.page === modelData.page
 
                             visible: root.showsAny(modelData.needs)
                             Layout.fillWidth: visible
                             Layout.fillHeight: true
-                            radius: 8
-                            color: current ? theme.selected : "transparent"
+                            theme: theme
+                            corner: 8
+                            fill: current ? theme.selected : "transparent"
+                            text: modelData.name
+
+                            Accessible.role: Accessible.PageTab
+                            Accessible.selected: tab.current
+                            Accessible.description: modelData.ready ? "" : modelData.unready
 
                             readonly property color mark: current ? theme.accent
                                 : modelData.ready ? theme.secondaryText
                                                   : theme.mutedText
 
-                            Kirigami.Icon {
-                                anchors.centerIn: parent
-                                visible: parent.modelData.icon !== ""
-                                source: parent.modelData.icon
-                                implicitWidth: 18
-                                implicitHeight: 18
-                                isMask: true
-                                color: parent.mark
-                            }
-
-                            Bolt {
-                                anchors.centerIn: parent
-                                visible: parent.modelData.icon === ""
-                                color: parent.mark
-                            }
-
-                            ToolTip.visible: hover.hovered
+                            ToolTip.visible: tab.hovered
                             ToolTip.text: modelData.ready ? modelData.name : modelData.unready
 
-                            HoverHandler { id: hover }
-                            TapHandler {
-                                enabled: modelData.ready
-                                onTapped: hub.page = modelData.page
+                            onClicked: if (modelData.ready) hub.page = modelData.page
+
+                            contentItem: Item {
+                                Kirigami.Icon {
+                                    anchors.centerIn: parent
+                                    visible: tab.modelData.icon !== ""
+                                    source: tab.modelData.icon
+                                    implicitWidth: 18
+                                    implicitHeight: 18
+                                    isMask: true
+                                    color: tab.mark
+                                }
+
+                                Bolt {
+                                    anchors.centerIn: parent
+                                    visible: tab.modelData.icon === ""
+                                    color: tab.mark
+                                }
                             }
                         }
                     }
@@ -658,21 +694,20 @@ Window {
             RowLayout {
                 Layout.fillWidth: true
 
-                Label {
-                    Layout.fillWidth: true
-                    text: hub.showing_settings ? "\u2039  Back" : "\u2699  Settings"
-                    font.pixelSize: 12
-                    color: theme.secondaryText
-
-                    TapHandler { onTapped: hub.show_settings(!hub.showing_settings) }
+                FooterAction {
+                    theme: theme
+                    source: hub.showing_settings ? "go-previous" : "configure"
+                    text: hub.showing_settings ? "Back" : "Settings"
+                    onClicked: hub.show_settings(!hub.showing_settings)
                 }
 
-                Label {
-                    text: "\u23fb  Quit"
-                    font.pixelSize: 12
-                    color: theme.secondaryText
+                Item { Layout.fillWidth: true }
 
-                    TapHandler { onTapped: Qt.quit() }
+                FooterAction {
+                    theme: theme
+                    source: "application-exit"
+                    text: "Quit"
+                    onClicked: Qt.quit()
                 }
             }
         }

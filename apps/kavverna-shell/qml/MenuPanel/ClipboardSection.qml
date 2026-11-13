@@ -276,8 +276,7 @@ ColumnLayout {
                 implicitWidth: 26
                 implicitHeight: 26
                 visible: section.clipboard.query.length > 0
-                ToolTip.visible: hovered
-                ToolTip.text: "Clear the search"
+                text: "Clear the search"
                 onClicked: {
                     search.text = "";
                     section.clipboard.search("");
@@ -291,8 +290,7 @@ ColumnLayout {
                 implicitWidth: 26
                 implicitHeight: 26
                 enabled: section.clipboard.recent_count > 0
-                ToolTip.visible: hovered
-                ToolTip.text: "Clear everything not pinned"
+                text: "Clear everything not pinned"
                 onClicked: section.clipboard.clear_unpinned()
             }
         }
@@ -404,8 +402,7 @@ ColumnLayout {
                                     implicitWidth: 22
                                     implicitHeight: 22
                                     enabled: section.clipboard.query.length === 0
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: "Move up"
+                                    text: "Move up"
                                     onClicked: section.clipboard.move_towards_top(row.entryId, true)
                                 }
 
@@ -416,8 +413,7 @@ ColumnLayout {
                                     implicitWidth: 22
                                     implicitHeight: 22
                                     enabled: section.clipboard.query.length === 0
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: "Move down"
+                                    text: "Move down"
                                     onClicked: section.clipboard.move_towards_top(row.entryId, false)
                                 }
 
@@ -427,8 +423,7 @@ ColumnLayout {
                                     size: 12
                                     implicitWidth: 22
                                     implicitHeight: 22
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: row.pinned ? "Unpin" : "Pin"
+                                    text: row.pinned ? "Unpin" : "Pin"
                                     onClicked: section.clipboard.pin(row.entryId, !row.pinned)
                                 }
 
@@ -455,8 +450,7 @@ ColumnLayout {
                                     size: 11
                                     implicitWidth: 22
                                     implicitHeight: 22
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: "Delete"
+                                    text: "Delete"
                                     onClicked: section.clipboard.forget(row.entryId)
                                 }
                             }

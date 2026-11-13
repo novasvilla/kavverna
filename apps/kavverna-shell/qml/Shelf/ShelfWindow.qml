@@ -195,8 +195,7 @@ Window {
                     theme: shelfWindow.theme
                     source: "edit-clear-all"
                     visible: shelfWindow.shelf.item_count > 0
-                    ToolTip.visible: hovered
-                    ToolTip.text: "Clear everything"
+                    text: "Clear everything"
                     onClicked: {
                         shelfWindow.picked = []
                         shelfWindow.shelf.clear()
@@ -206,6 +205,7 @@ Window {
                 IconButton {
                     theme: shelfWindow.theme
                     source: "window-close"
+                    text: "Close the shelf"
                     onClicked: shelfWindow.shelf.set_open(false)
                 }
             }

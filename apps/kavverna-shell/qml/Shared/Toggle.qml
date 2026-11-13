@@ -8,10 +8,12 @@ import QtQuick.Controls
 /// the other value through `switched`. A stock Switch flips itself on the click, which destroys
 /// a plain `checked:` binding, and a refused change then leaves it showing a value nobody holds:
 /// the backend writes back the value it already had, and an unchanged property notifies nobody.
-AbstractButton {
+///
+/// `text` is never drawn, the row beside the switch says it, but it is what a screen reader
+/// announces, so every switch is given one.
+Pressable {
     id: toggle
 
-    required property var theme
     /// What the backend says. The knob moves when this changes and at no other time.
     property bool on: false
 
@@ -19,8 +21,7 @@ AbstractButton {
 
     implicitWidth: 40
     implicitHeight: 22
-    padding: 0
-    hoverEnabled: true
+    corner: height / 2
 
     Accessible.role: Accessible.Switch
     Accessible.checkable: true

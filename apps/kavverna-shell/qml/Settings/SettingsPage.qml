@@ -101,7 +101,7 @@ ColumnLayout {
                       line: "The cave burning down: red heat, clay in daylight." }
                 ]
 
-                delegate: RowLayout {
+                delegate: Pressable {
                     id: themeRow
                     required property var modelData
                     readonly property bool current: page.hub.theme_name === modelData.id
@@ -109,85 +109,88 @@ ColumnLayout {
                         page.theme.palettes[modelData.id][page.theme.dark ? "dark" : "light"]
 
                     Layout.fillWidth: true
-                    spacing: page.theme.gapSnug
+                    theme: page.theme
+                    text: modelData.label
 
-                    Label {
-                        text: themeRow.current ? "●" : "○"
-                        font.pixelSize: page.theme.textSmall
-                        color: themeRow.current ? page.theme.accent
-                                                : page.theme.secondaryText
-                    }
+                    Accessible.role: Accessible.RadioButton
+                    Accessible.checkable: true
+                    Accessible.checked: themeRow.current
+                    Accessible.description: modelData.line
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 1
+                    onClicked: page.hub.choose_theme(themeRow.modelData.id)
 
-                        Label {
-                            text: themeRow.modelData.label
-                            font.pixelSize: page.theme.textBody
-                            font.bold: themeRow.current
-                            color: page.theme.primaryText
+                    contentItem: RowLayout {
+                        spacing: page.theme.gapSnug
+
+                        RadioMark {
+                            theme: page.theme
+                            chosen: themeRow.current
                         }
 
-                        Label {
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            text: themeRow.modelData.line
-                            font.pixelSize: page.theme.textSmall
-                            color: page.theme.secondaryText
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-
-                    Row {
-                        spacing: 4
-
-                        Repeater {
-                            model: [themeRow.shade.accent, themeRow.shade.surface,
-                                    themeRow.shade.primaryText]
-
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: 14
-                                height: 14
-                                radius: 4
-                                color: modelData
-                                border.width: 1
-                                border.color: page.theme.hairline
-                            }
-                        }
-
-                        // An inside joke living on the blue theme; the text stays exactly as
-                        // it is. Drawn in the window because a ToolTip popup is unreliable
-                        // over a layer surface, and inside this plain Row so the RowLayout
-                        // around it does not try to lay the bubble out as a cell.
-                        Rectangle {
-                            visible: themeRow.modelData.id === "tide" && rowHover.hovered
-                            anchors.bottom: parent.top
-                            anchors.bottomMargin: 2
-                            anchors.right: parent.right
-                            width: quip.implicitWidth + 16
-                            height: quip.implicitHeight + 10
-                            radius: page.theme.radiusSmall
-                            color: page.theme.surface
-                            border.width: 1
-                            border.color: page.theme.hairline
+                            spacing: 1
 
                             Label {
-                                id: quip
-                                anchors.centerIn: parent
-                                text: "Ian P. Mode ;-)"
-                                font.pixelSize: page.theme.textSmall
+                                text: themeRow.modelData.label
+                                font.pixelSize: page.theme.textBody
+                                font.bold: themeRow.current
                                 color: page.theme.primaryText
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: themeRow.modelData.line
+                                font.pixelSize: page.theme.textSmall
+                                color: page.theme.secondaryText
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        Row {
+                            spacing: 4
+
+                            Repeater {
+                                model: [themeRow.shade.accent, themeRow.shade.surface,
+                                        themeRow.shade.primaryText]
+
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: 14
+                                    height: 14
+                                    radius: 4
+                                    color: modelData
+                                    border.width: 1
+                                    border.color: page.theme.hairline
+                                }
+                            }
+
+                            // An inside joke living on the blue theme; the text stays exactly as
+                            // it is. Drawn in the window because a ToolTip popup is unreliable
+                            // over a layer surface, and inside this plain Row so the RowLayout
+                            // around it does not try to lay the bubble out as a cell.
+                            Rectangle {
+                                visible: themeRow.modelData.id === "tide" && themeRow.hovered
+                                anchors.bottom: parent.top
+                                anchors.bottomMargin: 2
+                                anchors.right: parent.right
+                                width: quip.implicitWidth + 16
+                                height: quip.implicitHeight + 10
+                                radius: page.theme.radiusSmall
+                                color: page.theme.surface
+                                border.width: 1
+                                border.color: page.theme.hairline
+
+                                Label {
+                                    id: quip
+                                    anchors.centerIn: parent
+                                    text: "Ian P. Mode ;-)"
+                                    font.pixelSize: page.theme.textSmall
+                                    color: page.theme.primaryText
+                                }
                             }
                         }
                     }
-
-                    TapHandler {
-                        onTapped: page.hub.choose_theme(themeRow.modelData.id)
-                    }
-
-                    HoverHandler { id: rowHover }
-
                 }
             }
         }
@@ -458,8 +461,7 @@ ColumnLayout {
                         source: "edit-delete"
                         size: 12
                         visible: ruleRow.yours
-                        ToolTip.visible: hovered
-                        ToolTip.text: "Remove this rule"
+                        text: "Remove this rule"
                         onClicked: page.clipboard.remove_clean_rule(ruleRow.modelData)
                     }
                 }
