@@ -1,6 +1,13 @@
-use crate::{routes, settings};
+use crate::{routes, settings, tray};
 use sound_mixer::{DeviceRole, MixerCommand, MixerCommands, MixerSnapshot, StreamTarget};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::time::{Duration, Instant};
+
+/// How long a burst of changes may gather before the interface hears of it. A volume drag
+/// sends a snapshot per step, and each one rebuilds every list in the sound page; the drag
+/// still feels live at this delay.
+const SETTLE: Duration = Duration::from_millis(40);
 
 static SNAPSHOT: Mutex<Option<MixerSnapshot>> = Mutex::new(None);
 static COMMANDS: OnceLock<MixerCommands> = OnceLock::new();
@@ -46,15 +53,69 @@ fn chosen_cycle(chosen: Option<&[String]>, present: &[String]) -> Vec<String> {
 }
 
 pub fn mute_every_input(muted: bool) {
-    for device in get().inputs {
-        send(MixerCommand::SetMute { node_id: device.node_id, muted });
+    let inputs: Vec<u32> = lock()
+        .as_ref()
+        .map(|snapshot| snapshot.inputs.iter().map(|device| device.node_id).collect())
+        .unwrap_or_default();
+    for node_id in inputs {
+        send(MixerCommand::SetMute { node_id, muted });
     }
 }
 
-/// True only when every input is muted, since a half muted set is not muted.
+/// Answered under the lock rather than from a copy, since the tray asks every time it builds
+/// its menu and a copy is the whole snapshot.
 pub fn every_input_muted() -> bool {
-    let inputs = get().inputs;
-    !inputs.is_empty() && inputs.iter().all(|device| device.muted)
+    lock().as_ref().is_some_and(|snapshot| all_muted(snapshot.inputs.iter().map(|d| d.muted)))
+}
+
+/// True only when every input is muted, since a half muted set is not muted.
+fn all_muted(inputs: impl IntoIterator<Item = bool>) -> bool {
+    let mut any = false;
+    for muted in inputs {
+        if !muted {
+            return false;
+        }
+        any = true;
+    }
+    any
+}
+
+/// Hands every change to `each` as it arrives and calls `settled` once a burst has gathered for
+/// at most `window` from its first change. The deadline is not pushed back by later changes, so
+/// a change that never stops still reaches the interface every `window`.
+fn settle_in_bursts<T>(
+    changes: &Receiver<T>,
+    window: Duration,
+    mut each: impl FnMut(T),
+    mut settled: impl FnMut(),
+) {
+    let mut due: Option<Instant> = None;
+    loop {
+        // Checked before receiving, since a receive with a queued change returns it whatever
+        // the timeout, and a steady stream would otherwise never settle.
+        if due.is_some_and(|at| Instant::now() >= at) {
+            due = None;
+            settled();
+            continue;
+        }
+        let next = match due {
+            None => changes.recv().map_err(|_| RecvTimeoutError::Disconnected),
+            Some(at) => changes.recv_timeout(at.saturating_duration_since(Instant::now())),
+        };
+        match next {
+            Ok(change) => {
+                each(change);
+                due.get_or_insert_with(|| Instant::now() + window);
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => {
+                if due.is_some() {
+                    settled();
+                }
+                return;
+            }
+        }
+    }
 }
 
 pub fn run(on_change: impl Fn()) {
@@ -77,7 +138,21 @@ pub fn run(on_change: impl Fn()) {
     let mut outputs_before: Vec<String> = Vec::new();
     let mut stream_ids_before: Vec<u32> = Vec::new();
 
-    while let Ok(snapshot) = changes.recv() {
+    // The tray caches its menu between updates, and the microphone item there says which way
+    // it will switch, so the tray is redrawn whenever that answer flips and once at the start.
+    let mut tray_says_muted: Option<bool> = None;
+    let settled = || {
+        on_change();
+        let muted = every_input_muted();
+        // Remembered only once a tray took it: the host can take half a minute to answer.
+        if tray_says_muted != Some(muted) && tray::refresh() {
+            tray_says_muted = Some(muted);
+        }
+    };
+
+    // Routes and the preferred input are worked out on every snapshot, since they compare one
+    // with the last; only telling the interface is gathered into bursts.
+    let each = |snapshot: MixerSnapshot| {
         let inputs_now: Vec<String> =
             snapshot.inputs.iter().map(|device| device.name.clone()).collect();
         let outputs_now: Vec<String> =
@@ -129,9 +204,9 @@ pub fn run(on_change: impl Fn()) {
         inputs_before = inputs_now;
         outputs_before = outputs_now;
         stream_ids_before = stream_ids_now;
+    };
 
-        on_change();
-    }
+    settle_in_bursts(&changes, SETTLE, each, settled);
 
     tracing::info!("mixer session ended");
 }
@@ -154,6 +229,52 @@ mod tests {
     use super::*;
 
     const HEADSET: &str = "alsa_input.usb-headset";
+
+    #[test]
+    fn a_burst_reaches_the_interface_once_with_every_change_handled() {
+        let (sender, changes) = std::sync::mpsc::channel();
+        for step in 0..5 {
+            sender.send(step).unwrap();
+        }
+        drop(sender);
+
+        let mut handled = Vec::new();
+        let mut settled = 0;
+        settle_in_bursts(
+            &changes,
+            Duration::from_secs(5),
+            |step| handled.push(step),
+            || settled += 1,
+        );
+
+        assert_eq!(handled, vec![0, 1, 2, 3, 4]);
+        assert_eq!(settled, 1);
+    }
+
+    #[test]
+    fn a_change_that_never_stops_still_settles_within_the_window() {
+        let (sender, changes) = std::sync::mpsc::channel();
+        let feeding = std::thread::spawn(move || {
+            let until = Instant::now() + Duration::from_millis(300);
+            while Instant::now() < until {
+                sender.send(()).unwrap();
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        });
+
+        let mut settled = 0;
+        settle_in_bursts(&changes, Duration::from_millis(20), |()| {}, || settled += 1);
+        feeding.join().unwrap();
+
+        assert!(settled >= 3, "a steady stream settled only {settled} times");
+    }
+
+    #[test]
+    fn a_half_muted_set_of_inputs_is_not_muted() {
+        assert!(all_muted([true, true]));
+        assert!(!all_muted([true, false]));
+        assert!(!all_muted([]), "no inputs is not a muted set");
+    }
 
     #[test]
     fn plugging_the_preferred_input_back_in_claims_it() {
