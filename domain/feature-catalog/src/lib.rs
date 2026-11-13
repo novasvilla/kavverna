@@ -13,6 +13,7 @@ pub enum Feature {
     MicrophoneTools,
     SystemMonitor,
     NetworkMonitor,
+    AgentUsage,
     MonitorAlerts,
     ClipboardHistory,
     ClipboardAutoClear,
@@ -34,6 +35,7 @@ impl Feature {
             Self::MicrophoneTools => "microphone-tools",
             Self::SystemMonitor => "system-monitor",
             Self::NetworkMonitor => "network-monitor",
+            Self::AgentUsage => "agent-usage",
             Self::MonitorAlerts => "monitor-alerts",
             Self::ClipboardHistory => "clipboard-history",
             Self::ClipboardAutoClear => "clipboard-auto-clear",
@@ -59,7 +61,7 @@ impl Feature {
         matches!(self.describe().readiness, Readiness::Built)
     }
 
-    /// Everything that exists arrives installed. Thirteen switches to find before the first use
+    /// Everything that exists arrives installed. A dozen switches to find before the first use
     /// is not a welcome, and each feature's own setting still decides what it actually does.
     pub const fn installed_by_default(self) -> bool {
         self.is_built()

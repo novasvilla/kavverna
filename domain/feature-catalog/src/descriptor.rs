@@ -112,6 +112,17 @@ impl Feature {
                 readiness: Readiness::Built,
                 enable_keys: &["network-monitor.enabled"],
             },
+            Self::AgentUsage => Descriptor {
+                title: "AI agents",
+                summary: "How much of each coding agent's allowance is used, read from local \
+                          files only: no network, no credentials.",
+                group: Group::Monitoring,
+                icon: "utilities-terminal",
+                // A read of a few local files every minute, and only while the panel is open.
+                energy: EnergyProfile::Periodic,
+                readiness: Readiness::Built,
+                enable_keys: &["agent-usage.enabled"],
+            },
             Self::MonitorAlerts => Descriptor {
                 title: "Alerts",
                 summary: "Notify on sustained load, high temperature, memory pressure or low disk.",
