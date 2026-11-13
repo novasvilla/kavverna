@@ -1,10 +1,12 @@
 use crate::settings;
-use clipboard_history::{Command, Commands, Entry, History, Kind, Settings, Snapshot};
+use clipboard_history::{
+    Command, Commands, Entry, History, Kind, Settings, Snapshot, Summary, Window,
+};
 use feature_catalog::Feature;
 use preferences::Preferences;
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::sync::{Mutex, MutexGuard, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 static SNAPSHOT: Mutex<Option<Snapshot>> = Mutex::new(None);
 static COMMANDS: Mutex<Option<Commands>> = Mutex::new(None);
@@ -140,6 +142,75 @@ pub fn full_text(entry: &Entry) -> String {
         Kind::Image => entry.preview(),
     }
 }
+
+/// Scripts and agents read the history only while it is something the person chose to keep.
+/// The store stays open for Clean URL or Transform with the history removed, and what it holds
+/// from before is not theirs to hand out then.
+fn readable() -> Result<Commands, String> {
+    if !settings::is_installed(Feature::ClipboardHistory) || !keeps_history() {
+        return Err("the clipboard history is switched off".into());
+    }
+    commands().ok_or_else(|| "the clipboard history is not running".into())
+}
+
+/// One window of the history as JSON, for `dev.kavverna.Shell.ClipboardEntries`. Blocks.
+pub fn entries_json(offset: u32, limit: u32, query: &str) -> Result<String, String> {
+    let window = Window { offset: offset as usize, limit: limit as usize }.clamped();
+    let page = readable()?.query(query, window).ok_or("the clipboard history did not answer")?;
+    Ok(page_json(&page.rows, page.total, window).to_string())
+}
+
+fn page_json(rows: &[Summary], total: usize, window: Window) -> serde_json::Value {
+    let entries: Vec<serde_json::Value> = rows
+        .iter()
+        .map(|row| {
+            serde_json::json!({
+                "id": row.id,
+                "kind": kind_name(row.kind, &row.preview),
+                "preview": row.preview,
+                "pinned": row.pinned,
+                "copied_at": iso_utc(row.copied_at),
+            })
+        })
+        .collect();
+    serde_json::json!({ "total": total, "offset": window.offset, "entries": entries })
+}
+
+/// One entry whole, for `dev.kavverna.Shell.ClipboardEntry`. Blocks.
+pub fn entry_text(id: i64) -> Result<String, String> {
+    readable()?.read(id).map(|entry| full_text(&entry)).ok_or_else(|| format!("no entry {id}"))
+}
+
+/// RFC 3339 in UTC, which every language parses without a time zone database.
+fn iso_utc(at: SystemTime) -> String {
+    let seconds = at.duration_since(UNIX_EPOCH).map(|since| since.as_secs() as i64).unwrap_or(0);
+    let (days, of_day) = (seconds.div_euclid(86_400), seconds.rem_euclid(86_400));
+    let (year, month, day) = civil_from_days(days);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        of_day / 3600,
+        of_day % 3600 / 60,
+        of_day % 60
+    )
+}
+
+/// Days since 1970-01-01 to a proleptic Gregorian date, after Howard Hinnant's algorithm.
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let of_era = z.rem_euclid(146_097);
+    let year_of_era = (of_era - of_era / 1460 + of_era / 36_524 - of_era / 146_096) / 365;
+    let of_year = of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let shifted_month = (5 * of_year + 2) / 153;
+    let day = (of_year - (153 * shifted_month + 2) / 5 + 1) as u32;
+    let month = if shifted_month < 10 { shifted_month + 3 } else { shifted_month - 9 } as u32;
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    (year, month, day)
+}
+
+// These read the switches as stored, which is what the clipboard page shows and writes back.
+// Whether anything runs is decided by `wanted_in` and `settings_in`, which put each feature's
+// availability above its switch.
 
 pub fn keeps_history() -> bool {
     settings::bool_at(settings::CLIPBOARD_ENABLED, settings::CLIPBOARD_ENABLED_DEFAULT)
@@ -404,6 +475,33 @@ mod tests {
         assert_eq!(kind_name(Kind::Text, "https://example.org and more"), "text");
         assert_eq!(kind_name(Kind::Files, "https://example.org"), "files");
         assert_eq!(kind_name(Kind::Image, "1920\u{d7}1080"), "image");
+    }
+
+    #[test]
+    fn times_for_scripts_are_written_in_utc() {
+        assert_eq!(iso_utc(UNIX_EPOCH), "1970-01-01T00:00:00Z");
+        let leap_day = UNIX_EPOCH + Duration::from_secs(1_709_210_096);
+        assert_eq!(iso_utc(leap_day), "2024-02-29T12:34:56Z");
+        assert_eq!(civil_from_days(-1), (1969, 12, 31));
+    }
+
+    #[test]
+    fn a_page_for_scripts_says_where_it_is_and_what_each_entry_is() {
+        let row = Summary {
+            id: 7,
+            kind: Kind::Text,
+            preview: "say \"hi\"".into(),
+            pinned: true,
+            copied_at: UNIX_EPOCH,
+            image: None,
+            thumbnail: None,
+            file_count: 0,
+        };
+        let json = page_json(&[row], 12, Window { offset: 5, limit: 1 });
+        assert_eq!(
+            json.to_string(),
+            r#"{"entries":[{"copied_at":"1970-01-01T00:00:00Z","id":7,"kind":"text","pinned":true,"preview":"say \"hi\""}],"offset":5,"total":12}"#
+        );
     }
 
     #[test]
