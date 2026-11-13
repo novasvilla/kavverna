@@ -7,6 +7,7 @@ use strum::IntoEnumIterator;
 #[test]
 fn ids_match_the_released_set() {
     let released = [
+        "agent-usage",
         "clean-url",
         "clipboard-auto-clear",
         "clipboard-history",
@@ -55,6 +56,7 @@ fn every_feature_declares_at_least_one_enable_key() {
 #[test]
 fn only_what_is_written_is_offered_as_built() {
     let built = [
+        "agent-usage",
         "clean-url",
         "clipboard-auto-clear",
         "clipboard-history",

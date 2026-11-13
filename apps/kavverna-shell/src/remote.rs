@@ -58,6 +58,12 @@ impl Shell {
         crate::mixer_state::mute_every_input(muted);
     }
 
+    /// The AI agents reading as JSON, read afresh for the call, with each window's freshness
+    /// and age judged at the moment of answering. Reads nothing when the utility is removed.
+    async fn agent_usage(&self) -> String {
+        crate::agent_usage_state::reading_as_json().await
+    }
+
     #[zbus(property)]
     fn default_output(&self) -> String {
         crate::mixer_state::get()
@@ -149,6 +155,9 @@ pub enum Wanted {
     Version,
     Usage,
     Selftest,
+    /// Claude Code's status line command: answered from stdin with no interface and no bus, since
+    /// it runs once for every status line every session draws.
+    ClaudeStatusLine,
     /// Said back with a non-zero exit rather than swallowed. A typo that opens the panel looks
     /// exactly like the flag having worked.
     Unknown(String),
@@ -167,6 +176,7 @@ impl Wanted {
             Some("--version" | "-V") => Self::Version,
             Some("--help" | "-h") => Self::Usage,
             Some("--selftest") => Self::Selftest,
+            Some("--claude-statusline") => Self::ClaudeStatusLine,
             Some(other) => Self::Unknown(other.to_owned()),
             None => Self::Panel,
         }
@@ -187,12 +197,17 @@ Usage: kavverna-shell [OPTION]
   --page <name>   Open the panel on a page: sound, monitoring, clipboard, tools, energy
   --settings      Open the settings page
   --selftest      Report what this machine offers of what Kavverna relies on, and exit
+  --claude-statusline
+                  Claude Code's status line command: keeps the allowance from the status
+                  line input on stdin for the AI agents page, prints a short status line
   -V, --version   Print the version and exit
   -h, --help      Print this and exit
 
 With no option it opens the panel, or raises the instance already running.
 
-Everything the panel does is also on the session bus, at dev.kavverna.Shell.
+The session bus name dev.kavverna.Shell opens the panel and its pages, holds and releases
+keep awake, cycles the output, mutes every microphone, and answers AgentUsage with the AI
+agents reading as JSON. The clipboard history and the shelf are not on the bus.
 ";
 
 async fn raise_running_instance(wanted: &Wanted) {
@@ -202,7 +217,11 @@ async fn raise_running_instance(wanted: &Wanted) {
 
     let call = match wanted {
         // Answered before the bus is reached, so a running instance never sees them.
-        Wanted::Version | Wanted::Usage | Wanted::Selftest | Wanted::Unknown(_) => return,
+        Wanted::Version
+        | Wanted::Usage
+        | Wanted::Selftest
+        | Wanted::ClaudeStatusLine
+        | Wanted::Unknown(_) => return,
         Wanted::Panel => {
             connection.call_method(Some(SERVICE), PATH, Some(INTERFACE), "Activate", &()).await
         }
@@ -253,6 +272,11 @@ mod tests {
     #[test]
     fn the_selftest_is_understood() {
         assert_eq!(wanted(&["--selftest"]), Wanted::Selftest);
+    }
+
+    #[test]
+    fn the_claude_status_line_is_understood() {
+        assert_eq!(wanted(&["--claude-statusline"]), Wanted::ClaudeStatusLine);
     }
 
     #[test]

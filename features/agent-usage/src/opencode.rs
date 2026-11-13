@@ -10,8 +10,9 @@ use std::time::{Duration, SystemTime};
 /// The span OpenCode totals cover, ending at the moment of the reading.
 pub const TOTALS_SPAN: Duration = Duration::from_secs(24 * 60 * 60);
 
-pub(crate) fn database(home: &Path) -> PathBuf {
-    home.join(".local/share/opencode/opencode.db")
+/// Under the XDG data home rather than a fixed folder in home, since OpenCode follows it.
+pub(crate) fn database(data_dir: &Path) -> PathBuf {
+    data_dir.join("opencode/opencode.db")
 }
 
 /// Only the role, token counts and cost are taken out of each message. Prompts and replies live
