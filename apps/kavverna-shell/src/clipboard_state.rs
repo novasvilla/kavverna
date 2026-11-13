@@ -245,6 +245,22 @@ mod tests {
         assert!(!settings_in(&prefs).keep_history, "nothing may be recorded");
     }
 
+    /// The case that was broken: Clean URL keeps the connection open, and a stale history
+    /// switch then went on recording through it.
+    #[test]
+    fn a_removed_history_records_nothing_while_clean_url_keeps_cleaning() {
+        let mut prefs = blank();
+        prefs.set_bool(settings::CLIPBOARD_ENABLED, true);
+        prefs.set_bool(settings::CLEAN_LINKS, true);
+
+        removed(&mut prefs, Feature::ClipboardHistory);
+
+        assert!(wanted_in(&prefs), "Clean URL still needs the connection");
+        let applied = settings_in(&prefs);
+        assert!(!applied.keep_history, "nothing may be recorded");
+        assert!(applied.clean_links);
+    }
+
     #[test]
     fn a_removed_clean_url_stops_cleaning_while_the_history_keeps_recording() {
         let mut prefs = blank();
