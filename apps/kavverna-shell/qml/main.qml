@@ -136,9 +136,13 @@ Window {
         value: root.screenNamed(hub.panel_screen)
     }
 
+    // The keyboard is on demand, so a surface that was only mapped has none, and Escape, Tab
+    // and the clipboard's arrows would wait for a first click into the panel. Asking for it
+    // as the panel opens is what makes them work straight away.
     onVisibleChanged: {
         if (visible) {
             panelHadFocus = false
+            Qt.callLater(() => root.requestActivate())
         } else {
             lostFocusCheck.stop()
         }
@@ -153,6 +157,11 @@ Window {
         }
     }
 
+    // A panel floating over everything never closes on lost focus. It floats so it can sit
+    // over a fullscreen window, and a fullscreen window taking the focus back would shut the
+    // panel a moment after it opened. The close button, Escape and the tray icon close it
+    // instead, which is predictable.
+    //
     // Mapping and activation emit transient focus changes. Only an ordinary-layer panel that
     // has genuinely held focus closes, and the delayed recheck lets those transitions settle.
     // A drag holds the pointer and maps the ghost, both of which move the focus around: closing
@@ -515,6 +524,15 @@ Window {
                     }
                 }
 
+                // The panel floats over everything by default and so never closes on lost
+                // focus; this is the way out that needs no keyboard and no tray.
+                IconButton {
+                    Layout.alignment: Qt.AlignTop
+                    theme: theme
+                    source: "window-close"
+                    text: "Close"
+                    onClicked: hub.dismiss()
+                }
             }
 
             Rectangle {
