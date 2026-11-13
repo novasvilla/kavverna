@@ -483,8 +483,11 @@ Window {
                         color: theme.primaryText
                     }
 
+                    // Keep awake's state, so it goes when keep awake is removed rather than
+                    // reporting on a utility that is no longer there.
                     Rectangle {
                         Layout.alignment: Qt.AlignLeft
+                        visible: root.shows("keep-awake")
                         implicitWidth: pill.implicitWidth + 18
                         implicitHeight: 21
                         radius: theme.radius
@@ -670,9 +673,14 @@ Window {
                     hub: hub
                     visible: !hub.showing_settings && root.page === root.toolsPage
                              && root.pageShown(root.toolsPage)
+                    onSettingsWanted: {
+                        settingsPage.openSection = "TOOLS"
+                        hub.show_settings(true)
+                    }
                 }
 
                 SettingsPage {
+                    id: settingsPage
                     theme: theme
                     hub: hub
                     clipboard: clipboard

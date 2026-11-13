@@ -31,6 +31,7 @@ RowLayout {
             color: row.theme.secondaryText
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
+            visible: text.length > 0
         }
     }
 

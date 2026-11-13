@@ -700,7 +700,8 @@ ColumnLayout {
                 { label: "30m", value: 30 },
                 { label: "1h", value: 60 },
                 { label: "2h", value: 120 },
-                { label: "4h", value: 240 }
+                { label: "4h", value: 240 },
+                { label: "8h", value: 480 }
             ]
             onPicked: (value) => page.hub.choose_default_minutes(value)
         }

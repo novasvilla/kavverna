@@ -78,6 +78,7 @@ ColumnLayout {
                     theme: section.theme
                     Layout.fillWidth: true
                     text: modelData.label
+                    active: section.hub.awake && section.hub.hold_preset === modelData.minutes
                     onClicked: section.hub.keep_awake_minutes(modelData.minutes)
                 }
             }
@@ -113,11 +114,14 @@ ColumnLayout {
             }
         }
 
-        Tick {
+        // A switch, as in Settings: a setting that is on or off is a Toggle everywhere, and a
+        // Tick is for picking members of a set, such as which outputs the shortcut visits.
+        SettingRow {
             theme: section.theme
-            text: "Let displays sleep"
+            title: "Let displays sleep"
+            detail: "Screens still turn off while the system stays up."
             on: section.hub.allow_display_sleep
-            onSwitched: (wanted) => section.hub.choose_display_sleep(wanted)
+            onToggled: (value) => section.hub.choose_display_sleep(value)
         }
     }
 }

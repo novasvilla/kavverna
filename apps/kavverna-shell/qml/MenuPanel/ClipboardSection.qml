@@ -215,21 +215,14 @@ ColumnLayout {
         visible: section.shows("clipboard-history")
         spacing: section.theme.gap
 
-        Tick {
+        SettingRow {
             theme: section.theme
-            text: "Save clipboard history"
+            title: "Save clipboard history"
+            detail: section.clipboard.enabled
+                    ? "Everything stays on this machine and can be cleared at any time."
+                    : "Turn this on to start saving what you copy."
             on: section.clipboard.enabled
-            onSwitched: (wanted) => section.clipboard.enable(wanted)
-        }
-
-        Label {
-            Layout.fillWidth: true
-            text: section.clipboard.enabled
-                  ? "Everything stays on this machine and can be cleared at any time."
-                  : "Turn this on to start saving what you copy."
-            font.pixelSize: section.theme.textSmall
-            color: section.theme.secondaryText
-            wrapMode: Text.WordWrap
+            onToggled: (value) => section.clipboard.enable(value)
         }
 
         Label {
