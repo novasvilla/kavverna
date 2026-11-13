@@ -486,8 +486,8 @@ Window {
                 Layout.fillWidth: true
                 spacing: theme.gap
 
-                // The mark alone, always in its flame: whether the machine is held awake is
-                // the pill's to say beside it, not the logo's. Drawn as a path because
+                // The mark alone, lit the same whether or not a hold is in place: that is the
+                // pill's to say beside it, not the logo's. Its colours come from the theme. Drawn as a path because
                 // Kirigami.Icon tints only icons it finds by name in the theme: an SVG it is
                 // handed by path keeps its own black whatever `isMask` says, which was checked.
                 Item {
