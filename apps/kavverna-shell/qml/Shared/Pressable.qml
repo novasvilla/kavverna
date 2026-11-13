@@ -20,7 +20,10 @@ AbstractButton {
     implicitHeight: Math.max(implicitBackgroundHeight + topInset + bottomInset,
                              implicitContentHeight + topPadding + bottomPadding)
     hoverEnabled: true
-    focusPolicy: Qt.StrongFocus
+    // Tab only. A click that took the focus would leave it parked on whatever was pressed,
+    // where Return now belongs to that control: reopened on the clipboard page, typing would
+    // go nowhere and Return would press a button instead of pasting.
+    focusPolicy: Qt.TabFocus
     padding: 0
 
     Accessible.role: Accessible.Button
@@ -39,12 +42,24 @@ AbstractButton {
         cursorShape: pressable.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
     }
 
-    background: Rectangle {
-        radius: pressable.corner
-        color: pressable.fill
-        // Only for the keyboard: a ring after every click would mark the last thing touched
-        // rather than where Tab will go next.
-        border.width: pressable.visualFocus ? pressable.theme.focusWidth : 0
-        border.color: pressable.theme.focusRing
+    background: Item {
+        Rectangle {
+            anchors.fill: parent
+            radius: pressable.corner
+            color: pressable.fill
+        }
+
+        // Outside the control's own edge, so content that fills it, a switch's track in the
+        // accent colour, cannot cover the ring. Only for the keyboard: a ring after every
+        // click would mark the last thing touched rather than where Tab will go next.
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -pressable.theme.focusWidth
+            visible: pressable.visualFocus
+            radius: pressable.corner + pressable.theme.focusWidth
+            color: "transparent"
+            border.width: pressable.theme.focusWidth
+            border.color: pressable.theme.focusRing
+        }
     }
 }

@@ -19,6 +19,10 @@ Window {
     readonly property int toolsPage: 4
     property int page: hub.page
     property bool panelHadFocus: false
+    /// The theme by a name a delegate can reach. Inside a delegate that has a `theme` property
+    /// of its own, a bare `theme` is that property, not the object below, so `theme: theme`
+    /// there binds the property to itself and every colour reads as undefined.
+    readonly property var panelTheme: theme
 
     /// A footer link: an icon from the desktop theme and the word for what it does.
     component FooterAction: Pressable {
@@ -577,18 +581,18 @@ Window {
                             visible: root.showsAny(modelData.needs)
                             Layout.fillWidth: visible
                             Layout.fillHeight: true
-                            theme: theme
-                            corner: theme.radiusRow
-                            fill: current ? theme.selected : "transparent"
+                            theme: root.panelTheme
+                            corner: tab.theme.radiusRow
+                            fill: current ? tab.theme.selected : "transparent"
                             text: modelData.name
 
                             Accessible.role: Accessible.PageTab
                             Accessible.selected: tab.current
                             Accessible.description: modelData.ready ? "" : modelData.unready
 
-                            readonly property color mark: current ? theme.accent
-                                : modelData.ready ? theme.secondaryText
-                                                  : theme.mutedText
+                            readonly property color mark: current ? tab.theme.accent
+                                : modelData.ready ? tab.theme.secondaryText
+                                                  : tab.theme.mutedText
 
                             ToolTip.visible: tab.hovered
                             ToolTip.text: modelData.ready ? modelData.name : modelData.unready
@@ -600,8 +604,8 @@ Window {
                                     anchors.centerIn: parent
                                     visible: tab.modelData.icon !== ""
                                     source: tab.modelData.icon
-                                    implicitWidth: theme.iconLarge
-                                    implicitHeight: theme.iconLarge
+                                    implicitWidth: tab.theme.iconLarge
+                                    implicitHeight: tab.theme.iconLarge
                                     isMask: true
                                     color: tab.mark
                                 }
