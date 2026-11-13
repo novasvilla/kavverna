@@ -128,12 +128,15 @@ QtObject {
     /// The top of it. Load or heat past the point where noticing is enough.
     readonly property color ember: shade.ember
 
-    /// The logo's flame, top to bottom. In the torch's dark cave it is Ian's own gradient as he
-    /// drew it; every other palette takes the flame from its own accent, since his yellow on
-    /// parchment or beside a blue accent would stop belonging to the panel around it.
-    readonly property bool drawnFlame: name === "torch" && dark
-    readonly property color markTop: drawnFlame ? "#ffab03" : accent
-    readonly property color markBottom: drawnFlame ? "#fff612" : Qt.lighter(accent, dark ? 1.35 : 1.6)
+    /// The logo's mark, top to bottom. The torch is Kavverna's own cave, so there the mark keeps
+    /// Ian Ponce Vargas's gradient exactly as he drew it, in light and dark alike: his colours
+    /// are never retuned to suit a background. Any other palette has a light of its own, and his
+    /// orange beside a blue or red accent would fight it, so there the mark steps back to the
+    /// text colour rather than borrowing the accent. It stays lit whether or not a hold is in
+    /// place; saying that is the pill's job.
+    readonly property bool designersColours: name === "torch" || palettes[name] === undefined
+    readonly property color markTop: designersColours ? "#ffab03" : primaryText
+    readonly property color markBottom: designersColours ? "#fff612" : primaryText
 
     readonly property color surface: shade.surface
     readonly property color raised: shade.raised
