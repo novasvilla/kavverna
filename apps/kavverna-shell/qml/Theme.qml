@@ -186,6 +186,4 @@ QtObject {
     readonly property int textBody: 11
     readonly property int textStrong: 13
     readonly property int textTitle: 16
-    /// The letter on the badge in the header, which is a mark rather than text.
-    readonly property int textBrand: 20
 }

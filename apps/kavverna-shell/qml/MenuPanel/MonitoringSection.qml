@@ -8,6 +8,7 @@ ColumnLayout {
 
     required property var theme
     required property var vitals
+    required property var agents
     required property var shows
 
     Layout.fillWidth: true
@@ -71,6 +72,14 @@ ColumnLayout {
                 color: meter.tint
             }
         }
+    }
+
+    // First, because the processor card's traces make it tall and an allowance a person opens
+    // the page to check should not sit below the fold.
+    AgentUsageCard {
+        theme: section.theme
+        agents: section.agents
+        visible: section.shows("agent-usage")
     }
 
     SectionLabel {
