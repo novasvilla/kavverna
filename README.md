@@ -40,6 +40,14 @@
     <img src="docs/assets/readme/light-monitoring.png" width="186" alt="Monitoring: processor, memory, pressure and both graphics cards">
   </picture>
   <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dark-monitoring-folds.png">
+    <img src="docs/assets/readme/light-monitoring-folds.png" width="186" alt="Monitoring with Apps using CPU open: one row per application and its share of the processor">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dark-agents.png">
+    <img src="docs/assets/readme/light-agents.png" width="186" alt="AI agents: how much of each Claude Code and Codex window is used, and when it resets">
+  </picture>
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dark-clipboard.png">
     <img src="docs/assets/readme/light-clipboard.png" width="186" alt="Clipboard history with search and quick paste shortcuts">
   </picture>
