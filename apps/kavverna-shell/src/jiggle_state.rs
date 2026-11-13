@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct JiggleState {
     pub running: bool,
     pub nudges: u32,

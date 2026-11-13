@@ -42,6 +42,12 @@ pub fn run(commands: Receiver<Command>, tray: TrayIcon) {
         }
     }
 
+    // What the panel and the tray were last given. The loop ticks every second for the timers,
+    // but most ticks change nothing either of them shows, and each push costs a trip to the Qt
+    // thread or a full rebuild of the tray.
+    let mut panel_shows: Option<PanelShows> = None;
+    let mut tray_shows: Option<StatusIcon> = None;
+
     loop {
         match commands.recv_timeout(TICK) {
             Ok(Command::Engage(hold, requested)) => {
@@ -93,25 +99,53 @@ pub fn run(commands: Receiver<Command>, tray: TrayIcon) {
             jiggle.rest();
         }
 
-        jiggle_state::set(jiggle_state::JiggleState {
+        let jiggling = jiggle_state::JiggleState {
             running: jiggling,
             nudges: jiggle.nudges(),
             seconds_until_next: jiggle.until_next().map(|left| left.as_secs()),
             waiting_seconds: jiggle.next_interval().as_secs(),
-        });
+        };
+        jiggle_state::set(jiggling);
 
         let active = keep_awake.is_active();
         let remaining = keep_awake.remaining();
 
         awake_state::set_hold(active, remaining);
-        panel::publish_awake(active, remaining);
 
-        if let Some(tray) = tray.lock().ok().and_then(|held| held.clone()) {
-            tray.update(move |icon: &mut StatusIcon| {
-                icon.awake = active;
-                icon.remaining = remaining;
-            });
+        // A hidden panel is given nothing and forgets what it had, so the first tick after it
+        // opens publishes again on top of what the panel took for itself as it opened.
+        if panel::is_open() {
+            let now = PanelShows::of(active, remaining, jiggling);
+            if panel_shows != Some(now) {
+                panel::publish_awake(active, remaining);
+                panel_shows = Some(now);
+            }
+        } else {
+            panel_shows = None;
         }
+
+        let showing = StatusIcon::showing(active, remaining);
+        if tray_shows != Some(showing) {
+            // Remembered only once a tray took it: the host can take half a minute to answer.
+            let handle = tray.lock().ok().and_then(|held| held.clone());
+            if handle.and_then(|tray| tray.update(move |icon| *icon = showing)).is_some() {
+                tray_shows = Some(showing);
+            }
+        }
+    }
+}
+
+/// What the panel's keep awake and jiggle rows show, to the second they show it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PanelShows {
+    active: bool,
+    seconds_left: Option<u64>,
+    jiggle: jiggle_state::JiggleState,
+}
+
+impl PanelShows {
+    fn of(active: bool, remaining: Option<Duration>, jiggle: jiggle_state::JiggleState) -> Self {
+        Self { active, seconds_left: remaining.map(|left| left.as_secs()), jiggle }
     }
 }
 
@@ -192,6 +226,29 @@ mod tests {
     use super::*;
 
     const NOW: i64 = 1_800_000_000;
+
+    #[test]
+    fn the_panel_is_given_a_new_second_and_not_a_new_millisecond() {
+        let jiggle = jiggle_state::JiggleState::default();
+        let at = |millis| PanelShows::of(true, Some(Duration::from_millis(millis)), jiggle);
+
+        assert_eq!(at(61_900), at(61_100));
+        assert_ne!(at(61_100), at(60_900));
+    }
+
+    #[test]
+    fn a_jiggle_countdown_alone_is_worth_publishing() {
+        let waiting = |seconds| jiggle_state::JiggleState {
+            running: true,
+            seconds_until_next: Some(seconds),
+            ..Default::default()
+        };
+
+        assert_ne!(
+            PanelShows::of(false, None, waiting(41)),
+            PanelShows::of(false, None, waiting(40))
+        );
+    }
 
     #[test]
     fn a_timed_hold_comes_back_with_what_was_left_of_it() {

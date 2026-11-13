@@ -5,6 +5,7 @@ use cxx_qt::Threading;
 use cxx_qt_lib::QString;
 use keep_awake::{Hold, format_duration};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 #[cxx_qt::bridge]
@@ -141,6 +142,32 @@ static SCREENS: Mutex<Vec<panel_anchor::Screen>> = Mutex::new(Vec::new());
 /// that on Wayland. Free-position arithmetic uses these sizes so a spot the ghost shows is
 /// the spot the panel lands on, clear of the task bar.
 static WORK_AREAS: Mutex<Vec<(String, i32, i32)>> = Mutex::new(Vec::new());
+
+/// Mirrors `panel_open` for the feature threads, which skip pushing into QML while nobody can
+/// see it. Kept from the property's own change signal, since QML writes the property too.
+static OPEN: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn is_open() -> bool {
+    OPEN.load(Ordering::Acquire)
+}
+
+/// What the feature threads held back while the panel was hidden goes in as soon as it shows.
+/// Queued rather than run inside the signal, which fires from within the setter that changed
+/// the property.
+fn shown_or_hidden(panel: Pin<&mut qobject::KavvernaPanel>) {
+    let open = *panel.panel_open();
+    OPEN.store(open, Ordering::Release);
+    if !open {
+        return;
+    }
+    let _ = panel.qt_thread().queue(|mut panel| {
+        let held = crate::awake_state::get();
+        panel.as_mut().apply(held.active, held.remaining);
+        crate::mixer_view::publish();
+        crate::vitals_view::publish();
+        crate::vitals_state::wake();
+    });
+}
 
 pub(crate) fn screens() -> Vec<panel_anchor::Screen> {
     SCREENS.lock().map(|held| held.clone()).unwrap_or_default()
@@ -346,6 +373,8 @@ fn summarise(active: bool, remaining: Option<Duration>) -> String {
 
 impl qobject::KavvernaPanel {
     fn attach(mut self: Pin<&mut Self>) {
+        // Before anything below can open the panel, so that opening is seen too.
+        self.as_mut().on_panel_open_changed(shown_or_hidden).release();
         let thread = self.as_mut().qt_thread();
         if let Some(wanted) = REQUESTED.lock().ok().and_then(|mut held| held.take()) {
             match wanted {
@@ -717,6 +746,23 @@ fn place(panel: &mut Pin<&mut qobject::KavvernaPanel>, click: Option<(i32, i32)>
     }
 }
 
+/// The exact last click, for the opens later in this session that carry none. The stored copy
+/// only has to survive a restart, so it is rewritten when the click lands somewhere else rather
+/// than on every click, each of which hits the icon a pixel or two from the last.
+static LAST_CLICK: Mutex<Option<String>> = Mutex::new(None);
+
+/// Wider than any tray icon Plasma draws, so clicks on the same icon count as the same place.
+const ICON_SLACK: i32 = 48;
+
+fn moved_off_the_icon(stored: &str, clicked: &str) -> bool {
+    match (panel_anchor::parse(stored), panel_anchor::parse(clicked)) {
+        (Some((was, x0, y0)), Some((now, x1, y1))) => {
+            was != now || (x1 - x0).abs() > ICON_SLACK || (y1 - y0).abs() > ICON_SLACK
+        }
+        _ => true,
+    }
+}
+
 /// A fresh click wins and is kept for the opens that carry none, a shortcut or a script. A
 /// stored click is trusted only while its screen is still connected and still contains it.
 fn beside_tray_or_remembered_anchor(
@@ -726,16 +772,23 @@ fn beside_tray_or_remembered_anchor(
 ) -> Option<(Placement, String)> {
     if let Some(point) = click {
         if let Some(screen) = panel_anchor::screen_containing(point, screens) {
-            settings::put_text(
-                settings::PLACEMENT_ANCHOR,
-                &panel_anchor::entry(&screen.name, point.0, point.1),
-            );
+            let clicked = panel_anchor::entry(&screen.name, point.0, point.1);
+            if moved_off_the_icon(&settings::text_at(settings::PLACEMENT_ANCHOR, ""), &clicked) {
+                settings::put_text(settings::PLACEMENT_ANCHOR, &clicked);
+            }
+            if let Ok(mut held) = LAST_CLICK.lock() {
+                *held = Some(clicked);
+            }
             return Some((panel_anchor::beside_tray(point, screen, spacing), screen.name.clone()));
         }
         tracing::info!(?point, "tray click outside every screen, treated as absent");
     }
 
-    let stored = settings::text_at(settings::PLACEMENT_ANCHOR, "");
+    let stored = LAST_CLICK
+        .lock()
+        .ok()
+        .and_then(|held| held.clone())
+        .unwrap_or_else(|| settings::text_at(settings::PLACEMENT_ANCHOR, ""));
     let (name, x, y) = panel_anchor::parse(&stored)?;
     let screen = screens.iter().find(|screen| screen.name == name)?;
     panel_anchor::screen_containing((x, y), std::slice::from_ref(screen))?;
@@ -845,4 +898,25 @@ pub fn open_settings() {
         place(&mut panel, None);
         panel.as_mut().set_panel_open(true);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn another_click_on_the_same_icon_is_not_stored_again() {
+        let stored = panel_anchor::entry("DP-1", 1850, 1060);
+
+        assert!(!moved_off_the_icon(&stored, &panel_anchor::entry("DP-1", 1853, 1058)));
+    }
+
+    #[test]
+    fn a_click_somewhere_else_or_on_another_screen_is_stored() {
+        let stored = panel_anchor::entry("DP-1", 1850, 1060);
+
+        assert!(moved_off_the_icon(&stored, &panel_anchor::entry("DP-1", 1700, 1060)));
+        assert!(moved_off_the_icon(&stored, &panel_anchor::entry("HDMI-A-1", 1850, 1060)));
+        assert!(moved_off_the_icon("", &panel_anchor::entry("DP-1", 1850, 1060)));
+    }
 }

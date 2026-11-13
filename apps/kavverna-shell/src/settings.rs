@@ -1,6 +1,7 @@
 use feature_catalog::Feature;
 use keep_awake::{Hold, Scope};
 use preferences::Preferences;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 /// A feature's switch is named once, in the catalogue, so the key that decides whether it runs
@@ -129,7 +130,11 @@ pub const HOLD_UNTIL_INDEFINITE: i64 = -1;
 /// next time, and never touches its enable keys, so putting it back restores what it was set to
 /// do rather than a fresh default.
 pub fn is_installed(feature: Feature) -> bool {
-    feature.is_built() && bool_at(&feature.availability_key(), feature.installed_by_default())
+    read(|prefs| is_installed_in(prefs, feature))
+}
+
+pub fn is_installed_in(prefs: &Preferences, feature: Feature) -> bool {
+    feature.is_built() && prefs.bool(&feature.availability_key(), feature.installed_by_default())
 }
 
 /// A shared service belongs to more than one feature, so it runs while any of them is here.
@@ -164,6 +169,20 @@ pub fn scope() -> Scope {
 
 static STORE: Mutex<Option<Preferences>> = Mutex::new(None);
 
+/// Raised by every write that reached the disk. A thread that polls can then rebuild what it
+/// derives from the settings only when they moved, rather than once a tick.
+static GENERATION: AtomicU64 = AtomicU64::new(0);
+
+pub fn generation() -> u64 {
+    GENERATION.load(Ordering::Acquire)
+}
+
+/// Several reads under one lock, for a decision that has to see one consistent state. The
+/// closure must not call back into this module, since the lock is held while it runs.
+pub fn read<T>(look: impl FnOnce(&Preferences) -> T) -> T {
+    look(&*store().get_or_insert_with(Preferences::load))
+}
+
 fn store() -> MutexGuard<'static, Option<Preferences>> {
     let mut guard = STORE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     if guard.is_none() {
@@ -185,11 +204,11 @@ pub fn integer_at(key: &str, fallback: i64) -> i64 {
 }
 
 pub fn put_bool(key: &str, value: bool) -> bool {
-    update(|prefs| prefs.set_bool(key, value))
+    update(|prefs| holds_bool(prefs, key, value), |prefs| prefs.set_bool(key, value))
 }
 
 pub fn put_integer(key: &str, value: i64) -> bool {
-    update(|prefs| prefs.set_integer(key, value))
+    update(|prefs| holds_integer(prefs, key, value), |prefs| prefs.set_integer(key, value))
 }
 
 pub fn text_at(key: &str, fallback: &str) -> String {
@@ -197,7 +216,7 @@ pub fn text_at(key: &str, fallback: &str) -> String {
 }
 
 pub fn put_text(key: &str, value: &str) -> bool {
-    update(|prefs| prefs.set_text(key, value))
+    update(|prefs| holds_text(prefs, key, value), |prefs| prefs.set_text(key, value))
 }
 
 pub fn texts_at(key: &str) -> Option<Vec<String>> {
@@ -205,12 +224,38 @@ pub fn texts_at(key: &str) -> Option<Vec<String>> {
 }
 
 pub fn put_texts(key: &str, values: &[String]) -> bool {
-    update(|prefs| prefs.set_texts(key, values))
+    update(|prefs| holds_texts(prefs, key, values), |prefs| prefs.set_texts(key, values))
 }
 
-fn update(change: impl FnOnce(&mut Preferences)) -> bool {
+// Each probe asks under two different fallbacks, since an absent key answers with whichever
+// fallback it is given and must still be written: absent means "never chosen", which is not
+// the same as having chosen the default.
+
+fn holds_bool(prefs: &Preferences, key: &str, value: bool) -> bool {
+    prefs.bool(key, !value) == value
+}
+
+fn holds_integer(prefs: &Preferences, key: &str, value: i64) -> bool {
+    prefs.integer(key, i64::MIN) == value && prefs.integer(key, i64::MAX) == value
+}
+
+fn holds_text(prefs: &Preferences, key: &str, value: &str) -> bool {
+    prefs.text(key, "") == value && prefs.text(key, "\u{0}") == value
+}
+
+fn holds_texts(prefs: &Preferences, key: &str, values: &[String]) -> bool {
+    prefs.texts(key).is_some_and(|held| held == values)
+}
+
+/// A write that would change nothing is skipped and counts as saved. Most of these arrive on
+/// the Qt thread, and rewriting and syncing the whole file there for nothing stalls the
+/// interface.
+fn update(holds: impl FnOnce(&Preferences) -> bool, change: impl FnOnce(&mut Preferences)) -> bool {
     let mut guard = store();
     let Some(current) = guard.as_ref() else { return false };
+    if holds(current) {
+        return true;
+    }
     let mut candidate = current.clone();
     if !candidate.can_save() {
         tracing::error!(path = %candidate.path().display(), "settings cannot be saved");
@@ -222,5 +267,55 @@ fn update(change: impl FnOnce(&mut Preferences)) -> bool {
         return false;
     }
     *guard = Some(candidate);
+    GENERATION.fetch_add(1, Ordering::Release);
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Never saved: the path sits under a directory that does not exist.
+    fn blank() -> Preferences {
+        Preferences::load_from("/nonexistent/kavverna-test/settings.json")
+    }
+
+    #[test]
+    fn an_absent_key_is_never_taken_for_its_default() {
+        let prefs = blank();
+
+        assert!(!holds_bool(&prefs, "k", false));
+        assert!(!holds_bool(&prefs, "k", true));
+        assert!(!holds_integer(&prefs, "k", 0));
+        assert!(!holds_text(&prefs, "k", ""));
+        assert!(!holds_texts(&prefs, "k", &[]));
+    }
+
+    #[test]
+    fn a_stored_value_holds_and_a_different_one_does_not() {
+        let mut prefs = blank();
+        prefs.set_bool("b", false);
+        prefs.set_integer("i", i64::MIN);
+        prefs.set_text("t", "");
+        prefs.set_texts("l", &[]);
+
+        assert!(holds_bool(&prefs, "b", false));
+        assert!(!holds_bool(&prefs, "b", true));
+        assert!(holds_integer(&prefs, "i", i64::MIN));
+        assert!(!holds_integer(&prefs, "i", 0));
+        assert!(holds_text(&prefs, "t", ""));
+        assert!(!holds_text(&prefs, "t", "x"));
+        assert!(holds_texts(&prefs, "l", &[]));
+        assert!(!holds_texts(&prefs, "l", &["x".to_owned()]));
+    }
+
+    #[test]
+    fn a_removed_feature_is_not_installed_whatever_its_switch_says() {
+        let mut prefs = blank();
+        assert!(is_installed_in(&prefs, Feature::ClipboardHistory));
+
+        prefs.set_bool(&Feature::ClipboardHistory.availability_key(), false);
+
+        assert!(!is_installed_in(&prefs, Feature::ClipboardHistory));
+    }
 }
