@@ -111,6 +111,23 @@ impl Shell {
         off_the_bus(process_state::listening_ports_json).await
     }
 
+    /// One window of the clipboard history as JSON: `total`, `offset` and `entries`, each with
+    /// `id`, `kind` (text, link, image or files), `preview`, `pinned` and `copied_at` in UTC.
+    /// An empty query lists everything, newest first after the pinned. Read only.
+    async fn clipboard_entries(
+        &self,
+        offset: u32,
+        limit: u32,
+        query: String,
+    ) -> zbus::fdo::Result<String> {
+        answered(move || crate::clipboard_state::entries_json(offset, limit, &query)).await
+    }
+
+    /// One entry whole: its text, its files one path a line, or a picture's size.
+    async fn clipboard_entry(&self, id: i64) -> zbus::fdo::Result<String> {
+        answered(move || crate::clipboard_state::entry_text(id)).await
+    }
+
     #[zbus(property)]
     fn default_output(&self) -> String {
         crate::mixer_state::get()
@@ -142,6 +159,25 @@ impl Shell {
         let state = awake_state::get();
         if !state.active { "off".into() } else { format_compact(state.remaining) }
     }
+}
+
+/// The clipboard thread can take two seconds to answer, and this interface is served from the
+/// connection's own executor, not tokio's, so the wait happens on a thread of its own rather
+/// than stalling every other call to the shell.
+async fn answered(
+    ask: impl FnOnce() -> Result<String, String> + Send + 'static,
+) -> zbus::fdo::Result<String> {
+    let (reply, answer) = tokio::sync::oneshot::channel();
+    std::thread::Builder::new()
+        .name("kavverna-bus-read".into())
+        .spawn(move || {
+            let _ = reply.send(ask());
+        })
+        .map_err(|err| zbus::fdo::Error::Failed(err.to_string()))?;
+    answer
+        .await
+        .map_err(|_| zbus::fdo::Error::Failed("the read did not finish".into()))?
+        .map_err(zbus::fdo::Error::Failed)
 }
 
 pub enum Claim {

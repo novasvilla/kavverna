@@ -17,7 +17,7 @@ use crate::selection::{
     CapturePolicy, Payload, Selection, SelectionEvent, SelectionWatcher, WatchError,
 };
 use crate::sensitivity::looks_sensitive;
-use crate::store::{Captured, Store, StoreError, Summary, Window};
+use crate::store::{Captured, Page, Store, StoreError, Summary, Window};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Settings {
@@ -67,6 +67,13 @@ pub enum Command {
     Read {
         id: i64,
         answer: SyncSender<Option<Entry>>,
+    },
+    /// Answers one window of any query and leaves the list the panel shows where it was, for
+    /// readers other than the panel.
+    Query {
+        query: String,
+        window: Window,
+        answer: SyncSender<Option<Page>>,
     },
     PutBack(i64),
     /// Puts the chosen text entries on the clipboard as one text, in the order given. The
@@ -158,6 +165,15 @@ impl Commands {
     pub fn read(&self, id: i64) -> Option<Entry> {
         let (answer, reply) = sync_channel(1);
         if !self.send(Command::Read { id, answer }) {
+            return None;
+        }
+        reply.recv_timeout(READ_PATIENCE).ok().flatten()
+    }
+
+    /// One window of a query, with the same patience as `read`.
+    pub fn query(&self, query: &str, window: Window) -> Option<Page> {
+        let (answer, reply) = sync_channel(1);
+        if !self.send(Command::Query { query: query.to_owned(), window, answer }) {
             return None;
         }
         reply.recv_timeout(READ_PATIENCE).ok().flatten()
@@ -473,6 +489,13 @@ fn change(store: &mut Store, settings: &mut Settings, view: &mut View, command: 
                 None
             });
             let _ = answer.try_send(found);
+            return false;
+        }
+        Command::Query { query, window, answer } => {
+            let found = store.page(&query, window).map_err(|err| {
+                tracing::error!(%err, "could not read the clipboard history");
+            });
+            let _ = answer.try_send(found.ok());
             return false;
         }
         Command::Pin { id, pinned } => store.set_pinned(id, pinned),
@@ -872,6 +895,27 @@ mod tests {
         let page = store.page(&view.query, view.window).unwrap();
         assert_eq!(page.rows.iter().map(|row| row.id).collect::<Vec<_>>(), vec![id]);
         assert!(store.page("typo", view.window).unwrap().rows.is_empty());
+    }
+
+    #[test]
+    fn a_query_from_elsewhere_leaves_the_panel_where_it_was() {
+        let room = tempfile::tempdir().expect("a temporary directory");
+        let mut store = Store::open(room.path()).unwrap();
+        let mut settings = Settings::default();
+        let mut view = View::default();
+        store.remember(text("apple")).unwrap();
+        store.remember(text("pear")).unwrap();
+        change(&mut store, &mut settings, &mut view, Command::Search("pear".into()));
+
+        let (answer, reply) = sync_channel(1);
+        let asked = Command::Query { query: "apple".into(), window: Window::first(10), answer };
+        assert!(!change(&mut store, &mut settings, &mut view, asked), "nothing to publish");
+
+        let page = reply.recv().unwrap().expect("a page");
+        assert_eq!(page.total, 1);
+        assert_eq!(page.rows[0].preview, "apple");
+        assert_eq!(view.query, "pear");
+        assert_eq!(view.window, Window::default());
     }
 
     #[test]

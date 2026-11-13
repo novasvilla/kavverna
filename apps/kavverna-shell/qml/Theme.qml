@@ -169,6 +169,14 @@ QtObject {
     /// For buttons that sit inside a row of a list, or a row of several presets.
     readonly property int buttonHeightCompact: 22
 
+    /// The clipboard list scrolls inside a height of its own rather than growing the page, so
+    /// the search above it and the counts below it stay where they are.
+    readonly property int clipboardListHeight: 284
+    readonly property int clipboardEmptyHeight: 72
+    /// A copied picture in its row: always this tall, never wider than this, aspect kept.
+    readonly property int thumbnailHeight: 40
+    readonly property int thumbnailWidth: 64
+
     readonly property int iconSmall: 12
     readonly property int iconMedium: 16
     readonly property int iconLarge: 18
