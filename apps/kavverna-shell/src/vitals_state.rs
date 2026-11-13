@@ -1,14 +1,23 @@
-use crate::settings;
+use crate::{panel, settings};
 use feature_catalog::Feature;
 use std::collections::VecDeque;
+use std::sync::mpsc::{RecvTimeoutError, Sender};
 use std::sync::{Mutex, MutexGuard};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use system_monitor::{Processor, Vitals, Vitalsigns};
 
-/// Two minutes at the sampler's own tick. Long enough to show the spike that was over before
-/// the panel was opened, short enough that a panel left open all day is not drawing an hour of
-/// readings into three hundred pixels.
+/// Two minutes of the tick the sampler keeps while the panel is open. Long enough to show the
+/// spike that was over before the panel was opened, short enough that a panel left open all day
+/// is not drawing an hour of readings into three hundred pixels.
 const KEPT: usize = 60;
+
+/// The tick while nobody is looking. Slow enough that the graphics cards are hardly asked, and
+/// under the ten seconds beyond which `system-monitor` refuses to work out a network or disk
+/// rate, so the reading shown the moment the panel opens still carries its rates.
+const HIDDEN: Duration = Duration::from_secs(8);
+
+/// Lets an opening panel cut a hidden wait short.
+static WAKE: Mutex<Option<Sender<()>>> = Mutex::new(None);
 
 static LATEST: Mutex<Option<Vitals>> = Mutex::new(None);
 /// What the machine calls its processor, read once when the sampler opens and never again.
@@ -53,23 +62,44 @@ fn push_capped(series: &mut VecDeque<f32>, value: f32) {
     }
 }
 
-fn record(history: &mut History, reading: &Vitals) {
-    // The first tick has no load yet, since load is the difference between two readings.
-    // Recording it as zero would draw a dip that never happened.
-    if let Some(load) = reading.cpu_load {
-        push_capped(&mut history.cpu, load);
-    }
-    push_capped(&mut history.memory, reading.memory.used_fraction());
+/// How many open ticks a reading stands for. A reading taken while the panel was hidden covers
+/// several, and recording it once for each keeps the trace two minutes wide whichever cadence
+/// drew it, instead of squeezing the hidden stretch into a few points. Processor load is
+/// measured across the whole gap, so a flat step over it is what the machine averaged; memory
+/// and the cards are one moment held flat, which is coarser but never invented.
+fn ticks_spanned(gap: Duration, tick: Duration) -> usize {
+    let ticks = gap.as_secs_f64() / tick.as_secs_f64().max(f64::EPSILON);
+    (ticks.round() as usize).clamp(1, KEPT)
+}
 
-    history.cards.resize_with(reading.graphics.cards.len(), VecDeque::new);
-    for (series, card) in history.cards.iter_mut().zip(&reading.graphics.cards) {
-        push_capped(series, card.reading.utilisation.unwrap_or(0.0));
+fn record(history: &mut History, reading: &Vitals, ticks: usize) {
+    for _ in 0..ticks {
+        // The first tick has no load yet, since load is the difference between two readings.
+        // Recording it as zero would draw a dip that never happened.
+        if let Some(load) = reading.cpu_load {
+            push_capped(&mut history.cpu, load);
+        }
+        push_capped(&mut history.memory, reading.memory.used_fraction());
+
+        history.cards.resize_with(reading.graphics.cards.len(), VecDeque::new);
+        for (series, card) in history.cards.iter_mut().zip(&reading.graphics.cards) {
+            push_capped(series, card.reading.utilisation.unwrap_or(0.0));
+        }
     }
 }
 
-/// Samples on a fixed tick. Load is a difference between readings, so the first tick only
-/// establishes a baseline.
-pub fn run(interval: Duration, on_change: impl Fn()) {
+/// Called when the panel opens. The next reading is taken at once if the last one is at least
+/// a tick old; a sooner one would measure load over a sliver of time and draw noise.
+pub fn wake() {
+    if let Some(sender) = WAKE.lock().ok().and_then(|held| held.clone()) {
+        let _ = sender.send(());
+    }
+}
+
+/// Samples every `tick` while the panel is open and every `HIDDEN` while it is not, and pushes
+/// to the interface only while it is open; the panel takes the latest reading as it opens.
+/// Load is a difference between readings, so the first sample only establishes a baseline.
+pub fn run(tick: Duration, on_change: impl Fn()) {
     let mut vitals = Vitalsigns::for_features(
         settings::is_installed(Feature::SystemMonitor),
         settings::is_installed(Feature::NetworkMonitor),
@@ -78,12 +108,33 @@ pub fn run(interval: Duration, on_change: impl Fn()) {
         Some(vitals.processor().clone());
     tracing::info!(processor = %vitals.processor().name, "vitals sampler started");
 
+    let (sender, wakes) = std::sync::mpsc::channel();
+    if let Ok(mut held) = WAKE.lock() {
+        *held = Some(sender);
+    }
+
+    let mut last: Option<Instant> = None;
     loop {
+        let now = Instant::now();
+        if let Some(at) = last {
+            let due = at + if panel::is_open() { tick } else { HIDDEN };
+            if now < due {
+                // A wake only sends the loop round again to look at the panel afresh.
+                if let Err(RecvTimeoutError::Disconnected) = wakes.recv_timeout(due - now) {
+                    std::thread::sleep(due - now);
+                }
+                continue;
+            }
+        }
+
         let reading = vitals.sample();
-        record(history_lock().get_or_insert_with(History::default), &reading);
+        let ticks = last.map_or(1, |at| ticks_spanned(now.duration_since(at), tick));
+        record(history_lock().get_or_insert_with(History::default), &reading, ticks);
+        last = Some(now);
         *lock() = Some(reading);
-        on_change();
-        std::thread::sleep(interval);
+        if panel::is_open() {
+            on_change();
+        }
     }
 }
 
@@ -102,6 +153,27 @@ mod tests {
         assert_eq!(series.len(), KEPT);
         assert_eq!(series.front(), Some(&10.0), "the oldest ten should be gone");
         assert_eq!(series.back(), Some(&((KEPT + 9) as f32)));
+    }
+
+    #[test]
+    fn a_hidden_reading_fills_the_ticks_it_covered() {
+        let tick = Duration::from_secs(2);
+
+        assert_eq!(ticks_spanned(Duration::from_millis(2100), tick), 1);
+        assert_eq!(ticks_spanned(HIDDEN, tick), 4);
+        assert_eq!(ticks_spanned(Duration::from_millis(300), tick), 1, "never less than one");
+        assert_eq!(ticks_spanned(Duration::from_secs(3600), tick), KEPT, "never more than kept");
+    }
+
+    #[test]
+    fn a_reading_is_recorded_once_for_every_tick_it_covered() {
+        let mut history = History::default();
+        let reading = Vitals { cpu_load: Some(0.5), ..Default::default() };
+
+        record(&mut history, &reading, 4);
+
+        assert_eq!(history.cpu.len(), 4);
+        assert_eq!(history.memory.len(), 4);
     }
 
     /// A card unplugged between samples must not leave its old readings attached to whatever

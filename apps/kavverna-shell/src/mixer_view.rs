@@ -159,9 +159,7 @@ impl qobject::MixerView {
     }
 
     fn mute_every_input(self: Pin<&mut Self>, muted: bool) {
-        for device in mixer_state::get().inputs {
-            mixer_state::send(MixerCommand::SetMute { node_id: device.node_id, muted });
-        }
+        mixer_state::mute_every_input(muted);
     }
 
     fn make_default_output(self: Pin<&mut Self>, node_id: i32) {
@@ -476,7 +474,12 @@ fn send_mute(node_id: i32, muted: bool) {
     }
 }
 
+/// Nothing goes in while the panel is hidden: the panel publishes once as it opens, and the
+/// rebuild of every list in the sound page is wasted on a page nobody can see.
 pub fn publish() {
+    if !crate::panel::is_open() {
+        return;
+    }
     let Ok(view) = VIEW.lock() else {
         return;
     };
