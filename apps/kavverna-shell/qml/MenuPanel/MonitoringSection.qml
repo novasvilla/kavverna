@@ -158,6 +158,26 @@ Item {
                         cursorShape: Qt.OpenHandCursor
                     }
 
+                    // The fold and the grip lead the line rather than end it, where the page's
+                    // scroll bar would lie over them.
+                    Kirigami.Icon {
+                        source: "go-next-symbolic"
+                        implicitWidth: section.theme.iconSmall
+                        implicitHeight: section.theme.iconSmall
+                        isMask: true
+                        color: placed.folded ? section.theme.secondaryText : section.theme.accent
+                        rotation: placed.folded ? 0 : 90
+
+                        Behavior on rotation {
+                            NumberAnimation { duration: section.theme.motionQuick; easing.type: Easing.OutCubic }
+                        }
+                    }
+
+                    // Room for the grip drawn over this line.
+                    Item {
+                        implicitWidth: section.theme.iconSmall
+                    }
+
                     SectionLabel {
                         theme: section.theme
                         text: placed.title.toUpperCase()
@@ -175,24 +195,6 @@ Item {
                     Item {
                         Layout.fillWidth: !placed.folded || placed.summary.length === 0
                         implicitWidth: 0
-                    }
-
-                    // Room for the grip drawn over this line.
-                    Item {
-                        implicitWidth: section.theme.iconSmall
-                    }
-
-                    Kirigami.Icon {
-                        source: "go-next-symbolic"
-                        implicitWidth: section.theme.iconSmall
-                        implicitHeight: section.theme.iconSmall
-                        isMask: true
-                        color: placed.folded ? section.theme.secondaryText : section.theme.accent
-                        rotation: placed.folded ? 0 : 90
-
-                        Behavior on rotation {
-                            NumberAnimation { duration: section.theme.motionQuick; easing.type: Easing.OutCubic }
-                        }
                     }
                 }
             }
@@ -241,8 +243,8 @@ Item {
             }
 
             Kirigami.Icon {
-                anchors.right: parent.right
-                anchors.rightMargin: section.theme.iconSmall + section.theme.gapSnug
+                anchors.left: parent.left
+                anchors.leftMargin: section.theme.iconSmall + section.theme.gapSnug
                 anchors.verticalCenter: parent.verticalCenter
                 source: "drag-handle-symbolic"
                 implicitWidth: section.theme.iconSmall

@@ -486,8 +486,8 @@ Window {
                 Layout.fillWidth: true
                 spacing: theme.gap
 
-                // The mark alone, in one colour, so it lights with the flame while the
-                // machine is held awake the way the old letter did. Drawn as a path because
+                // The mark alone, always in its flame: whether the machine is held awake is
+                // the pill's to say beside it, not the logo's. Drawn as a path because
                 // Kirigami.Icon tints only icons it finds by name in the theme: an SVG it is
                 // handed by path keeps its own black whatever `isMask` says, which was checked.
                 Item {
@@ -504,7 +504,14 @@ Window {
 
                         ShapePath {
                             strokeWidth: -1
-                            fillColor: hub.awake ? theme.accent : theme.secondaryText
+                            fillGradient: LinearGradient {
+                                x1: 0
+                                y1: 0
+                                x2: 0
+                                y2: 248.664
+                                GradientStop { position: 0; color: theme.markTop }
+                                GradientStop { position: 1; color: theme.markBottom }
+                            }
 
                             PathSvg {
                                 path: "m 38.00068,0 c -20.902102,0 -38.000679,17.10028 -38.000679,38.00238 0,20.90209 17.098579,38.00068 38.000679,38.00068 h 87.90061 L 16.404664,185.4963 c -14.399326,14.39933 -14.399326,37.96862 0,52.36794 14.399625,14.39963 37.970035,14.39965 52.369645,0 l 118.20958,-118.20786 117.2513,117.253 c 14.39903,14.399 37.96723,14.39901 52.36625,0 7.19951,-7.19952 10.87289,-16.72009 10.87289,-26.18482 0,-9.46473 -3.67337,-18.98532 -10.87289,-26.18483 L 248.064799,76.00306 h 86.94233 c 20.9021,0 38.00067,-17.09859 38.00067,-38.00068 0,-20.9021 -17.09856,-38.00238 -38.00067,-38.00238 z"

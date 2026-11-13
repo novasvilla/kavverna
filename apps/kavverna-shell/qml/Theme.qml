@@ -128,6 +128,13 @@ QtObject {
     /// The top of it. Load or heat past the point where noticing is enough.
     readonly property color ember: shade.ember
 
+    /// The logo's flame, top to bottom. In the torch's dark cave it is Ian's own gradient as he
+    /// drew it; every other palette takes the flame from its own accent, since his yellow on
+    /// parchment or beside a blue accent would stop belonging to the panel around it.
+    readonly property bool drawnFlame: name === "torch" && dark
+    readonly property color markTop: drawnFlame ? "#ffab03" : accent
+    readonly property color markBottom: drawnFlame ? "#fff612" : Qt.lighter(accent, dark ? 1.35 : 1.6)
+
     readonly property color surface: shade.surface
     readonly property color raised: shade.raised
     readonly property color sunken: shade.sunken

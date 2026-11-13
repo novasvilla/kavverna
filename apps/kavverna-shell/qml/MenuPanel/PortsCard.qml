@@ -59,15 +59,6 @@ ColumnLayout {
         contentItem: RowLayout {
             spacing: ports.theme.gapSnug
 
-            // Counted only once something has been read: before the first look, nought would
-            // claim that nothing listens.
-            SectionLabel {
-                theme: ports.theme
-                Layout.fillWidth: true
-                text: "LISTENING PORTS" + (ports.view.count > 0 ? "  ·  " + ports.view.count : "")
-                color: ports.open ? ports.theme.accent : ports.theme.secondaryText
-            }
-
             Kirigami.Icon {
                 source: "go-next-symbolic"
                 implicitWidth: ports.theme.iconSmall
@@ -79,6 +70,21 @@ ColumnLayout {
                 Behavior on rotation {
                     NumberAnimation { duration: ports.theme.motionQuick; easing.type: Easing.OutCubic }
                 }
+            }
+
+            // Room for the grip the Monitoring page draws over this line, as on the other
+            // cards' headings.
+            Item {
+                implicitWidth: ports.theme.iconSmall
+            }
+
+            // Counted only once something has been read: before the first look, nought would
+            // claim that nothing listens.
+            SectionLabel {
+                theme: ports.theme
+                Layout.fillWidth: true
+                text: "LISTENING PORTS" + (ports.view.count > 0 ? "  ·  " + ports.view.count : "")
+                color: ports.open ? ports.theme.accent : ports.theme.secondaryText
             }
         }
     }
