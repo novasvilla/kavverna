@@ -47,6 +47,48 @@ pub(crate) fn desktop_ids(unit: &str) -> Vec<String> {
     ids
 }
 
+/// The program a unit with no entry of its own was started by, read from the front of its id:
+/// a terminal starts each surface as `app-ghostty-surface-transient-<n>.scope`, which names
+/// no entry, while `ghostty` names the terminal. Longest first, and never the full id, which
+/// `desktop_ids` has already offered.
+pub(crate) fn host_ids(unit: &str) -> Vec<String> {
+    let Some(id) = desktop_ids(unit).into_iter().next() else {
+        return Vec::new();
+    };
+    let mut hosts = Vec::new();
+    let mut rest = id.as_str();
+    while let Some((front, _)) = rest.rsplit_once('-') {
+        if !front.is_empty() {
+            hosts.push(front.to_owned());
+        }
+        rest = front;
+    }
+    hosts
+}
+
+/// The processes that are the desktop session rather than an application, under the names a
+/// person knows them by and an icon the theme carries. Matched on the executable's file name,
+/// since the kernel's command stops at fifteen bytes and `kwin_wayland_wrapper` would not
+/// match. Each is one application however many units it runs in, so the three PipeWire
+/// daemons are one row.
+const SESSION_SERVICES: [(&str, &str, &str); 7] = [
+    ("kwin_wayland", "KWin", "kwin"),
+    ("kwin_wayland_wrapper", "KWin", "kwin"),
+    ("plasmashell", "Plasma", "plasmashell"),
+    ("Xwayland", "Xwayland", "xorg"),
+    ("pipewire", "PipeWire", "audio-card"),
+    ("pipewire-pulse", "PipeWire", "audio-card"),
+    ("wireplumber", "PipeWire", "audio-card"),
+];
+
+/// The name and icon of a session service, by its binary's file name.
+pub(crate) fn session_service(binary: &str) -> Option<(&'static str, &'static str)> {
+    SESSION_SERVICES
+        .iter()
+        .find(|(known, _, _)| *known == binary)
+        .map(|(_, name, icon)| (*name, *icon))
+}
+
 /// systemd writes a dash inside a name as `\x2d`, and any other unsafe byte the same way.
 fn unescape(text: &str) -> String {
     let bytes = text.as_bytes();
@@ -75,12 +117,23 @@ pub(crate) struct Placement<'a> {
     pub unit: Option<&'a str>,
     /// The process's own name, already resolved through the desktop index where it could be.
     pub name: &'a str,
+    /// A session service, grouped by `name` whatever unit it runs in.
+    pub session: bool,
 }
 
 pub(crate) struct Assigned {
     pub key: ApplicationKey,
     /// The entry the unit names, when it names one.
     pub entry: Option<DesktopEntry>,
+}
+
+/// The program that started a unit naming no entry of its own, through `resolve_host`, which
+/// knows programs by binary as well as by identity.
+pub(crate) fn host_of(
+    unit: &str,
+    resolve_host: &dyn Fn(&str) -> Option<DesktopEntry>,
+) -> Option<DesktopEntry> {
+    host_ids(unit).iter().find_map(|id| resolve_host(id))
 }
 
 /// One key per process, in the order given. `resolve` looks a desktop id up, which is the
@@ -105,8 +158,18 @@ pub(crate) fn assign(
         })
     };
 
-    let mut assigned: Vec<Option<Assigned>> =
-        processes.iter().map(|process| process.unit.and_then(&mut by_unit)).collect();
+    let mut assigned: Vec<Option<Assigned>> = processes
+        .iter()
+        .map(|process| {
+            if process.session {
+                return Some(Assigned {
+                    key: ApplicationKey::Named(process.name.to_owned()),
+                    entry: None,
+                });
+            }
+            process.unit.and_then(&mut by_unit)
+        })
+        .collect();
 
     // Outside a user unit, a process belongs to the nearest ancestor that is in one. The walk
     // is bounded, since a parent table read across two moments can hold a cycle.
@@ -182,24 +245,28 @@ mod tests {
                 parent: 1,
                 unit: Some("app-com.google.Chrome@a.service"),
                 name: "Google Chrome",
+                session: false,
             },
             Placement {
                 pid: 11,
                 parent: 10,
                 unit: Some("app-com.google.Chrome@a.service"),
                 name: "Chrome_crashpad",
+                session: false,
             },
             Placement {
                 pid: 20,
                 parent: 1,
                 unit: Some("app-com.google.Chrome-77.scope"),
                 name: "Google Chrome",
+                session: false,
             },
             Placement {
                 pid: 30,
                 parent: 1,
                 unit: Some("app-flatpak-org.mozilla.firefox-5.scope"),
                 name: "bwrap",
+                session: false,
             },
         ];
         let keys: Vec<ApplicationKey> =
@@ -218,18 +285,21 @@ mod tests {
                 parent: 1,
                 unit: Some("app-ghostty-surface-transient-5656.scope"),
                 name: "zsh",
+                session: false,
             },
             Placement {
                 pid: 6,
                 parent: 1,
                 unit: Some("app-ghostty-surface-transient-6612.scope"),
                 name: "zsh",
+                session: false,
             },
             Placement {
                 pid: 7,
                 parent: 1,
                 unit: Some("plasma-plasmashell.service"),
                 name: "Plasma",
+                session: false,
             },
         ];
         let keys: Vec<ApplicationKey> =
@@ -250,11 +320,12 @@ mod tests {
                 parent: 1,
                 unit: Some("app-org.kde.konsole@x.service"),
                 name: "Konsole",
+                session: false,
             },
-            Placement { pid: 41, parent: 40, unit: None, name: "bash" },
-            Placement { pid: 42, parent: 41, unit: None, name: "cargo" },
-            Placement { pid: 50, parent: 1, unit: None, name: "bash" },
-            Placement { pid: 51, parent: 1, unit: None, name: "bash" },
+            Placement { pid: 41, parent: 40, unit: None, name: "bash", session: false },
+            Placement { pid: 42, parent: 41, unit: None, name: "cargo", session: false },
+            Placement { pid: 50, parent: 1, unit: None, name: "bash", session: false },
+            Placement { pid: 51, parent: 1, unit: None, name: "bash", session: false },
         ];
         let keys: Vec<ApplicationKey> =
             assign(&processes, &known).into_iter().map(|a| a.key).collect();
@@ -265,10 +336,54 @@ mod tests {
     }
 
     #[test]
+    fn a_unit_without_an_entry_is_traced_to_the_program_that_started_it() {
+        assert_eq!(
+            host_ids("app-ghostty-surface-transient-5656.scope"),
+            vec!["ghostty-surface".to_owned(), "ghostty".to_owned()]
+        );
+        assert!(host_ids("app-ghostty-5656.scope").is_empty(), "the full id is not offered twice");
+        assert!(host_ids("plasma-plasmashell.service").is_empty());
+
+        let by_binary = |id: &str| (id == "ghostty").then(|| entry("Ghostty"));
+        let host = host_of("app-ghostty-surface-transient-5656.scope", &by_binary).unwrap();
+        assert_eq!(host.name, "Ghostty");
+        assert!(host_of("app-unknown-thing-3.scope", &by_binary).is_none());
+    }
+
+    #[test]
+    fn the_session_services_go_by_their_own_names_across_units() {
+        assert_eq!(session_service("kwin_wayland_wrapper"), Some(("KWin", "kwin")));
+        assert_eq!(session_service("wireplumber"), Some(("PipeWire", "audio-card")));
+        assert_eq!(session_service("kwin_wayland_wr"), None, "the truncated command is not enough");
+        assert_eq!(session_service("firefox"), None);
+
+        let processes = [
+            Placement {
+                pid: 70,
+                parent: 1,
+                unit: Some("pipewire.service"),
+                name: "PipeWire",
+                session: true,
+            },
+            Placement {
+                pid: 71,
+                parent: 1,
+                unit: Some("wireplumber.service"),
+                name: "PipeWire",
+                session: true,
+            },
+        ];
+        let keys: Vec<ApplicationKey> =
+            assign(&processes, &known).into_iter().map(|a| a.key).collect();
+        assert_eq!(keys[0], ApplicationKey::Named("PipeWire".into()));
+        assert_eq!(keys[0], keys[1], "the sound server is one application, not three");
+    }
+
+    #[test]
     fn a_parent_cycle_does_not_hang() {
         let processes = [
-            Placement { pid: 60, parent: 61, unit: None, name: "a" },
-            Placement { pid: 61, parent: 60, unit: None, name: "b" },
+            Placement { pid: 60, parent: 61, unit: None, name: "a", session: false },
+            Placement { pid: 61, parent: 60, unit: None, name: "b", session: false },
         ];
         assert_eq!(assign(&processes, &known).len(), 2);
     }

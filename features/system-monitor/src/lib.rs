@@ -60,6 +60,9 @@ pub struct Vitalsigns {
     amd: Vec<SysfsCard>,
     network: NetworkSampler,
     disk: DiskSampler,
+    /// The cards as the last full reading found them, so a reading that skips graphics can
+    /// still say which cards there are.
+    cards_seen: Vec<Gpu>,
 }
 
 impl Vitalsigns {
@@ -82,6 +85,7 @@ impl Vitalsigns {
             amd: if system_enabled { discover_sysfs_cards() } else { Vec::new() },
             network: NetworkSampler::default(),
             disk: DiskSampler::default(),
+            cards_seen: Vec::new(),
         }
     }
 
@@ -92,6 +96,17 @@ impl Vitalsigns {
 
     /// The first call cannot report processor load: there is nothing to compare against.
     pub fn sample(&mut self) -> Vitals {
+        self.sample_with(true)
+    }
+
+    /// Everything but the graphics cards, which are named and left unread. Asking NVML even
+    /// for a temperature wakes a discrete card that had powered down, so a reading nobody is
+    /// looking at leaves the cards alone.
+    pub fn sample_without_graphics(&mut self) -> Vitals {
+        self.sample_with(false)
+    }
+
+    fn sample_with(&mut self, graphics: bool) -> Vitals {
         let now = Instant::now();
         if !self.system_enabled {
             return Vitals {
@@ -118,11 +133,23 @@ impl Vitalsigns {
         };
         self.previous = Some(ticks);
 
-        let mut cards = self.nvidia.as_ref().map(NvidiaCards::read).unwrap_or_default();
-        cards.extend(
-            self.amd.iter().map(|card| Gpu { role: GpuRole::Integrated, reading: card.read() }),
-        );
-        cards.sort_by_key(|card| card.role);
+        let cards = if graphics {
+            let mut cards = self.nvidia.as_ref().map(NvidiaCards::read).unwrap_or_default();
+            cards.extend(
+                self.amd.iter().map(|card| Gpu { role: GpuRole::Integrated, reading: card.read() }),
+            );
+            cards.sort_by_key(|card| card.role);
+            self.cards_seen = cards.clone();
+            cards
+        } else {
+            self.cards_seen
+                .iter()
+                .map(|card| Gpu {
+                    role: card.role,
+                    reading: GpuReading { name: card.reading.name.clone(), ..Default::default() },
+                })
+                .collect()
+        };
 
         Vitals {
             cpu_load,

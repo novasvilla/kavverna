@@ -181,6 +181,7 @@ struct Known {
     unit: Option<String>,
     name: String,
     icon: Option<String>,
+    session: bool,
 }
 
 struct Walked {
@@ -193,6 +194,9 @@ struct Group {
     key: ApplicationKey,
     name: String,
     icon: Option<String>,
+    /// The program that started a unit naming no entry, a terminal for its surfaces. The
+    /// group is then named after its busiest member, which depends on the resource asked.
+    host: Option<DesktopEntry>,
     members: Vec<usize>,
 }
 
@@ -236,6 +240,7 @@ pub struct ProcessSampler {
     graphics: HashMap<usize, GraphicsBaseline>,
     pss: HashMap<ProcessKey, (u64, Instant)>,
     resolve: fn(&str) -> Option<DesktopEntry>,
+    resolve_host: fn(&str) -> Option<DesktopEntry>,
     buffer: String,
 }
 
@@ -243,19 +248,31 @@ fn desktop_entry(id: &str) -> Option<DesktopEntry> {
     app_identity::named_after_identity(id).cloned()
 }
 
+/// A terminal is known by its binary as often as by its identity: Ghostty's entry is
+/// `com.mitchellh.ghostty` and runs `ghostty`, which is what its surfaces are named after.
+fn host_entry(id: &str) -> Option<DesktopEntry> {
+    app_identity::named_after_identity(id).or_else(|| app_identity::named_after_binary(id)).cloned()
+}
+
 impl ProcessSampler {
     pub fn open() -> Self {
         let nvml = Nvml::init().ok();
-        Self::build(Path::new("/proc"), Path::new("/sys/class/drm"), current_uid(), nvml)
+        Self::build(Path::new("/proc"), Some(Path::new("/sys/class/drm")), current_uid(), nvml)
+    }
+
+    /// Knows no card and never asks a driver anything, for the folds that need none: opening
+    /// NVML is enough to wake a discrete card that was asleep.
+    pub fn without_graphics() -> Self {
+        Self::build(Path::new("/proc"), None, current_uid(), None)
     }
 
     /// Reads processes under `proc_root` and amdgpu cards under `drm_root`, with no NVIDIA
     /// driver, so a test can point both at trees it wrote.
     pub fn open_in(proc_root: &Path, drm_root: &Path) -> Self {
-        Self::build(proc_root, drm_root, current_uid(), None)
+        Self::build(proc_root, Some(drm_root), current_uid(), None)
     }
 
-    fn build(proc_root: &Path, drm_root: &Path, uid: u32, nvml: Option<Nvml>) -> Self {
+    fn build(proc_root: &Path, drm_root: Option<&Path>, uid: u32, nvml: Option<Nvml>) -> Self {
         let mut cards = Vec::new();
         if let Some(nvml) = &nvml {
             for index in 0..nvml.device_count().unwrap_or(0) {
@@ -272,7 +289,7 @@ impl ProcessSampler {
                 });
             }
         }
-        for card in discover_sysfs_cards_in(drm_root) {
+        for card in drm_root.map(discover_sysfs_cards_in).unwrap_or_default() {
             let pci_slot =
                 std::fs::read_to_string(card.device.join("uevent")).ok().and_then(|text| {
                     text.lines()
@@ -295,6 +312,7 @@ impl ProcessSampler {
             graphics: HashMap::new(),
             pss: HashMap::new(),
             resolve: desktop_entry,
+            resolve_host: host_entry,
             buffer: String::with_capacity(4096),
         }
     }
@@ -358,7 +376,8 @@ impl ProcessSampler {
             .collect();
 
         let groups = self.group(&walked);
-        let mut applications = self.fold(&groups, &walked, &values, |members| {
+        let busiest = |share: &CpuShare| f64::from(share.of_machine);
+        let mut applications = self.fold(&groups, &walked, &values, busiest, |members| {
             let of_machine: f32 = members.iter().map(|share| share.of_machine).sum();
             CpuShare { of_machine: of_machine.min(1.0), of_one_core: of_machine * threads as f32 }
         });
@@ -441,7 +460,8 @@ impl ProcessSampler {
                 None => resident.map(|bytes| MemoryUse { bytes, basis: MemoryBasis::Resident }),
             })
             .collect();
-        let mut applications = self.fold(&groups, &walked, &values, |members| MemoryUse {
+        let busiest = |use_: &MemoryUse| use_.bytes as f64;
+        let mut applications = self.fold(&groups, &walked, &values, busiest, |members| MemoryUse {
             bytes: members.iter().map(|member| member.bytes).sum(),
             basis: if members.iter().all(|member| member.basis == MemoryBasis::Proportional) {
                 MemoryBasis::Proportional
@@ -501,7 +521,8 @@ impl ProcessSampler {
             })
             .collect();
         let groups = self.group(&walked);
-        let mut applications = self.fold(&groups, &walked, &values, |members| DiskRate {
+        let busiest = |rate: &DiskRate| (rate.read_per_second + rate.written_per_second) as f64;
+        let mut applications = self.fold(&groups, &walked, &values, busiest, |members| DiskRate {
             read_per_second: members.iter().map(|rate| rate.read_per_second).sum(),
             written_per_second: members.iter().map(|rate| rate.written_per_second).sum(),
         });
@@ -542,7 +563,12 @@ impl ProcessSampler {
         let values: Vec<Option<CardUse>> =
             walked.iter().map(|process| per_pid.get(&process.key.pid).copied()).collect();
         let groups = self.group(&walked);
-        let mut applications = self.fold(&groups, &walked, &values, |members| {
+        // Busy share decides; video memory, scaled far below any busy figure, only separates
+        // members equally busy, which on an idle card is all of them.
+        let busiest = |use_: &CardUse| {
+            f64::from(use_.busy.unwrap_or(0.0)) + use_.vram.unwrap_or(0) as f64 / 1e15
+        };
+        let mut applications = self.fold(&groups, &walked, &values, busiest, |members| {
             let busy: Option<f32> =
                 members.iter().filter_map(|use_| use_.busy).reduce(|a, b| a + b);
             let vram: Option<u64> =
@@ -568,6 +594,18 @@ impl ProcessSampler {
             quiet: all - applications.len(),
             applications,
         })
+    }
+
+    /// Every process of an application as it stands now, not only those a fold listed: the
+    /// graphics fold lists the processes on a card, and ending a browser means its window
+    /// too, not just its GPU helper.
+    pub fn members_of(&mut self, key: &ApplicationKey) -> Vec<ProcessKey> {
+        let walked = self.walk();
+        self.group(&walked)
+            .into_iter()
+            .find(|group| group.key == *key)
+            .map(|group| group.members.iter().map(|&at| walked[at].key).collect())
+            .unwrap_or_default()
     }
 
     fn nvidia_use(&self, device: u32, seen: Option<u64>) -> (HashMap<u32, CardUse>, Option<u64>) {
@@ -706,8 +744,9 @@ impl ProcessSampler {
                     .and_then(|group| procfs::user_unit(group, self.uid))
             })
             .flatten();
+        let session = session_of(&command, executable.as_deref()).is_some();
         let (name, icon) = process_name(&self.proc_root, pid, &command, executable.clone());
-        Known { command, executable, unit, name, icon }
+        Known { command, executable, unit, name, icon, session }
     }
 
     fn group(&self, walked: &[Walked]) -> Vec<Group> {
@@ -720,6 +759,7 @@ impl ProcessSampler {
                 parent: process.parent,
                 unit: known.unit.as_deref(),
                 name: &known.name,
+                session: known.session,
             })
             .collect();
         let assigned = grouping::assign(&placements, &self.resolve);
@@ -729,10 +769,17 @@ impl ProcessSampler {
         let mut entries = Vec::new();
         for (at, found) in assigned.into_iter().enumerate() {
             let slot = *by_key.entry(found.key.clone()).or_insert_with(|| {
+                let host = match (&found.key, &found.entry) {
+                    (ApplicationKey::Unit(unit), None) => {
+                        grouping::host_of(unit, &self.resolve_host)
+                    }
+                    _ => None,
+                };
                 groups.push(Group {
                     key: found.key,
                     name: String::new(),
                     icon: None,
+                    host,
                     members: Vec::new(),
                 });
                 entries.push(found.entry);
@@ -762,7 +809,10 @@ impl ProcessSampler {
                 }
                 None => {
                     group.name = known[leader].name.clone();
-                    group.icon = known[leader].icon.clone();
+                    group.icon = match &group.host {
+                        Some(host) => host.icon.clone().or_else(|| known[leader].icon.clone()),
+                        None => known[leader].icon.clone(),
+                    };
                 }
             }
         }
@@ -774,6 +824,7 @@ impl ProcessSampler {
         groups: &[Group],
         walked: &[Walked],
         values: &[Option<V>],
+        weight: impl Fn(&V) -> f64,
         sum: impl Fn(&[V]) -> V,
     ) -> Vec<ApplicationUse<V>> {
         groups
@@ -799,9 +850,26 @@ impl ProcessSampler {
                     return None;
                 }
                 let each: Vec<V> = members.iter().map(|member| member.value).collect();
+                // Ties go to the lowest pid, the shell a surface opened with, so an idle
+                // terminal reads as its shell rather than as whichever process listed last.
+                let name = match &group.host {
+                    Some(host) => {
+                        let busiest = members
+                            .iter()
+                            .min_by(|left, right| {
+                                weight(&right.value)
+                                    .total_cmp(&weight(&left.value))
+                                    .then_with(|| left.key.pid.cmp(&right.key.pid))
+                            })
+                            .map(|member| self.known[&member.key].name.as_str())
+                            .unwrap_or(&group.name);
+                        format!("{busiest} · {}", host.name)
+                    }
+                    None => group.name.clone(),
+                };
                 Some(ApplicationUse {
                     key: group.key.clone(),
-                    name: group.name.clone(),
+                    name,
                     icon: group.icon.clone(),
                     value: sum(&each),
                     members,
@@ -842,6 +910,9 @@ pub(crate) fn process_name(
     command: &str,
     executable: Option<PathBuf>,
 ) -> (String, Option<String>) {
+    if let Some((name, icon)) = session_of(command, executable.as_deref()) {
+        return (name.to_owned(), Some(icon.to_owned()));
+    }
     let identity = app_identity::process_in(proc_root, pid);
     let name = identity
         .name
@@ -850,6 +921,12 @@ pub(crate) fn process_name(
         .or_else(|| executable.and_then(installed_under))
         .unwrap_or_else(|| command.to_owned());
     (name, identity.icon)
+}
+
+fn session_of(command: &str, executable: Option<&Path>) -> Option<(&'static str, &'static str)> {
+    let binary =
+        executable.and_then(Path::file_name).and_then(|name| name.to_str()).unwrap_or(command);
+    grouping::session_service(binary)
 }
 
 fn looks_like_version(name: &str) -> bool {
