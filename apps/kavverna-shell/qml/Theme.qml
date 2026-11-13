@@ -173,6 +173,13 @@ QtObject {
     readonly property int iconMedium: 16
     readonly property int iconLarge: 18
 
+    /// How far a fold under a meter sits in: past the chevron, so its rows line up with the
+    /// meter's label rather than with the chevron that opened them.
+    readonly property int foldIndent: iconSmall + gapSnug
+    /// A row for something that has already gone, an application that exited or a port an
+    /// action closed, kept until the next reading drops it.
+    readonly property real gone: 0.45
+
     // Durations come from the desktop, which scales them by Plasma's animation speed and makes
     // them zero when animations are switched off, so motion here obeys the same setting as
     // everything else on the screen.

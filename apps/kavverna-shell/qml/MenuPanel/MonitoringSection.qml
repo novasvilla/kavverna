@@ -10,6 +10,9 @@ ColumnLayout {
     required property var vitals
     required property var agents
     required property var shows
+    /// The applications behind each meter, and the ports they listen on.
+    required property var processes
+    required property var ports
 
     Layout.fillWidth: true
     spacing: section.theme.pad
@@ -18,8 +21,11 @@ ColumnLayout {
         id: meter
 
         required property var theme
-        property alias label: meterLabel.text
-        property alias value: meterValue.text
+        property string label
+        property string value
+        /// Which `open_fold` lists the applications behind this meter, empty for none.
+        property string fold: ""
+        property string foldTitle: ""
         property real fraction: 0
         property color tint: theme.accent
         /// The last couple of minutes of this reading. Left out for a meter whose past says
@@ -29,25 +35,13 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 3
 
-        RowLayout {
-            Layout.fillWidth: true
-
-            // The label carries live readings beside its name, a temperature and a power draw
-            // for the GPU, and gives way to the value on its right rather than pushing it out.
-            LongLabel {
-                id: meterLabel
-                theme: meter.theme
-                Layout.fillWidth: true
-                font.pixelSize: section.theme.textBody
-                color: theme.secondaryText
-            }
-
-            Label {
-                id: meterValue
-                font.pixelSize: section.theme.textBody
-                font.bold: true
-                color: theme.primaryText
-            }
+        FoldHeading {
+            theme: meter.theme
+            label: meter.label
+            value: meter.value
+            foldable: meter.fold.length > 0
+            open: meter.fold.length > 0 && section.processes.open_fold === meter.fold
+            onClicked: section.processes.open_fold = open ? "" : meter.fold
         }
 
         Trace {
@@ -71,6 +65,13 @@ ColumnLayout {
                 radius: 3
                 color: meter.tint
             }
+        }
+
+        ApplicationFold {
+            theme: meter.theme
+            view: section.processes
+            resource: meter.fold
+            title: meter.foldTitle
         }
     }
 
@@ -120,6 +121,8 @@ ColumnLayout {
 
         Meter {
             theme: section.theme
+            fold: "cpu"
+            foldTitle: "Apps using CPU"
             label: "CPU  ·  " + section.vitals.cpu_temperature_text
             value: section.vitals.cpu_load_text
             fraction: section.vitals.cpu_load
@@ -159,6 +162,8 @@ ColumnLayout {
         Meter {
             theme: section.theme
             label: "Memory"
+            fold: "memory"
+            foldTitle: "Apps using memory"
             value: section.vitals.memory_text
             fraction: section.vitals.memory_used
             past: section.vitals.memory_history
@@ -240,8 +245,19 @@ ColumnLayout {
             }
         }
 
+        // The GPU fold reads the card the picker shows, by the name the picker shows it under,
+        // and is told before anything opens it, so one card's apps never land under another.
+        Binding {
+            target: section.processes
+            property: "card_name"
+            value: section.vitals.card_names[section.vitals.chosen_card] ?? ""
+        }
+
         Meter {
             theme: section.theme
+            fold: "gpu"
+            foldTitle: "Apps using "
+                       + (section.vitals.card_names[section.vitals.chosen_card] ?? "the GPU")
             label: "GPU  ·  " + section.vitals.gpu_temperature_text
                    + "  ·  " + section.vitals.gpu_power_text
             value: section.vitals.gpu_usage_text
@@ -384,5 +400,27 @@ ColumnLayout {
                 }
             }
         }
+
+        // One fold for the card rather than one per disk: the applications are counted by what
+        // they read and write, not by which disk it lands on.
+        FoldHeading {
+            theme: section.theme
+            label: "Disk activity"
+            open: section.processes.open_fold === "disk"
+            onClicked: section.processes.open_fold = open ? "" : "disk"
+        }
+
+        ApplicationFold {
+            theme: section.theme
+            view: section.processes
+            resource: "disk"
+            title: "Apps using the disk"
+        }
+    }
+
+    PortsCard {
+        theme: section.theme
+        view: section.ports
+        visible: section.shows("system-monitor")
     }
 }

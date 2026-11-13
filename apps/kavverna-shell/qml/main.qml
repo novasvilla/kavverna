@@ -287,6 +287,16 @@ Window {
         Component.onCompleted: attach()
     }
 
+    ProcessView {
+        id: processView
+        Component.onCompleted: attach()
+    }
+
+    PortsView {
+        id: portsView
+        Component.onCompleted: attach()
+    }
+
     ClipboardView {
         id: clipboard
         Component.onCompleted: attach()
@@ -733,6 +743,8 @@ Window {
                     shows: root.shows
                     vitals: vitals
                     agents: agents
+                    processes: processView
+                    ports: portsView
                     visible: !hub.showing_settings && root.page === root.monitoringPage
                              && root.pageShown(root.monitoringPage)
                 }
