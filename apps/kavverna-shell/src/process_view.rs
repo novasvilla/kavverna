@@ -95,7 +95,8 @@ pub mod qobject {
 
         #[qinvokable]
         #[cxx_override]
-        fn data(self: &ProcessView, index: &QModelIndex, role: i32) -> QVariant;
+        #[cxx_name = "data"]
+        fn role_value(self: &ProcessView, index: &QModelIndex, role: i32) -> QVariant;
         #[qinvokable]
         #[cxx_override]
         #[cxx_name = "rowCount"]
@@ -165,7 +166,8 @@ pub mod qobject {
 
         #[qinvokable]
         #[cxx_override]
-        fn data(self: &PortsView, index: &QModelIndex, role: i32) -> QVariant;
+        #[cxx_name = "data"]
+        fn role_value(self: &PortsView, index: &QModelIndex, role: i32) -> QVariant;
         #[qinvokable]
         #[cxx_override]
         #[cxx_name = "rowCount"]
@@ -454,10 +456,12 @@ impl qobject::ProcessView {
         if let Ok(mut view) = VIEW.lock() {
             *view = Some(thread);
         }
+        // The worker learns of the fold before anything else reacts to the change: an apply
+        // run first would find a fold open that nothing has asked for and close it again.
         self.as_mut()
             .on_open_fold_changed(|mut view| {
-                view.as_mut().set_expanded(false);
                 view.as_mut().ask();
+                view.as_mut().set_expanded(false);
             })
             .release();
         self.as_mut().on_card_name_changed(|view| view.ask()).release();
@@ -516,7 +520,7 @@ impl qobject::ProcessView {
         sync(self, rows.into_iter().take(shown_rows).collect());
     }
 
-    fn data(&self, index: &QModelIndex, role: i32) -> QVariant {
+    fn role_value(&self, index: &QModelIndex, role: i32) -> QVariant {
         let Some(row) = usize::try_from(index.row()).ok().and_then(|at| self.rust().rows.get(at))
         else {
             return QVariant::default();
@@ -573,7 +577,7 @@ impl qobject::PortsView {
         sync(self, shown.rows);
     }
 
-    fn data(&self, index: &QModelIndex, role: i32) -> QVariant {
+    fn role_value(&self, index: &QModelIndex, role: i32) -> QVariant {
         let Some(row) = usize::try_from(index.row()).ok().and_then(|at| self.rust().rows.get(at))
         else {
             return QVariant::default();

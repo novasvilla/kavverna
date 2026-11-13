@@ -158,14 +158,30 @@ pub(crate) fn assign(
         })
     };
 
+    // A session service takes its whole unit with it: Plasma's unit also holds the shells and
+    // KIO workers it started, which are Plasma, not applications of their own to be ended.
+    // A session service of its own keeps its own name, so Xwayland in KWin's unit is still
+    // Xwayland; the rest of a unit go by its lowest session process.
+    let mut session_units: HashMap<&str, (u32, &str)> = HashMap::new();
+    for process in processes.iter().filter(|process| process.session) {
+        let Some(unit) = process.unit else {
+            continue;
+        };
+        let held = session_units.entry(unit).or_insert((process.pid, process.name));
+        if process.pid < held.0 {
+            *held = (process.pid, process.name);
+        }
+    }
     let mut assigned: Vec<Option<Assigned>> = processes
         .iter()
         .map(|process| {
-            if process.session {
-                return Some(Assigned {
-                    key: ApplicationKey::Named(process.name.to_owned()),
-                    entry: None,
-                });
+            let session = if process.session {
+                Some(process.name)
+            } else {
+                process.unit.and_then(|unit| session_units.get(unit)).map(|(_, name)| *name)
+            };
+            if let Some(name) = session {
+                return Some(Assigned { key: ApplicationKey::Named(name.to_owned()), entry: None });
             }
             process.unit.and_then(&mut by_unit)
         })
@@ -377,6 +393,42 @@ mod tests {
             assign(&processes, &known).into_iter().map(|a| a.key).collect();
         assert_eq!(keys[0], ApplicationKey::Named("PipeWire".into()));
         assert_eq!(keys[0], keys[1], "the sound server is one application, not three");
+
+        let plasma = [
+            Placement {
+                pid: 80,
+                parent: 1,
+                unit: Some("plasma-plasmashell.service"),
+                name: "Plasma",
+                session: true,
+            },
+            Placement {
+                pid: 81,
+                parent: 80,
+                unit: Some("plasma-plasmashell.service"),
+                name: "kioworker",
+                session: false,
+            },
+            Placement {
+                pid: 90,
+                parent: 1,
+                unit: Some("plasma-kwin_wayland.service"),
+                name: "KWin",
+                session: true,
+            },
+            Placement {
+                pid: 91,
+                parent: 90,
+                unit: Some("plasma-kwin_wayland.service"),
+                name: "Xwayland",
+                session: true,
+            },
+        ];
+        let keys: Vec<ApplicationKey> =
+            assign(&plasma, &known).into_iter().map(|a| a.key).collect();
+        assert_eq!(keys[1], ApplicationKey::Named("Plasma".into()), "a worker Plasma started");
+        assert_eq!(keys[2], ApplicationKey::Named("KWin".into()));
+        assert_eq!(keys[3], ApplicationKey::Named("Xwayland".into()));
     }
 
     #[test]

@@ -589,6 +589,13 @@ fn send(message: Message) -> bool {
 pub fn want(resource: Option<Resource>, card: &str) {
     {
         let mut wanted = held(&WANTED);
+        if wanted.resource != resource {
+            // A pointer that left with the old fold never said so to this one.
+            wanted.holding = false;
+            if let Some(said) = held(&FEEDBACK).as_mut() {
+                said.retain(|_, (feedback, _)| feedback.kind == FeedbackKind::Working);
+            }
+        }
         wanted.resource = resource;
         wanted.card = card.to_owned();
     }
@@ -614,8 +621,11 @@ pub fn get() -> Shown {
     let mut shown = held(&SHOWN_NOW).clone().unwrap_or_default();
     let mut feedback = held(&FEEDBACK);
     let feedback = feedback.get_or_insert_with(HashMap::new);
-    feedback
-        .retain(|_, (said, at)| said.kind == FeedbackKind::Working || at.elapsed() < FEEDBACK_KEPT);
+    // Still running stays until another action replaces it, since it is what offers Force end.
+    feedback.retain(|_, (said, at)| {
+        matches!(said.kind, FeedbackKind::Working | FeedbackKind::StillRunning)
+            || at.elapsed() < FEEDBACK_KEPT
+    });
     for row in &mut shown.rows {
         row.feedback = feedback.get(&row.key).map(|(said, _)| said.clone());
     }
@@ -750,7 +760,11 @@ pub fn run(tick: Duration, on_change: fn()) {
                 }
             }
             Step::Close => {
-                held(&WANTED).resource = None;
+                {
+                    let mut wanted = held(&WANTED);
+                    wanted.resource = None;
+                    wanted.holding = false;
+                }
                 worker.measured_for = None;
                 worker.due = None;
                 publish(Shown::default(), on_change);
