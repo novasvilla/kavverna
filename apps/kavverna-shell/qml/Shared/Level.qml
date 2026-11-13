@@ -12,11 +12,28 @@ Slider {
     property real unity: to > 100 ? 100 : to
 
     implicitHeight: 18
-    // The wheel adjusts rather than scrolls while over a slider. Two per notch: fine enough
-    // to land on an exact figure, quick enough to cross the range. Drags stay free because
-    // no snap mode is set.
-    wheelEnabled: true
+    // The sliders sit in a scrolling page, and a page scrolled past them must never change a
+    // volume, so the wheel only adjusts one while Ctrl is held. Anything else falls through to
+    // the page. Two per notch: fine enough to land on an exact figure, quick enough to cross
+    // the range. Drags stay free because no snap mode is set.
+    wheelEnabled: false
     stepSize: 2
+
+    WheelHandler {
+        acceptedModifiers: Qt.ControlModifier
+        target: null
+        onWheel: (event) => {
+            const notch = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
+            if (notch > 0) {
+                level.increase()
+            } else if (notch < 0) {
+                level.decrease()
+            }
+            // increase() and decrease() move the value without a drag, which reports
+            // nothing; the call sites listen for moved.
+            level.moved()
+        }
+    }
 
     background: Rectangle {
         x: level.leftPadding
