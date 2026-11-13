@@ -662,12 +662,25 @@ impl qobject::ClipboardView {
         clipboard_state::send(Command::Move { id: id as i64, towards_top });
     }
 
-    fn forget(self: Pin<&mut Self>, id: i32) {
+    /// A row leaving the list may only have scrolled out of the window, so the selection lets
+    /// go of an entry here, where it is known to be deleted. An expired one stays picked and is
+    /// skipped by the join.
+    fn forget(mut self: Pin<&mut Self>, id: i32) {
         clipboard_state::send(Command::Forget(id as i64));
+        self.as_mut().deselect(|picked| picked == id as i64);
     }
 
-    fn clear_unpinned(self: Pin<&mut Self>) {
+    fn clear_unpinned(mut self: Pin<&mut Self>) {
         clipboard_state::send(Command::ClearUnpinned);
+        let pinned: HashSet<i64> =
+            self.rust().rows.iter().filter(|row| row.pinned).map(|row| row.id).collect();
+        self.as_mut().deselect(|picked| !pinned.contains(&picked));
+    }
+
+    fn deselect(mut self: Pin<&mut Self>, dropped: impl Fn(i64) -> bool) {
+        self.as_mut().rust_mut().selection.retain(|(id, _)| !dropped(*id));
+        let count = self.rust().selection.len() as i32;
+        self.as_mut().set_selected_count(count);
     }
 
     /// The history thread can take up to two seconds to answer, so the read runs on a thread of
@@ -930,20 +943,6 @@ impl qobject::ClipboardView {
             }
             unsafe { self.as_mut().end_reset_model() };
         } else {
-            // A row gone from the same window was forgotten or expired, not scrolled away.
-            if self.rust().window == snapshot.window {
-                let kept: HashSet<i64> = new.iter().map(|row| row.id).collect();
-                let gone: HashSet<i64> = self
-                    .rust()
-                    .rows
-                    .iter()
-                    .map(|row| row.id)
-                    .filter(|id| !kept.contains(id))
-                    .collect();
-                self.as_mut().rust_mut().selection.retain(|(id, _)| !gone.contains(id));
-                let count = self.rust().selection.len() as i32;
-                self.as_mut().set_selected_count(count);
-            }
             for edit in edits(&self.rust().rows, &new) {
                 self.as_mut().replay_announced(&new, &edit);
             }
