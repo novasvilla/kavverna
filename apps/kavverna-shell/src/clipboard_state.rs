@@ -201,6 +201,11 @@ fn settings_in(prefs: &Preferences) -> Settings {
             prefs.integer(settings::CLIPBOARD_LIMIT, settings::CLIPBOARD_LIMIT_DEFAULT),
         )
         .unwrap_or(0),
+        keep_days: u32::try_from(
+            prefs.integer(settings::CLIPBOARD_KEEP_DAYS, settings::CLIPBOARD_KEEP_DAYS_DEFAULT),
+        )
+        .ok()
+        .filter(|days| *days > 0),
         skip_sensitive: prefs
             .bool(settings::CLIPBOARD_SKIP_SENSITIVE, settings::CLIPBOARD_SKIP_SENSITIVE_DEFAULT),
         images_and_files: prefs.bool(

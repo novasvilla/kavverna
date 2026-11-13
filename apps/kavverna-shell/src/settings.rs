@@ -21,6 +21,7 @@ pub const DEFAULT_MINUTES: &str = "keep-awake.default-minutes";
 pub const MIDDLE_CLICK_TOGGLE: &str = "keep-awake.middle-click-toggle";
 pub const CLIPBOARD_ENABLED: &str = enable_key(Feature::ClipboardHistory);
 pub const CLIPBOARD_LIMIT: &str = "clipboard-history.limit";
+pub const CLIPBOARD_KEEP_DAYS: &str = "clipboard-history.keep-days";
 pub const CLIPBOARD_IMAGES_AND_FILES: &str = "clipboard-history.images-and-files";
 pub const CLIPBOARD_SKIP_SENSITIVE: &str = "clipboard-history.skip-sensitive";
 pub const CLEAR_AFTER_SECONDS: &str = "clipboard-auto-clear.after-seconds";
@@ -85,6 +86,9 @@ pub const MIDDLE_CLICK_TOGGLE_DEFAULT: bool = false;
 /// somebody's behalf.
 pub const CLIPBOARD_ENABLED_DEFAULT: bool = false;
 pub const CLIPBOARD_LIMIT_DEFAULT: i64 = 50;
+/// Zero keeps entries until the count limit pushes them out, which is how every earlier
+/// release behaved.
+pub const CLIPBOARD_KEEP_DAYS_DEFAULT: i64 = 0;
 pub const CLIPBOARD_IMAGES_AND_FILES_DEFAULT: bool = true;
 pub const CLIPBOARD_SKIP_SENSITIVE_DEFAULT: bool = true;
 
