@@ -98,6 +98,9 @@ fn switches_in(prefs: &Preferences) -> Switches {
 /// Auto clear needs the connection as much as the history does, and it has to keep working with
 /// the history switched off. With it off nothing is read: the compositor still reports that a
 /// copy happened, which is all the timer needs.
+///
+/// Transform has no switch of its own, its buttons being the switch, so being installed is
+/// enough. It reads the selection only when a button asks, and keeps nothing.
 fn wanted_in(prefs: &Preferences) -> bool {
     let on = switches_in(prefs);
     on.keep_history
@@ -105,6 +108,7 @@ fn wanted_in(prefs: &Preferences) -> bool {
         || on.clear_on_suspend
         || on.clear_on_screen_lock
         || on.clear_after.is_some()
+        || settings::is_installed_in(prefs, Feature::ClipboardTransform)
 }
 
 /// Starts and stops with the setting, so switching it off really does unbind the device.
@@ -233,14 +237,45 @@ mod tests {
         prefs.set_bool(&feature.availability_key(), false);
     }
 
+    /// Transform arrives installed and needs no switch, so a fresh install holds the
+    /// connection for it. The cases about the other features take it away first.
+    fn without_transform() -> Preferences {
+        let mut prefs = blank();
+        removed(&mut prefs, Feature::ClipboardTransform);
+        prefs
+    }
+
     #[test]
     fn nothing_switched_on_wants_nothing() {
-        assert!(!wanted_in(&blank()));
+        assert!(!wanted_in(&without_transform()));
+    }
+
+    /// The case that was broken: with Transform alone nothing opened the connection, and its
+    /// buttons were dropped.
+    #[test]
+    fn transform_alone_opens_the_connection_and_records_nothing() {
+        let mut prefs = blank();
+        for feature in [Feature::ClipboardHistory, Feature::CleanUrl, Feature::ClipboardAutoClear] {
+            removed(&mut prefs, feature);
+        }
+        // Switches left on from before the removals, which must count for nothing.
+        prefs.set_bool(settings::CLIPBOARD_ENABLED, true);
+        prefs.set_bool(settings::CLEAN_LINKS, true);
+        prefs.set_integer(settings::CLEAR_AFTER_SECONDS, 30);
+
+        assert!(wanted_in(&prefs), "Transform needs the connection");
+        let applied = settings_in(&prefs);
+        assert!(!applied.keep_history, "nothing may be recorded");
+        assert!(!applied.clean_links);
+        assert_eq!(applied.clear_after, None);
+
+        removed(&mut prefs, Feature::ClipboardTransform);
+        assert!(!wanted_in(&prefs), "with Transform gone too, nothing is left to hold it open");
     }
 
     #[test]
     fn a_removed_history_stops_recording_while_clean_url_stays() {
-        let mut prefs = blank();
+        let mut prefs = without_transform();
         prefs.set_bool(settings::CLIPBOARD_ENABLED, true);
         assert!(wanted_in(&prefs));
 
@@ -281,7 +316,7 @@ mod tests {
 
     #[test]
     fn a_removed_auto_clear_no_longer_holds_the_connection_open() {
-        let mut prefs = blank();
+        let mut prefs = without_transform();
         prefs.set_integer(settings::CLEAR_AFTER_SECONDS, 30);
         prefs.set_bool(settings::CLEAR_ON_SUSPEND, true);
         prefs.set_bool(settings::CLEAR_ON_SCREEN_LOCK, true);
