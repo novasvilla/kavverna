@@ -397,82 +397,93 @@ ColumnLayout {
                                 }
                             }
 
-                            RowLayout {
+                            // The actions and the shortcut line share one slot as tall as the
+                            // actions, so the row is the same height whichever is showing and
+                            // the list never moves under the pointer. Hidden means invisible,
+                            // not just transparent, so a hidden button takes no click or Tab.
+                            Item {
                                 Layout.fillWidth: true
-                                spacing: section.theme.gapTight
-                                visible: hover.hovered
+                                implicitHeight: section.theme.buttonHeightCompact
 
-                                IconButton {
-                                    theme: section.theme
-                                    source: "go-up"
-                                    size: section.theme.iconSmall
-                                    enabled: section.clipboard.query.length === 0
-                                    text: "Move up"
-                                    onClicked: section.clipboard.move_towards_top(row.entryId, true)
-                                }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    spacing: section.theme.gapTight
+                                    opacity: hover.hovered ? 1 : 0
+                                    visible: opacity > 0
 
-                                IconButton {
-                                    theme: section.theme
-                                    source: "go-down"
-                                    size: section.theme.iconSmall
-                                    enabled: section.clipboard.query.length === 0
-                                    text: "Move down"
-                                    onClicked: section.clipboard.move_towards_top(row.entryId, false)
-                                }
-
-                                IconButton {
-                                    theme: section.theme
-                                    source: row.pinned ? "window-pin" : "window-unpin"
-                                    size: section.theme.iconSmall
-                                    text: row.pinned ? "Unpin" : "Pin"
-                                    onClicked: section.clipboard.pin(row.entryId, !row.pinned)
-                                }
-
-                                PillButton {
-                                    theme: section.theme
-                                    text: copied.running ? "Copied" : "Copy"
-                                    compact: true
-                                    onClicked: {
-                                        section.clipboard.put_back(row.entryId);
-                                        copied.restart();
+                                    IconButton {
+                                        theme: section.theme
+                                        source: "go-up"
+                                        size: section.theme.iconSmall
+                                        enabled: section.clipboard.query.length === 0
+                                        text: "Move up"
+                                        onClicked: section.clipboard.move_towards_top(row.entryId, true)
                                     }
 
-                                    Timer {
-                                        id: copied
-                                        interval: 1200
+                                    IconButton {
+                                        theme: section.theme
+                                        source: "go-down"
+                                        size: section.theme.iconSmall
+                                        enabled: section.clipboard.query.length === 0
+                                        text: "Move down"
+                                        onClicked: section.clipboard.move_towards_top(row.entryId, false)
+                                    }
+
+                                    IconButton {
+                                        theme: section.theme
+                                        source: row.pinned ? "window-pin" : "window-unpin"
+                                        size: section.theme.iconSmall
+                                        text: row.pinned ? "Unpin" : "Pin"
+                                        onClicked: section.clipboard.pin(row.entryId, !row.pinned)
+                                    }
+
+                                    PillButton {
+                                        theme: section.theme
+                                        text: copied.running ? "Copied" : "Copy"
+                                        compact: true
+                                        onClicked: {
+                                            section.clipboard.put_back(row.entryId);
+                                            copied.restart();
+                                        }
+
+                                        Timer {
+                                            id: copied
+                                            interval: 1200
+                                        }
+                                    }
+
+                                    Item { Layout.fillWidth: true }
+
+                                    IconButton {
+                                        theme: section.theme
+                                        source: "edit-delete"
+                                        size: section.theme.iconSmall
+                                        text: "Delete"
+                                        onClicked: section.clipboard.forget(row.entryId)
                                     }
                                 }
 
-                                Item { Layout.fillWidth: true }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    opacity: hover.hovered ? 0 : 1
+                                    visible: opacity > 0
+                                    spacing: section.theme.gapSnug
 
-                                IconButton {
-                                    theme: section.theme
-                                    source: "edit-delete"
-                                    size: section.theme.iconSmall
-                                    text: "Delete"
-                                    onClicked: section.clipboard.forget(row.entryId)
-                                }
-                            }
+                                    Label {
+                                        visible: row.index < 9
+                                        text: "Ctrl+" + (row.index + 1)
+                                        font.pixelSize: section.theme.textFine
+                                        color: section.theme.mutedText
+                                    }
 
-                            RowLayout {
-                                Layout.fillWidth: true
-                                visible: !hover.hovered
-                                spacing: section.theme.gapSnug
+                                    Item { Layout.fillWidth: true }
 
-                                Label {
-                                    visible: row.index < 9
-                                    text: "Ctrl+" + (row.index + 1)
-                                    font.pixelSize: section.theme.textFine
-                                    color: section.theme.mutedText
-                                }
-
-                                Item { Layout.fillWidth: true }
-
-                                Label {
-                                    text: new Date(section.clipboard.row_times[row.index])
-                                          .toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
-                                    font.pixelSize: section.theme.textFine
-                                    color: section.theme.mutedText
+                                    Label {
+                                        text: new Date(section.clipboard.row_times[row.index])
+                                              .toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
+                                        font.pixelSize: section.theme.textFine
+                                        color: section.theme.mutedText
+                                    }
                                 }
                             }
                         }

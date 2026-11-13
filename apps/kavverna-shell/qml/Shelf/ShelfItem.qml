@@ -175,58 +175,70 @@ Rectangle {
                     elide: Text.ElideMiddle
                 }
 
-                Label {
+                // The detail line and the actions share one slot as tall as the actions, so
+                // revealing them never changes the row's height. Hidden means invisible, so
+                // a hidden button takes no click or Tab.
+                Item {
                     Layout.fillWidth: true
-                    visible: !hover.hovered
-                    text: row.alive ? row.shelf.row_details[row.at] : "gone from disk"
-                    font.pixelSize: row.theme.textFine
-                    color: row.theme.mutedText
-                    elide: Text.ElideRight
-                }
+                    implicitHeight: row.theme.buttonHeightCompact
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    visible: hover.hovered
-                    spacing: 2
-
-                    IconButton {
-                        theme: row.theme
-                        source: "document-open"
-                        size: row.theme.iconSmall
-                        enabled: row.alive
-                        text: "Open"
-                        onClicked: Qt.openUrlExternally(row.shelf.open_target(row.entryId))
+                    Label {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        opacity: hover.hovered ? 0 : 1
+                        visible: opacity > 0
+                        text: row.alive ? row.shelf.row_details[row.at] : "gone from disk"
+                        font.pixelSize: row.theme.textFine
+                        color: row.theme.mutedText
+                        elide: Text.ElideRight
                     }
 
-                    IconButton {
-                        theme: row.theme
-                        source: "system-file-manager"
-                        size: row.theme.iconSmall
-                        visible: row.shelf.row_kinds[row.at] !== "link"
-                        enabled: row.alive
-                        text: "Reveal in the file manager"
-                        onClicked: row.shelf.reveal(row.entryId)
-                    }
+                    RowLayout {
+                        anchors.fill: parent
+                        opacity: hover.hovered ? 1 : 0
+                        visible: opacity > 0
+                        spacing: 2
 
-                    IconButton {
-                        theme: row.theme
-                        source: "edit-copy"
-                        size: row.theme.iconSmall
-                        text: row.shelf.row_kinds[row.at] === "link"
-                                      ? "Copy the address" : "Copy the path"
-                        onClicked: row.home.copyText(row.shelf.path_of(row.entryId))
-                    }
+                        IconButton {
+                            theme: row.theme
+                            source: "document-open"
+                            size: row.theme.iconSmall
+                            enabled: row.alive
+                            text: "Open"
+                            onClicked: Qt.openUrlExternally(row.shelf.open_target(row.entryId))
+                        }
 
-                    Item { Layout.fillWidth: true }
+                        IconButton {
+                            theme: row.theme
+                            source: "system-file-manager"
+                            size: row.theme.iconSmall
+                            visible: row.shelf.row_kinds[row.at] !== "link"
+                            enabled: row.alive
+                            text: "Reveal in the file manager"
+                            onClicked: row.shelf.reveal(row.entryId)
+                        }
 
-                    IconButton {
-                        theme: row.theme
-                        source: "edit-delete"
-                        size: row.theme.iconSmall
-                        text: "Take it off the shelf"
-                        onClicked: {
-                            row.home.picked = []
-                            row.shelf.remove(row.entryId)
+                        IconButton {
+                            theme: row.theme
+                            source: "edit-copy"
+                            size: row.theme.iconSmall
+                            text: row.shelf.row_kinds[row.at] === "link"
+                                          ? "Copy the address" : "Copy the path"
+                            onClicked: row.home.copyText(row.shelf.path_of(row.entryId))
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        IconButton {
+                            theme: row.theme
+                            source: "edit-delete"
+                            size: row.theme.iconSmall
+                            text: "Take it off the shelf"
+                            onClicked: {
+                                row.home.picked = []
+                                row.shelf.remove(row.entryId)
+                            }
                         }
                     }
                 }
