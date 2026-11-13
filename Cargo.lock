@@ -1468,6 +1468,7 @@ dependencies = [
  "link-cleaner",
  "notify-rust",
  "preferences",
+ "serde_json",
  "shelf",
  "sound-mixer",
  "strum",

@@ -10,6 +10,7 @@ const RUST: &[&str] = &[
     "src/clipboard_view.rs",
     "src/features_view.rs",
     "src/shelf_view.rs",
+    "src/process_view.rs",
 ];
 
 /// Found rather than listed. The list used to be written out by hand and a new component was

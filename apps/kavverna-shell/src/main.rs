@@ -18,6 +18,8 @@ mod mixer_state;
 mod mixer_view;
 mod panel;
 mod panel_anchor;
+mod process_state;
+mod process_view;
 mod remote;
 mod routes;
 mod selftest;
@@ -123,6 +125,11 @@ fn main() {
     if settings::any_installed(&[Feature::SystemMonitor, Feature::NetworkMonitor]) {
         std::thread::spawn(|| {
             vitals_state::run(std::time::Duration::from_secs(2), vitals_view::publish)
+        });
+    }
+    if settings::is_installed(Feature::SystemMonitor) {
+        std::thread::spawn(|| {
+            process_state::run(std::time::Duration::from_secs(2), process_view::publish)
         });
     }
     if settings::is_installed(Feature::Shelf) {
