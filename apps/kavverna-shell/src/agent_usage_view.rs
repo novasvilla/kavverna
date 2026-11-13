@@ -219,7 +219,12 @@ const DAY: Duration = Duration::from_secs(24 * 3600);
 
 /// A reading from days ago that every window has outlived is history, not a figure, and a day
 /// with nothing spent is one fact rather than a row of zeros. Either folds the agent to a line.
+/// An agent that cannot be asked keeps its rows, since the problem is the one thing on it that
+/// needs doing and a folded line would bury it.
 pub fn brief(found: &AgentUsage, now: SystemTime) -> String {
+    if found.problem.is_some() {
+        return String::new();
+    }
     match &found.usage {
         Usage::NoReading if found.agent == Agent::ClaudeCode => "not connected".into(),
         Usage::NoReading => String::new(),
@@ -539,6 +544,21 @@ mod tests {
         let now = at(100_000);
         assert_eq!(brief(&found(Agent::ClaudeCode, Usage::NoReading), now), "not connected");
         assert_eq!(brief(&found(Agent::OpenCode, Usage::NoReading), now), "");
+    }
+
+    #[test]
+    fn an_agent_that_cannot_be_asked_never_folds() {
+        let now = at(10 * 86_400);
+        let read = now - Duration::from_secs(9 * 86_400);
+        let mut old = found(
+            Agent::ClaudeCode,
+            Usage::Allowance(vec![window(40.0, read, read + Duration::from_secs(3600))]),
+        );
+        old.problem = Some(agent_usage::AskError::NeedsSignIn);
+        assert_eq!(brief(&old, now), "");
+        let mut waiting = found(Agent::ClaudeCode, Usage::NoReading);
+        waiting.problem = Some(agent_usage::AskError::Missing);
+        assert_eq!(brief(&waiting, now), "");
     }
 
     #[test]

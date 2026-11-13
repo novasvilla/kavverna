@@ -49,6 +49,11 @@ ColumnLayout {
             return "Reset time unknown"
         }
         const left = at - now
+        // The panel's clock runs on between readings, so a reset can pass before the reading
+        // that would mark the window expired arrives.
+        if (left <= 0) {
+            return "Reset since last reading"
+        }
         if (left < 60000) {
             return "Resets in under a minute"
         }
@@ -186,7 +191,9 @@ ColumnLayout {
                         readonly property bool stale: reading.freshness === "stale"
                         // A window that reset after it was read has an unknown figure now. The
                         // old one would read as current, so it is not shown at all.
+                        readonly property real resetsAt: usage.agents.window_resets_at[reading.index] ?? 0
                         readonly property bool expired: reading.freshness === "expired"
+                            || (reading.resetsAt > 0 && reading.resetsAt <= usage.now)
                         readonly property real used: usage.agents.window_used[reading.index] ?? 0
 
                         visible: usage.agents.window_agents[reading.index] === agent.index
@@ -246,7 +253,7 @@ ColumnLayout {
                         Label {
                             Layout.fillWidth: true
                             visible: !reading.expired
-                            text: usage.resetWords(usage.agents.window_resets_at[reading.index] ?? 0,
+                            text: usage.resetWords(reading.resetsAt,
                                                    usage.now)
                             font.pixelSize: usage.theme.textSmall
                             color: usage.theme.mutedText
