@@ -3,6 +3,7 @@
 
 mod disk;
 mod graphics;
+mod listening;
 mod memory;
 mod network;
 mod nvidia;
@@ -12,6 +13,9 @@ mod thermal;
 
 pub use disk::{DiskReading, DiskSampler, Volume};
 pub use graphics::{Gpu, GpuReading, GpuRole, GraphicsReading, SysfsCard, discover_sysfs_cards};
+pub use listening::{
+    Exposure, ListeningSocket, SocketHolder, Transport, listening_sockets, listening_sockets_in,
+};
 pub use memory::{
     CompressedSwap, MemoryPressure, MemoryReading, PressureLevel, discover_compressed_swap,
     parse_meminfo, parse_mm_stat, parse_pressure,
