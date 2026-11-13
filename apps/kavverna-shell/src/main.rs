@@ -4,6 +4,8 @@
 //! shared without a mutex, and nothing reaches QML except through `CxxQtThread::queue`. The
 //! `*_state` modules hold what a feature last published; the `*_view` modules push it across.
 
+mod agent_usage_state;
+mod agent_usage_view;
 mod app_icon;
 mod auto_clear;
 mod awake_loop;
@@ -38,6 +40,7 @@ fn main() {
         remote::Wanted::Version => return println!("{}", remote::version()),
         remote::Wanted::Usage => return print!("{}", remote::USAGE),
         remote::Wanted::Selftest => std::process::exit(selftest::run()),
+        remote::Wanted::ClaudeStatusLine => return agent_usage_state::pass_status_line(),
         remote::Wanted::Unknown(what) => {
             eprintln!("not understood: {what}");
             eprint!("{}", remote::USAGE);
@@ -124,6 +127,9 @@ fn main() {
         std::thread::spawn(|| {
             vitals_state::run(std::time::Duration::from_secs(2), vitals_view::publish)
         });
+    }
+    if settings::is_installed(Feature::AgentUsage) {
+        std::thread::spawn(|| agent_usage_state::run(agent_usage_view::publish));
     }
     if settings::is_installed(Feature::Shelf) {
         shelf_state::prepare();

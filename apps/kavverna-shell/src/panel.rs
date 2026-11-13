@@ -166,6 +166,7 @@ fn shown_or_hidden(panel: Pin<&mut qobject::KavvernaPanel>) {
         crate::mixer_view::publish();
         crate::vitals_view::publish();
         crate::vitals_state::wake();
+        crate::agent_usage_state::wake();
     });
 }
 

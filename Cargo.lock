@@ -1454,6 +1454,7 @@ dependencies = [
 name = "kavverna-shell"
 version = "0.5.0"
 dependencies = [
+ "agent-usage",
  "clipboard-history",
  "cxx",
  "cxx-qt",
@@ -1468,6 +1469,7 @@ dependencies = [
  "link-cleaner",
  "notify-rust",
  "preferences",
+ "serde_json",
  "shelf",
  "sound-mixer",
  "strum",
