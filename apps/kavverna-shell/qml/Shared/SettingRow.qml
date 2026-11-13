@@ -12,7 +12,7 @@ RowLayout {
     signal toggled(bool value)
 
     Layout.fillWidth: true
-    spacing: 10
+    spacing: row.theme.gap
 
     ColumnLayout {
         Layout.fillWidth: true
@@ -31,12 +31,14 @@ RowLayout {
             color: row.theme.secondaryText
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
+            visible: text.length > 0
         }
     }
 
     Toggle {
         theme: row.theme
-        checked: row.on
-        onToggled: row.toggled(checked)
+        text: row.title
+        on: row.on
+        onSwitched: (wanted) => row.toggled(wanted)
     }
 }

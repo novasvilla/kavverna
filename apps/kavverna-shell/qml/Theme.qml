@@ -1,4 +1,5 @@
 import QtQuick
+import org.kde.kirigami as Kirigami
 
 /// Three caverns, each in two lights. The torch is the one Kavverna has always lived in:
 /// charcoal and stone under a warm flame, parchment at the mouth. The tide is the same cave
@@ -136,10 +137,16 @@ QtObject {
     readonly property color selected: Qt.alpha(accent, dark ? 0.26 : 0.22)
     /// The fainter wash behind something running, a step below a selection.
     readonly property color glow: Qt.alpha(accent, 0.18)
+    /// The same wash in ember, behind something that is one press away from losing data.
+    readonly property color emberGlow: Qt.alpha(ember, 0.18)
 
     readonly property color primaryText: shade.primaryText
     readonly property color secondaryText: shade.secondaryText
     readonly property color mutedText: shade.mutedText
+
+    /// Where the keyboard is. Drawn only for keyboard focus, never after a click.
+    readonly property color focusRing: accent
+    readonly property int focusWidth: 2
 
     // Only what is genuinely repeated. A one-off pixel value doing a local job, the seven pixel
     // dot or the one pixel gap between a title and its detail, is geometry rather than scale and
@@ -151,11 +158,34 @@ QtObject {
     readonly property int pad: 12
 
     readonly property int radiusSmall: 6
+    /// A row in a list and a tab in the strip: rounder than a button, tighter than a card.
+    readonly property int radiusRow: 8
     readonly property int radius: 10
+    /// The outer skin of a window, the panel's and the shelf's, and the ghosts that stand in
+    /// for them during a drag.
+    readonly property int radiusSurface: 14
+
+    readonly property int buttonHeight: 26
+    /// For buttons that sit inside a row of a list, or a row of several presets.
+    readonly property int buttonHeightCompact: 22
+
+    readonly property int iconSmall: 12
+    readonly property int iconMedium: 16
+    readonly property int iconLarge: 18
+
+    // Durations come from the desktop, which scales them by Plasma's animation speed and makes
+    // them zero when animations are switched off, so motion here obeys the same setting as
+    // everything else on the screen.
+    /// A control answering a press, an action appearing on hover.
+    readonly property int motionQuick: Kirigami.Units.shortDuration
+    /// A page or a group of settings arriving.
+    readonly property int motionCalm: Kirigami.Units.longDuration
 
     readonly property int textFine: 9
     readonly property int textSmall: 10
     readonly property int textBody: 11
     readonly property int textStrong: 13
     readonly property int textTitle: 16
+    /// The letter on the badge in the header, which is a mark rather than text.
+    readonly property int textBrand: 20
 }

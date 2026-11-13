@@ -1,12 +1,12 @@
 use crate::command::{self, Command};
 use crate::panel_anchor::{self, Placement};
 use crate::{launch_at_login, settings};
-use cxx_qt::Threading;
+use cxx_qt::{CxxQtType, Threading};
 use cxx_qt_lib::QString;
 use keep_awake::{Hold, format_duration};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[cxx_qt::bridge]
 pub mod qobject {
@@ -33,6 +33,7 @@ pub mod qobject {
         #[qproperty(i32, default_minutes)]
         #[qproperty(bool, middle_click_toggle)]
         #[qproperty(bool, timed)]
+        #[qproperty(i32, hold_preset)]
         #[qproperty(bool, jiggle_available)]
         #[qproperty(QString, jiggle_status)]
         #[qproperty(i32, appearance)]
@@ -211,6 +212,13 @@ pub struct KavvernaPanelRust {
     default_minutes: i32,
     middle_click_toggle: bool,
     timed: bool,
+    /// The panel preset the running hold was started from, in minutes, or 0 when it came
+    /// from anywhere else or has since been extended. Only the panel knows which button was
+    /// pressed; a remaining time cannot say, since every hold counts down past the others.
+    hold_preset: i32,
+    /// When that preset was pressed and how long it asked for, so a published hold can be
+    /// recognised as the preset's own by where it ends.
+    preset_started: Option<(Instant, Duration)>,
     jiggle_available: bool,
     jiggle_status: QString,
     appearance: i32,
@@ -277,6 +285,8 @@ impl Default for KavvernaPanelRust {
                 settings::MIDDLE_CLICK_TOGGLE_DEFAULT,
             ),
             timed: false,
+            hold_preset: 0,
+            preset_started: None,
             jiggle_available: keep_awake::MouseJiggle::is_available(),
             jiggle_status: QString::from("Off"),
             appearance: as_i32(
@@ -401,11 +411,18 @@ impl qobject::KavvernaPanel {
         self.as_mut().set_showing_settings(showing);
     }
 
-    fn toggle_awake(self: Pin<&mut Self>) {
+    /// Switching a hold on starts the default duration, which lights its preset when there is
+    /// one; switching it off clears the preset when the release is published.
+    fn toggle_awake(mut self: Pin<&mut Self>) {
+        if !*self.awake() {
+            let minutes = *self.default_minutes();
+            self.as_mut().choose_preset(minutes);
+        }
         crate::awake_state::toggle();
     }
 
-    fn keep_awake_minutes(self: Pin<&mut Self>, minutes: i32) {
+    fn keep_awake_minutes(mut self: Pin<&mut Self>, minutes: i32) {
+        self.as_mut().choose_preset(minutes);
         let seconds = u64::try_from(minutes).unwrap_or(0).saturating_mul(60);
         command::send(Command::Engage(Hold::For(Duration::from_secs(seconds)), settings::scope()));
     }
@@ -489,7 +506,8 @@ impl qobject::KavvernaPanel {
         command::send(Command::NudgeNow);
     }
 
-    fn extend_minutes(self: Pin<&mut Self>, minutes: i32) {
+    fn extend_minutes(mut self: Pin<&mut Self>, minutes: i32) {
+        self.as_mut().choose_preset(0);
         let seconds = u64::try_from(minutes).unwrap_or(0).saturating_mul(60);
         command::send(Command::Extend(Duration::from_secs(seconds)));
     }
@@ -689,6 +707,14 @@ impl qobject::KavvernaPanel {
         apply_placement(&mut self, pinned, &name);
     }
 
+    /// Lights the preset that started the hold, or none for 0. Nothing is sent from here: the
+    /// caller starts or changes the hold itself.
+    fn choose_preset(mut self: Pin<&mut Self>, minutes: i32) {
+        let length = Duration::from_secs(u64::try_from(minutes).unwrap_or(0).saturating_mul(60));
+        self.as_mut().rust_mut().preset_started = (minutes > 0).then(|| (Instant::now(), length));
+        self.as_mut().set_hold_preset(minutes.max(0));
+    }
+
     fn choose_launch_at_login(mut self: Pin<&mut Self>, launch: bool) {
         match launch_at_login::set(launch) {
             Ok(()) => self.as_mut().set_launch_at_login(launch_at_login::is_enabled()),
@@ -704,6 +730,9 @@ impl qobject::KavvernaPanel {
         self.as_mut().set_jiggle_status(QString::from(&describe_jiggle(jiggle)));
         self.as_mut().set_awake(active);
         self.as_mut().set_timed(active && remaining.is_some());
+        if !still_the_preset(self.rust().preset_started, active, remaining, Instant::now()) {
+            self.as_mut().choose_preset(0);
+        }
         self.as_mut().set_awake_summary(QString::from(&summarise(active, remaining)));
     }
 }
@@ -815,6 +844,35 @@ fn with_panel(action: impl FnOnce(Pin<&mut qobject::KavvernaPanel>) + Send + 'st
     }
 }
 
+/// How long after a preset is pressed a publish may still describe the hold from before it:
+/// the awake thread can have sent one just before it read the new command.
+const PRESET_SETTLING: Duration = Duration::from_secs(2);
+/// How far a hold's end may sit from where its preset put it and still be that preset's hold.
+const PRESET_DRIFT: Duration = Duration::from_secs(3);
+
+/// Whether the published hold is still the one a preset started. A hold that ends somewhere
+/// else was extended, or replaced from the tray or the remote interface, and no preset stands
+/// for it any more.
+fn still_the_preset(
+    started: Option<(Instant, Duration)>,
+    active: bool,
+    remaining: Option<Duration>,
+    now: Instant,
+) -> bool {
+    let Some((pressed, length)) = started else {
+        return false;
+    };
+    let settling = now.saturating_duration_since(pressed) < PRESET_SETTLING;
+    let ends_where_it_should = active
+        && remaining.is_some_and(|left| {
+            let wanted = pressed + length;
+            let ends = now + left;
+            ends.saturating_duration_since(wanted).max(wanted.saturating_duration_since(ends))
+                <= PRESET_DRIFT
+        });
+    ends_where_it_should || settling
+}
+
 pub fn publish_awake(active: bool, remaining: Option<Duration>) {
     with_panel(move |panel| panel.apply(active, remaining));
 }
@@ -918,5 +976,51 @@ mod tests {
         assert!(moved_off_the_icon(&stored, &panel_anchor::entry("DP-1", 1700, 1060)));
         assert!(moved_off_the_icon(&stored, &panel_anchor::entry("HDMI-A-1", 1850, 1060)));
         assert!(moved_off_the_icon("", &panel_anchor::entry("DP-1", 1850, 1060)));
+    }
+
+    const HOUR: Duration = Duration::from_secs(3600);
+
+    #[test]
+    fn a_hold_ending_where_its_preset_put_it_keeps_the_preset() {
+        let pressed = Instant::now();
+        let later = pressed + Duration::from_secs(600);
+        let left = HOUR - Duration::from_secs(600);
+
+        assert!(still_the_preset(Some((pressed, HOUR)), true, Some(left), later));
+    }
+
+    #[test]
+    fn an_extended_hold_is_no_preset_of_ours() {
+        let pressed = Instant::now();
+        let later = pressed + Duration::from_secs(600);
+        let left = HOUR - Duration::from_secs(600) + Duration::from_secs(900);
+
+        assert!(!still_the_preset(Some((pressed, HOUR)), true, Some(left), later));
+    }
+
+    #[test]
+    fn the_hold_from_before_the_press_is_forgiven_while_the_press_settles() {
+        let pressed = Instant::now();
+        let moments_later = pressed + Duration::from_millis(300);
+
+        assert!(still_the_preset(Some((pressed, HOUR)), false, None, moments_later));
+        assert!(still_the_preset(Some((pressed, HOUR)), true, Some(2 * HOUR), moments_later));
+    }
+
+    #[test]
+    fn a_released_hold_clears_the_preset_once_settled() {
+        let pressed = Instant::now();
+        let later = pressed + Duration::from_secs(10);
+
+        assert!(!still_the_preset(Some((pressed, HOUR)), false, None, later));
+    }
+
+    #[test]
+    fn a_hold_with_no_end_has_no_preset() {
+        let pressed = Instant::now();
+        let later = pressed + Duration::from_secs(10);
+
+        assert!(!still_the_preset(Some((pressed, HOUR)), true, None, later));
+        assert!(!still_the_preset(None, true, Some(HOUR), later));
     }
 }

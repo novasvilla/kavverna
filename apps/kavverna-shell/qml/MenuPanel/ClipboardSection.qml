@@ -30,7 +30,7 @@ ColumnLayout {
     }
 
     Layout.fillWidth: true
-    spacing: 12
+    spacing: section.theme.pad
 
     Shortcut {
         sequence: "Down"
@@ -76,8 +76,8 @@ ColumnLayout {
 
             Kirigami.Icon {
                 source: "mail-attachment"
-                implicitWidth: 18
-                implicitHeight: 18
+                implicitWidth: section.theme.iconLarge
+                implicitHeight: section.theme.iconLarge
                 isMask: true
                 color: section.shelf.item_count > 0 ? section.theme.accent
                                                     : section.theme.secondaryText
@@ -213,23 +213,16 @@ ColumnLayout {
     Card {
         theme: section.theme
         visible: section.shows("clipboard-history")
-        spacing: 8
+        spacing: section.theme.gap
 
-        Tick {
+        SettingRow {
             theme: section.theme
-            text: "Save clipboard history"
-            checked: section.clipboard.enabled
-            onToggled: section.clipboard.enable(checked)
-        }
-
-        Label {
-            Layout.fillWidth: true
-            text: section.clipboard.enabled
-                  ? "Everything stays on this machine and can be cleared at any time."
-                  : "Turn this on to start saving what you copy."
-            font.pixelSize: section.theme.textSmall
-            color: section.theme.secondaryText
-            wrapMode: Text.WordWrap
+            title: "Save clipboard history"
+            detail: section.clipboard.enabled
+                    ? "Everything stays on this machine and can be cleared at any time."
+                    : "Turn this on to start saving what you copy."
+            on: section.clipboard.enabled
+            onToggled: (value) => section.clipboard.enable(value)
         }
 
         Label {
@@ -243,7 +236,7 @@ ColumnLayout {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 6
+            spacing: section.theme.gapSnug
             visible: section.clipboard.enabled
 
             TextField {
@@ -272,28 +265,24 @@ ColumnLayout {
             IconButton {
                 theme: section.theme
                 source: "edit-clear"
-                size: 12
-                implicitWidth: 26
-                implicitHeight: 26
+                size: section.theme.iconSmall
+                tall: true
                 visible: section.clipboard.query.length > 0
-                ToolTip.visible: hovered
-                ToolTip.text: "Clear the search"
+                text: "Clear the search"
                 onClicked: {
                     search.text = "";
                     section.clipboard.search("");
                 }
             }
 
-            IconButton {
+            ConfirmButton {
                 theme: section.theme
                 source: "edit-delete"
-                size: 12
-                implicitWidth: 26
-                implicitHeight: 26
+                tall: true
                 enabled: section.clipboard.recent_count > 0
-                ToolTip.visible: hovered
-                ToolTip.text: "Clear everything not pinned"
-                onClicked: section.clipboard.clear_unpinned()
+                text: "Clear everything not pinned"
+                confirmText: "Clear " + section.clipboard.recent_count + "?"
+                onConfirmed: section.clipboard.clear_unpinned()
             }
         }
     }
@@ -327,7 +316,7 @@ ColumnLayout {
             ColumnLayout {
                 id: entries
                 width: parent.width
-                spacing: 7
+                spacing: section.theme.gapSnug
 
                 Repeater {
                     model: section.clipboard.row_ids.length
@@ -344,7 +333,7 @@ ColumnLayout {
 
                         Layout.fillWidth: true
                         implicitHeight: line.implicitHeight + 16
-                        radius: 8
+                        radius: section.theme.radiusRow
                         color: hover.hovered || row.onIt ? section.theme.selected
                                                          : section.theme.sunken
                         border.width: row.onIt ? 1 : 0
@@ -357,23 +346,32 @@ ColumnLayout {
                             id: line
                             anchors.fill: parent
                             anchors.margins: 8
-                            spacing: 5
+                            spacing: section.theme.gapSnug
 
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 5
+                                spacing: section.theme.gapSnug
 
-                                Label {
+                                Kirigami.Icon {
+                                    Layout.alignment: Qt.AlignTop
                                     visible: row.pinned
-                                    text: "◆"
-                                    font.pixelSize: section.theme.textFine
+                                    source: "window-pin"
+                                    implicitWidth: section.theme.iconSmall
+                                    implicitHeight: section.theme.iconSmall
+                                    isMask: true
                                     color: section.theme.accent
                                 }
 
-                                Label {
-                                    text: row.kind === "image" ? "▣"
-                                        : row.kind === "files" ? "▫" : "≡"
-                                    font.pixelSize: section.theme.textSmall
+                                // Monochrome action icons rather than the mimetype ones: those
+                                // are drawn in colour and flatten to a blob as a mask.
+                                Kirigami.Icon {
+                                    Layout.alignment: Qt.AlignTop
+                                    source: row.kind === "image" ? "insert-image-symbolic"
+                                          : row.kind === "files" ? "folder-symbolic"
+                                                                 : "view-list-text"
+                                    implicitWidth: section.theme.iconSmall
+                                    implicitHeight: section.theme.iconSmall
+                                    isMask: true
                                     color: section.theme.mutedText
                                 }
 
@@ -392,94 +390,95 @@ ColumnLayout {
                                 }
                             }
 
-                            RowLayout {
+                            // The actions and the shortcut line share one slot as tall as the
+                            // actions, so the row is the same height whichever is showing and
+                            // the list never moves under the pointer. Hidden means invisible,
+                            // not just transparent, so a hidden button takes no click or Tab.
+                            Item {
                                 Layout.fillWidth: true
-                                spacing: 4
-                                visible: hover.hovered
+                                implicitHeight: section.theme.buttonHeightCompact
 
-                                IconButton {
-                                    theme: section.theme
-                                    source: "go-up"
-                                    size: 11
-                                    implicitWidth: 22
-                                    implicitHeight: 22
-                                    enabled: section.clipboard.query.length === 0
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: "Move up"
-                                    onClicked: section.clipboard.move_towards_top(row.entryId, true)
-                                }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    spacing: section.theme.gapTight
+                                    opacity: hover.hovered ? 1 : 0
+                                    Behavior on opacity { NumberAnimation { duration: section.theme.motionQuick } }
+                                    visible: opacity > 0
 
-                                IconButton {
-                                    theme: section.theme
-                                    source: "go-down"
-                                    size: 11
-                                    implicitWidth: 22
-                                    implicitHeight: 22
-                                    enabled: section.clipboard.query.length === 0
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: "Move down"
-                                    onClicked: section.clipboard.move_towards_top(row.entryId, false)
-                                }
-
-                                IconButton {
-                                    theme: section.theme
-                                    source: row.pinned ? "window-pin" : "window-unpin"
-                                    size: 12
-                                    implicitWidth: 22
-                                    implicitHeight: 22
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: row.pinned ? "Unpin" : "Pin"
-                                    onClicked: section.clipboard.pin(row.entryId, !row.pinned)
-                                }
-
-                                PillButton {
-                                    theme: section.theme
-                                    text: copied.running ? "Copied" : "Copy"
-                                    implicitHeight: 22
-                                    onClicked: {
-                                        section.clipboard.put_back(row.entryId);
-                                        copied.restart();
+                                    IconButton {
+                                        theme: section.theme
+                                        source: "go-up"
+                                        size: section.theme.iconSmall
+                                        enabled: section.clipboard.query.length === 0
+                                        text: "Move up"
+                                        onClicked: section.clipboard.move_towards_top(row.entryId, true)
                                     }
 
-                                    Timer {
-                                        id: copied
-                                        interval: 1200
+                                    IconButton {
+                                        theme: section.theme
+                                        source: "go-down"
+                                        size: section.theme.iconSmall
+                                        enabled: section.clipboard.query.length === 0
+                                        text: "Move down"
+                                        onClicked: section.clipboard.move_towards_top(row.entryId, false)
+                                    }
+
+                                    IconButton {
+                                        theme: section.theme
+                                        source: row.pinned ? "window-pin" : "window-unpin"
+                                        size: section.theme.iconSmall
+                                        text: row.pinned ? "Unpin" : "Pin"
+                                        onClicked: section.clipboard.pin(row.entryId, !row.pinned)
+                                    }
+
+                                    PillButton {
+                                        theme: section.theme
+                                        text: copied.running ? "Copied" : "Copy"
+                                        compact: true
+                                        onClicked: {
+                                            section.clipboard.put_back(row.entryId);
+                                            copied.restart();
+                                        }
+
+                                        Timer {
+                                            id: copied
+                                            interval: 1200
+                                        }
+                                    }
+
+                                    Item { Layout.fillWidth: true }
+
+                                    IconButton {
+                                        theme: section.theme
+                                        source: "edit-delete"
+                                        size: section.theme.iconSmall
+                                        text: "Delete"
+                                        onClicked: section.clipboard.forget(row.entryId)
                                     }
                                 }
 
-                                Item { Layout.fillWidth: true }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    opacity: hover.hovered ? 0 : 1
+                                    Behavior on opacity { NumberAnimation { duration: section.theme.motionQuick } }
+                                    visible: opacity > 0
+                                    spacing: section.theme.gapSnug
 
-                                IconButton {
-                                    theme: section.theme
-                                    source: "edit-delete"
-                                    size: 11
-                                    implicitWidth: 22
-                                    implicitHeight: 22
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: "Delete"
-                                    onClicked: section.clipboard.forget(row.entryId)
-                                }
-                            }
+                                    Label {
+                                        visible: row.index < 9
+                                        text: "Ctrl+" + (row.index + 1)
+                                        font.pixelSize: section.theme.textFine
+                                        color: section.theme.mutedText
+                                    }
 
-                            RowLayout {
-                                Layout.fillWidth: true
-                                visible: !hover.hovered
-                                spacing: 6
+                                    Item { Layout.fillWidth: true }
 
-                                Label {
-                                    visible: row.index < 9
-                                    text: "Ctrl+" + (row.index + 1)
-                                    font.pixelSize: section.theme.textFine
-                                    color: section.theme.mutedText
-                                }
-
-                                Item { Layout.fillWidth: true }
-
-                                Label {
-                                    text: new Date(section.clipboard.row_times[row.index])
-                                          .toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
-                                    font.pixelSize: section.theme.textFine
-                                    color: section.theme.mutedText
+                                    Label {
+                                        text: new Date(section.clipboard.row_times[row.index])
+                                              .toLocaleTimeString(Qt.locale(), Locale.ShortFormat)
+                                        font.pixelSize: section.theme.textFine
+                                        color: section.theme.mutedText
+                                    }
                                 }
                             }
                         }
@@ -492,7 +491,7 @@ ColumnLayout {
     RowLayout {
         Layout.fillWidth: true
         visible: section.shows("clipboard-history") && section.clipboard.enabled
-        spacing: 6
+        spacing: section.theme.gapSnug
 
         Label {
             text: section.clipboard.pinned_count + " pinned  ·  "

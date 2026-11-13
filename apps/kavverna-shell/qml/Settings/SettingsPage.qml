@@ -21,7 +21,7 @@ ColumnLayout {
     property bool cleanRulesOpen: false
 
     Layout.fillWidth: true
-    spacing: 12
+    spacing: page.theme.pad
 
     Label {
         Layout.fillWidth: true
@@ -36,7 +36,7 @@ ColumnLayout {
         theme: page.theme
         title: "PANEL"
         detail: "Where it opens, whether it floats over everything"
-        spacing: 12
+        spacing: page.theme.pad
         open: page.openSection === "PANEL"
         onToggled: page.openSection = open ? "" : "PANEL"
 
@@ -75,7 +75,7 @@ ColumnLayout {
         theme: page.theme
         title: "APPEARANCE"
         detail: "Theme and light or dark"
-        spacing: 12
+        spacing: page.theme.pad
         open: page.openSection === "APPEARANCE"
         onToggled: page.openSection = open ? "" : "APPEARANCE"
 
@@ -101,7 +101,7 @@ ColumnLayout {
                       line: "The cave burning down: red heat, clay in daylight." }
                 ]
 
-                delegate: RowLayout {
+                delegate: Pressable {
                     id: themeRow
                     required property var modelData
                     readonly property bool current: page.hub.theme_name === modelData.id
@@ -109,85 +109,88 @@ ColumnLayout {
                         page.theme.palettes[modelData.id][page.theme.dark ? "dark" : "light"]
 
                     Layout.fillWidth: true
-                    spacing: page.theme.gapSnug
+                    theme: page.theme
+                    text: modelData.label
 
-                    Label {
-                        text: themeRow.current ? "●" : "○"
-                        font.pixelSize: page.theme.textSmall
-                        color: themeRow.current ? page.theme.accent
-                                                : page.theme.secondaryText
-                    }
+                    Accessible.role: Accessible.RadioButton
+                    Accessible.checkable: true
+                    Accessible.checked: themeRow.current
+                    Accessible.description: modelData.line
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 1
+                    onClicked: page.hub.choose_theme(themeRow.modelData.id)
 
-                        Label {
-                            text: themeRow.modelData.label
-                            font.pixelSize: page.theme.textBody
-                            font.bold: themeRow.current
-                            color: page.theme.primaryText
+                    contentItem: RowLayout {
+                        spacing: page.theme.gapSnug
+
+                        RadioMark {
+                            theme: page.theme
+                            chosen: themeRow.current
                         }
 
-                        Label {
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            text: themeRow.modelData.line
-                            font.pixelSize: page.theme.textSmall
-                            color: page.theme.secondaryText
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-
-                    Row {
-                        spacing: 4
-
-                        Repeater {
-                            model: [themeRow.shade.accent, themeRow.shade.surface,
-                                    themeRow.shade.primaryText]
-
-                            delegate: Rectangle {
-                                required property var modelData
-                                width: 14
-                                height: 14
-                                radius: 4
-                                color: modelData
-                                border.width: 1
-                                border.color: page.theme.hairline
-                            }
-                        }
-
-                        // An inside joke living on the blue theme; the text stays exactly as
-                        // it is. Drawn in the window because a ToolTip popup is unreliable
-                        // over a layer surface, and inside this plain Row so the RowLayout
-                        // around it does not try to lay the bubble out as a cell.
-                        Rectangle {
-                            visible: themeRow.modelData.id === "tide" && rowHover.hovered
-                            anchors.bottom: parent.top
-                            anchors.bottomMargin: 2
-                            anchors.right: parent.right
-                            width: quip.implicitWidth + 16
-                            height: quip.implicitHeight + 10
-                            radius: page.theme.radiusSmall
-                            color: page.theme.surface
-                            border.width: 1
-                            border.color: page.theme.hairline
+                            spacing: 1
 
                             Label {
-                                id: quip
-                                anchors.centerIn: parent
-                                text: "Ian P. Mode ;-)"
-                                font.pixelSize: page.theme.textSmall
+                                text: themeRow.modelData.label
+                                font.pixelSize: page.theme.textBody
+                                font.bold: themeRow.current
                                 color: page.theme.primaryText
+                            }
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: themeRow.modelData.line
+                                font.pixelSize: page.theme.textSmall
+                                color: page.theme.secondaryText
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        Row {
+                            spacing: page.theme.gapTight
+
+                            Repeater {
+                                model: [themeRow.shade.accent, themeRow.shade.surface,
+                                        themeRow.shade.primaryText]
+
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: 14
+                                    height: 14
+                                    radius: 4
+                                    color: modelData
+                                    border.width: 1
+                                    border.color: page.theme.hairline
+                                }
+                            }
+
+                            // An inside joke living on the blue theme; the text stays exactly as
+                            // it is. Drawn in the window because a ToolTip popup is unreliable
+                            // over a layer surface, and inside this plain Row so the RowLayout
+                            // around it does not try to lay the bubble out as a cell.
+                            Rectangle {
+                                visible: themeRow.modelData.id === "tide" && themeRow.hovered
+                                anchors.bottom: parent.top
+                                anchors.bottomMargin: 2
+                                anchors.right: parent.right
+                                width: quip.implicitWidth + 16
+                                height: quip.implicitHeight + 10
+                                radius: page.theme.radiusSmall
+                                color: page.theme.surface
+                                border.width: 1
+                                border.color: page.theme.hairline
+
+                                Label {
+                                    id: quip
+                                    anchors.centerIn: parent
+                                    text: "Ian P. Mode ;-)"
+                                    font.pixelSize: page.theme.textSmall
+                                    color: page.theme.primaryText
+                                }
                             }
                         }
                     }
-
-                    TapHandler {
-                        onTapped: page.hub.choose_theme(themeRow.modelData.id)
-                    }
-
-                    HoverHandler { id: rowHover }
-
                 }
             }
         }
@@ -217,7 +220,7 @@ ColumnLayout {
         theme: page.theme
         title: "SOUND"
         detail: "Preferred microphone, the outputs the shortcut steps through"
-        spacing: 14
+        spacing: page.theme.pad
         open: page.openSection === "SOUND"
         onToggled: page.openSection = open ? "" : "SOUND"
         visible: page.shows("microphone-tools") || page.shows("output-switcher")
@@ -251,10 +254,10 @@ ColumnLayout {
                     Layout.fillWidth: true
                     theme: page.theme
                     text: page.mixer.input_names[index]
-                    checked: index < page.mixer.input_preferred.length
-                             && page.mixer.input_preferred[index]
-                    onToggled: page.mixer.choose_preferred_input(
-                        page.mixer.input_ids[index], checked)
+                    on: index < page.mixer.input_preferred.length
+                        && page.mixer.input_preferred[index]
+                    onSwitched: (wanted) => page.mixer.choose_preferred_input(
+                        page.mixer.input_ids[index], wanted)
                 }
             }
 
@@ -296,10 +299,10 @@ ColumnLayout {
                     Layout.fillWidth: true
                     theme: page.theme
                     text: page.mixer.output_names[index]
-                    checked: index < page.mixer.output_in_cycle.length
-                             && page.mixer.output_in_cycle[index]
-                    onToggled: page.mixer.choose_output_in_cycle(
-                        page.mixer.output_ids[index], checked)
+                    on: index < page.mixer.output_in_cycle.length
+                        && page.mixer.output_in_cycle[index]
+                    onSwitched: (wanted) => page.mixer.choose_output_in_cycle(
+                        page.mixer.output_ids[index], wanted)
                 }
             }
         }
@@ -309,7 +312,7 @@ ColumnLayout {
         theme: page.theme
         title: "CLIPBOARD"
         detail: "History, what is skipped, emptying, URL rules"
-        spacing: 14
+        spacing: page.theme.pad
         open: page.openSection === "CLIPBOARD"
         onToggled: page.openSection = open ? "" : "CLIPBOARD"
         visible: page.shows("clipboard-history") || page.shows("clipboard-auto-clear")
@@ -447,23 +450,18 @@ ColumnLayout {
                         theme: page.theme
                         text: page.clipboard.clean_rule_scopes[ruleRow.modelData] + " · "
                               + page.clipboard.clean_rule_parameters[ruleRow.modelData]
-                        // A click writes the box itself and would drop a plain binding; the
-                        // rows move as rules are added and searched, and the box would then
-                        // sit beside a different rule.
-                        Binding on checked {
-                            value: ruleRow.modelData < page.clipboard.clean_rule_enabled.length
-                                   && page.clipboard.clean_rule_enabled[ruleRow.modelData]
-                        }
-                        onToggled: page.clipboard.toggle_clean_rule(ruleRow.modelData, checked)
+                        on: ruleRow.modelData < page.clipboard.clean_rule_enabled.length
+                            && page.clipboard.clean_rule_enabled[ruleRow.modelData]
+                        onSwitched: (wanted) => page.clipboard.toggle_clean_rule(
+                            ruleRow.modelData, wanted)
                     }
 
                     IconButton {
                         theme: page.theme
                         source: "edit-delete"
-                        size: 12
+                        size: page.theme.iconSmall
                         visible: ruleRow.yours
-                        ToolTip.visible: hovered
-                        ToolTip.text: "Remove this rule"
+                        text: "Remove this rule"
                         onClicked: page.clipboard.remove_clean_rule(ruleRow.modelData)
                     }
                 }
@@ -590,7 +588,7 @@ ColumnLayout {
 
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: 6
+            spacing: page.theme.gapSnug
             visible: page.clipboard.klipper_waiting > 0 && page.clipboard.available
 
             Label {
@@ -624,7 +622,7 @@ ColumnLayout {
         theme: page.theme
         title: "SHELF"
         detail: "Edge strip, where it hangs, what survives a restart"
-        spacing: 12
+        spacing: page.theme.pad
         open: page.openSection === "SHELF"
         onToggled: page.openSection = open ? "" : "SHELF"
         visible: page.shows("shelf")
@@ -670,7 +668,7 @@ ColumnLayout {
         theme: page.theme
         title: "ENERGY"
         detail: "How long a hold lasts, what it holds"
-        spacing: 14
+        spacing: page.theme.pad
         open: page.openSection === "ENERGY"
         onToggled: page.openSection = open ? "" : "ENERGY"
         visible: page.shows("keep-awake")
@@ -702,7 +700,8 @@ ColumnLayout {
                 { label: "30m", value: 30 },
                 { label: "1h", value: 60 },
                 { label: "2h", value: 120 },
-                { label: "4h", value: 240 }
+                { label: "4h", value: 240 },
+                { label: "8h", value: 480 }
             ]
             onPicked: (value) => page.hub.choose_default_minutes(value)
         }
@@ -712,7 +711,7 @@ ColumnLayout {
         theme: page.theme
         title: "TOOLS"
         detail: "When the mouse is nudged and with what"
-        spacing: 12
+        spacing: page.theme.pad
         open: page.openSection === "TOOLS"
         onToggled: page.openSection = open ? "" : "TOOLS"
         visible: page.shows("mouse-jiggle")
@@ -776,7 +775,7 @@ ColumnLayout {
         theme: page.theme
         title: "STARTUP"
         detail: "Starting with the session, restoring a hold"
-        spacing: 12
+        spacing: page.theme.pad
         open: page.openSection === "STARTUP"
         onToggled: page.openSection = open ? "" : "STARTUP"
 
@@ -801,17 +800,17 @@ ColumnLayout {
         theme: page.theme
         title: "ABOUT"
         detail: "Version, where the settings live, what this machine offers"
-        spacing: 8
+        spacing: page.theme.gap
         open: page.openSection === "ABOUT"
         onToggled: page.openSection = open ? "" : "ABOUT"
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 8
+            spacing: page.theme.gap
 
             Label {
                 text: "Kavverna"
-                font.pixelSize: 14
+                font.pixelSize: page.theme.textStrong
                 font.bold: true
                 color: page.theme.primaryText
             }
@@ -845,7 +844,7 @@ ColumnLayout {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 6
+            spacing: page.theme.gapSnug
 
             Repeater {
                 model: [

@@ -13,7 +13,7 @@ ColumnLayout {
     signal picked(int value)
 
     Layout.fillWidth: true
-    spacing: 6
+    spacing: row.theme.gapSnug
 
     Label {
         id: titleLabel
@@ -33,7 +33,7 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
-        spacing: 4
+        spacing: row.theme.gapTight
 
         Repeater {
             model: row.choices

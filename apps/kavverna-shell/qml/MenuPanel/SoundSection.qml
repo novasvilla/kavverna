@@ -14,7 +14,50 @@ ColumnLayout {
     required property var shows
 
     Layout.fillWidth: true
-    spacing: 12
+    spacing: section.theme.pad
+
+    /// Where a stream or a recording is going, and the way to change it: a press opens the list
+    /// of devices beneath it.
+    component RouteOpener: Pressable {
+        id: opener
+
+        property bool open: false
+
+        Layout.fillWidth: true
+
+        Accessible.description: "Choose where this goes"
+        Accessible.expandable: true
+        Accessible.expanded: opener.open
+
+        contentItem: RowLayout {
+            spacing: opener.theme.gapTight
+
+            Kirigami.Icon {
+                source: "go-next-symbolic"
+                implicitWidth: opener.theme.iconSmall
+                implicitHeight: opener.theme.iconSmall
+                isMask: true
+                color: opener.open ? opener.theme.primaryText : opener.theme.secondaryText
+                rotation: opener.open ? 90 : 0
+
+                Behavior on rotation {
+                    NumberAnimation {
+                        duration: opener.theme.motionQuick
+                        easing.type: Easing.OutCubic
+                    }
+                }
+            }
+
+            LongLabel {
+                theme: opener.theme
+                Layout.fillWidth: true
+                text: opener.text
+                font.pixelSize: opener.theme.textSmall
+                color: opener.open ? opener.theme.primaryText : opener.theme.secondaryText
+                elide: Text.ElideRight
+            }
+        }
+    }
 
     SectionLabel {
         theme: section.theme
@@ -24,7 +67,7 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        spacing: 8
+        spacing: section.theme.gap
         visible: section.shows("output-switcher")
 
         Repeater {
@@ -44,26 +87,39 @@ ColumnLayout {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: section.theme.gapSnug
 
-                    Label {
-                        text: outputRow.isDefault ? "\u25cf" : "\u25cb"
-                        font.pixelSize: section.theme.textSmall
-                        color: outputRow.isDefault ? section.theme.accent
-                                                   : section.theme.secondaryText
-                    }
-
-                    Label {
+                    Pressable {
+                        id: outputChoice
                         Layout.fillWidth: true
+                        theme: section.theme
                         text: section.mixer.output_names[outputRow.index]
-                        font.pixelSize: section.theme.textBody
-                        font.bold: outputRow.isDefault
-                        color: section.theme.primaryText
-                        elide: Text.ElideRight
 
-                        TapHandler {
-                            onTapped: section.mixer.make_default_output(
-                                section.mixer.output_ids[outputRow.index])
+                        Accessible.role: Accessible.RadioButton
+                        Accessible.checkable: true
+                        Accessible.checked: outputRow.isDefault
+                        Accessible.description: "Make this the default output"
+
+                        onClicked: section.mixer.make_default_output(
+                            section.mixer.output_ids[outputRow.index])
+
+                        contentItem: RowLayout {
+                            spacing: section.theme.gapSnug
+
+                            RadioMark {
+                                theme: section.theme
+                                chosen: outputRow.isDefault
+                            }
+
+                            LongLabel {
+                                theme: section.theme
+                                Layout.fillWidth: true
+                                text: outputChoice.text
+                                font.pixelSize: section.theme.textBody
+                                font.bold: outputRow.isDefault
+                                color: section.theme.primaryText
+                                elide: Text.ElideRight
+                            }
                         }
                     }
 
@@ -79,6 +135,9 @@ ColumnLayout {
                         theme: section.theme
                         source: section.mixer.output_muted[outputRow.index]
                                 ? "audio-volume-muted" : "audio-volume-high"
+                        text: section.mixer.output_muted[outputRow.index]
+                              ? "Unmute " + section.mixer.output_names[outputRow.index]
+                              : "Mute " + section.mixer.output_names[outputRow.index]
                         onClicked: section.mixer.mute_output(
                             section.mixer.output_ids[outputRow.index],
                             !section.mixer.output_muted[outputRow.index])
@@ -106,7 +165,7 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        spacing: 8
+        spacing: section.theme.gap
         visible: section.shows("volume-mixer")
 
         Label {
@@ -153,15 +212,16 @@ ColumnLayout {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: section.theme.gapSnug
 
                     Kirigami.Icon {
                         source: section.mixer.stream_icons[streamRow.index]
-                        implicitWidth: 16
-                        implicitHeight: 16
+                        implicitWidth: section.theme.iconMedium
+                        implicitHeight: section.theme.iconMedium
                     }
 
-                    Label {
+                    LongLabel {
+                        theme: section.theme
                         Layout.fillWidth: true
                         text: section.mixer.stream_names[streamRow.index]
                         font.pixelSize: section.theme.textBody
@@ -182,7 +242,7 @@ ColumnLayout {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: section.theme.gapSnug
 
                     Level {
                         theme: section.theme
@@ -198,6 +258,9 @@ ColumnLayout {
                         theme: section.theme
                         source: section.mixer.stream_muted[streamRow.index]
                                 ? "audio-volume-muted" : "audio-volume-high"
+                        text: section.mixer.stream_muted[streamRow.index]
+                              ? "Unmute " + section.mixer.stream_names[streamRow.index]
+                              : "Mute " + section.mixer.stream_names[streamRow.index]
                         onClicked: section.mixer.mute_stream(
                             section.mixer.stream_ids[streamRow.index],
                             !section.mixer.stream_muted[streamRow.index])
@@ -212,18 +275,12 @@ ColumnLayout {
                     color: section.theme.mutedText
                 }
 
-                Label {
-                    Layout.fillWidth: true
+                RouteOpener {
+                    theme: section.theme
                     visible: streamRow.anchorReason === ""
-                    text: "▸ " + section.mixer.stream_route_labels[streamRow.index]
-                    font.pixelSize: section.theme.textSmall
-                    color: streamRow.routeOpen ? section.theme.primaryText
-                                               : section.theme.secondaryText
-                    elide: Text.ElideRight
-
-                    TapHandler {
-                        onTapped: streamRow.routeOpen = !streamRow.routeOpen
-                    }
+                    text: section.mixer.stream_route_labels[streamRow.index]
+                    open: streamRow.routeOpen
+                    onClicked: streamRow.routeOpen = !streamRow.routeOpen
                 }
 
                 Label {
@@ -296,24 +353,37 @@ ColumnLayout {
                 Layout.fillWidth: true
                 spacing: section.theme.gapSnug
 
-                Label {
-                    text: inputRow.isDefault ? "\u25cf" : "\u25cb"
-                    font.pixelSize: section.theme.textSmall
-                    color: inputRow.isDefault ? section.theme.accent
-                                              : section.theme.secondaryText
-                }
-
-                Label {
+                Pressable {
+                    id: inputChoice
                     Layout.fillWidth: true
+                    theme: section.theme
                     text: section.mixer.input_names[inputRow.index]
-                    font.pixelSize: section.theme.textBody
-                    font.bold: inputRow.isDefault
-                    color: section.theme.primaryText
-                    elide: Text.ElideRight
 
-                    TapHandler {
-                        onTapped: section.mixer.make_default_input(
-                            section.mixer.input_ids[inputRow.index])
+                    Accessible.role: Accessible.RadioButton
+                    Accessible.checkable: true
+                    Accessible.checked: inputRow.isDefault
+                    Accessible.description: "Make this the default microphone"
+
+                    onClicked: section.mixer.make_default_input(
+                        section.mixer.input_ids[inputRow.index])
+
+                    contentItem: RowLayout {
+                        spacing: section.theme.gapSnug
+
+                        RadioMark {
+                            theme: section.theme
+                            chosen: inputRow.isDefault
+                        }
+
+                        LongLabel {
+                            theme: section.theme
+                            Layout.fillWidth: true
+                            text: inputChoice.text
+                            font.pixelSize: section.theme.textBody
+                            font.bold: inputRow.isDefault
+                            color: section.theme.primaryText
+                            elide: Text.ElideRight
+                        }
                     }
                 }
             }
@@ -360,15 +430,16 @@ ColumnLayout {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: section.theme.gapSnug
 
                     Kirigami.Icon {
                         source: section.mixer.recorder_icons[recorderRow.index]
-                        implicitWidth: 16
-                        implicitHeight: 16
+                        implicitWidth: section.theme.iconMedium
+                        implicitHeight: section.theme.iconMedium
                     }
 
-                    Label {
+                    LongLabel {
+                        theme: section.theme
                         Layout.fillWidth: true
                         text: section.mixer.recorder_names[recorderRow.index]
                         font.pixelSize: section.theme.textBody
@@ -385,18 +456,12 @@ ColumnLayout {
                     color: section.theme.mutedText
                 }
 
-                Label {
-                    Layout.fillWidth: true
+                RouteOpener {
+                    theme: section.theme
                     visible: recorderRow.anchorReason === ""
-                    text: "▸ " + section.mixer.recorder_route_labels[recorderRow.index]
-                    font.pixelSize: section.theme.textSmall
-                    color: recorderRow.routeOpen ? section.theme.primaryText
-                                                 : section.theme.secondaryText
-                    elide: Text.ElideRight
-
-                    TapHandler {
-                        onTapped: recorderRow.routeOpen = !recorderRow.routeOpen
-                    }
+                    text: section.mixer.recorder_route_labels[recorderRow.index]
+                    open: recorderRow.routeOpen
+                    onClicked: recorderRow.routeOpen = !recorderRow.routeOpen
                 }
 
                 Label {

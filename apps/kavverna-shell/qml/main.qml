@@ -19,6 +19,39 @@ Window {
     readonly property int toolsPage: 4
     property int page: hub.page
     property bool panelHadFocus: false
+    /// The theme by a name a delegate can reach. Inside a delegate that has a `theme` property
+    /// of its own, a bare `theme` is that property, not the object below, so `theme: theme`
+    /// there binds the property to itself and every colour reads as undefined.
+    readonly property var panelTheme: theme
+
+    /// A footer link: an icon from the desktop theme and the word for what it does.
+    component FooterAction: Pressable {
+        id: footerLink
+
+        required property string source
+
+        padding: footerLink.theme.gapTight
+        fill: footerLink.down ? footerLink.theme.controlDown
+            : footerLink.hovered ? footerLink.theme.control : "transparent"
+
+        contentItem: RowLayout {
+            spacing: footerLink.theme.gapSnug
+
+            Kirigami.Icon {
+                source: footerLink.source
+                implicitWidth: footerLink.theme.iconMedium
+                implicitHeight: footerLink.theme.iconMedium
+                isMask: true
+                color: footerLink.theme.secondaryText
+            }
+
+            Label {
+                text: footerLink.text
+                font.pixelSize: footerLink.theme.textBody
+                color: footerLink.theme.secondaryText
+            }
+        }
+    }
 
     /// True while the utility is in the features list. Reading `features.installed` here is what
     /// makes every binding below re-evaluate the moment one is switched off.
@@ -107,9 +140,13 @@ Window {
         value: root.screenNamed(hub.panel_screen)
     }
 
+    // The keyboard is on demand, so a surface that was only mapped has none, and Escape, Tab
+    // and the clipboard's arrows would wait for a first click into the panel. Asking for it
+    // as the panel opens is what makes them work straight away.
     onVisibleChanged: {
         if (visible) {
             panelHadFocus = false
+            Qt.callLater(() => root.requestActivate())
         } else {
             lostFocusCheck.stop()
         }
@@ -124,6 +161,11 @@ Window {
         }
     }
 
+    // A panel floating over everything never closes on lost focus. It floats so it can sit
+    // over a fullscreen window, and a fullscreen window taking the focus back would shut the
+    // panel a moment after it opened. The close button, Escape and the tray icon close it
+    // instead, which is predictable.
+    //
     // Mapping and activation emit transient focus changes. Only an ordinary-layer panel that
     // has genuinely held focus closes, and the delayed recheck lets those transitions settle.
     // A drag holds the pointer and maps the ghost, both of which move the focus around: closing
@@ -313,7 +355,7 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
-                radius: 14
+                radius: theme.radiusSurface
                 color: shelfWindow.shelfShot ? "transparent" : theme.glow
                 border.width: 2
                 border.color: theme.accent
@@ -364,7 +406,7 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
-                radius: 14
+                radius: theme.radiusSurface
                 color: root.ghostShot ? "transparent" : theme.glow
                 border.width: 2
                 border.color: theme.accent
@@ -380,7 +422,7 @@ Window {
         id: skin
         anchors.fill: parent
         anchors.margins: 6
-        radius: 14
+        radius: theme.radiusSurface
         color: theme.surface
         border.width: 1
         border.color: theme.hairline
@@ -422,22 +464,22 @@ Window {
             id: body
             anchors.fill: parent
             anchors.margins: theme.pad
-            spacing: 12
+            spacing: theme.pad
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 10
+                spacing: theme.gap
 
                 Rectangle {
                     implicitWidth: 38
                     implicitHeight: 38
-                    radius: 9
+                    radius: theme.radiusRow
                     color: theme.raised
 
                     Label {
                         anchors.centerIn: parent
                         text: "K"
-                        font.pixelSize: 20
+                        font.pixelSize: theme.textBrand
                         font.bold: true
                         color: hub.awake ? theme.accent : theme.secondaryText
                     }
@@ -445,7 +487,7 @@ Window {
 
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: 4
+                    spacing: theme.gapTight
 
                     Label {
                         text: hub.showing_settings ? "Settings" : "Kavverna"
@@ -454,8 +496,11 @@ Window {
                         color: theme.primaryText
                     }
 
+                    // Keep awake's state, so it goes when keep awake is removed rather than
+                    // reporting on a utility that is no longer there.
                     Rectangle {
                         Layout.alignment: Qt.AlignLeft
+                        visible: root.shows("keep-awake")
                         implicitWidth: pill.implicitWidth + 18
                         implicitHeight: 21
                         radius: theme.radius
@@ -464,7 +509,7 @@ Window {
                         RowLayout {
                             id: pill
                             anchors.centerIn: parent
-                            spacing: 6
+                            spacing: theme.gapSnug
 
                             Rectangle {
                                 implicitWidth: 7
@@ -483,6 +528,15 @@ Window {
                     }
                 }
 
+                // The panel floats over everything by default and so never closes on lost
+                // focus; this is the way out that needs no keyboard and no tray.
+                IconButton {
+                    Layout.alignment: Qt.AlignTop
+                    theme: theme
+                    source: "window-close"
+                    text: "Close"
+                    onClicked: hub.dismiss()
+                }
             }
 
             Rectangle {
@@ -517,43 +571,50 @@ Window {
                               needs: root.pageNeeds[root.energyPage] }
                         ]
 
-                        delegate: Rectangle {
+                        // Left enabled while its utility is not ready, so the pointer still
+                        // finds the hint that says why; the press is what waits.
+                        delegate: Pressable {
+                            id: tab
                             required property var modelData
                             readonly property bool current: root.page === modelData.page
 
                             visible: root.showsAny(modelData.needs)
                             Layout.fillWidth: visible
                             Layout.fillHeight: true
-                            radius: 8
-                            color: current ? theme.selected : "transparent"
+                            theme: root.panelTheme
+                            corner: tab.theme.radiusRow
+                            fill: current ? tab.theme.selected : "transparent"
+                            text: modelData.name
 
-                            readonly property color mark: current ? theme.accent
-                                : modelData.ready ? theme.secondaryText
-                                                  : theme.mutedText
+                            Accessible.role: Accessible.PageTab
+                            Accessible.selected: tab.current
+                            Accessible.description: modelData.ready ? "" : modelData.unready
 
-                            Kirigami.Icon {
-                                anchors.centerIn: parent
-                                visible: parent.modelData.icon !== ""
-                                source: parent.modelData.icon
-                                implicitWidth: 18
-                                implicitHeight: 18
-                                isMask: true
-                                color: parent.mark
-                            }
+                            readonly property color mark: current ? tab.theme.accent
+                                : modelData.ready ? tab.theme.secondaryText
+                                                  : tab.theme.mutedText
 
-                            Bolt {
-                                anchors.centerIn: parent
-                                visible: parent.modelData.icon === ""
-                                color: parent.mark
-                            }
-
-                            ToolTip.visible: hover.hovered
+                            ToolTip.visible: tab.hovered
                             ToolTip.text: modelData.ready ? modelData.name : modelData.unready
 
-                            HoverHandler { id: hover }
-                            TapHandler {
-                                enabled: modelData.ready
-                                onTapped: hub.page = modelData.page
+                            onClicked: if (modelData.ready) hub.page = modelData.page
+
+                            contentItem: Item {
+                                Kirigami.Icon {
+                                    anchors.centerIn: parent
+                                    visible: tab.modelData.icon !== ""
+                                    source: tab.modelData.icon
+                                    implicitWidth: tab.theme.iconLarge
+                                    implicitHeight: tab.theme.iconLarge
+                                    isMask: true
+                                    color: tab.mark
+                                }
+
+                                Bolt {
+                                    anchors.centerIn: parent
+                                    visible: tab.modelData.icon === ""
+                                    color: tab.mark
+                                }
                             }
                         }
                     }
@@ -576,12 +637,30 @@ Window {
                 // next page wherever the last one was left, its top hidden above the fold.
                 Connections {
                     target: root
-                    function onPageChanged() { scroller.contentItem.contentY = 0 }
+                    function onPageChanged() {
+                        scroller.contentItem.contentY = 0
+                        pageArrival.restart()
+                    }
                 }
 
                 Connections {
                     target: hub
-                    function onShowing_settingsChanged() { scroller.contentItem.contentY = 0 }
+                    function onShowing_settingsChanged() {
+                        scroller.contentItem.contentY = 0
+                        pageArrival.restart()
+                    }
+                }
+
+                // The new page fades in where the old one was; it does not slide, since the
+                // window resizes to each page's height and a moving page would fight that.
+                NumberAnimation {
+                    id: pageArrival
+                    target: pages
+                    property: "opacity"
+                    from: 0
+                    to: 1
+                    duration: theme.motionCalm
+                    easing.type: Easing.OutCubic
                 }
 
                 ColumnLayout {
@@ -590,7 +669,7 @@ Window {
                     // the flickable's own width instead leaves the content wider than what is
                     // visible, and the right hand side of every row goes off the edge.
                     width: scroller.availableWidth
-                    spacing: 12
+                    spacing: theme.pad
 
                 EnergySection {
                     theme: theme
@@ -634,9 +713,14 @@ Window {
                     hub: hub
                     visible: !hub.showing_settings && root.page === root.toolsPage
                              && root.pageShown(root.toolsPage)
+                    onSettingsWanted: {
+                        settingsPage.openSection = "TOOLS"
+                        hub.show_settings(true)
+                    }
                 }
 
                 SettingsPage {
+                    id: settingsPage
                     theme: theme
                     hub: hub
                     clipboard: clipboard
@@ -658,21 +742,20 @@ Window {
             RowLayout {
                 Layout.fillWidth: true
 
-                Label {
-                    Layout.fillWidth: true
-                    text: hub.showing_settings ? "\u2039  Back" : "\u2699  Settings"
-                    font.pixelSize: 12
-                    color: theme.secondaryText
-
-                    TapHandler { onTapped: hub.show_settings(!hub.showing_settings) }
+                FooterAction {
+                    theme: theme
+                    source: hub.showing_settings ? "go-previous" : "configure"
+                    text: hub.showing_settings ? "Back" : "Settings"
+                    onClicked: hub.show_settings(!hub.showing_settings)
                 }
 
-                Label {
-                    text: "\u23fb  Quit"
-                    font.pixelSize: 12
-                    color: theme.secondaryText
+                Item { Layout.fillWidth: true }
 
-                    TapHandler { onTapped: Qt.quit() }
+                FooterAction {
+                    theme: theme
+                    source: "application-exit"
+                    text: "Quit"
+                    onClicked: Qt.quit()
                 }
             }
         }

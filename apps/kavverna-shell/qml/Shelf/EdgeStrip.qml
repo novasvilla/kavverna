@@ -70,7 +70,7 @@ Window {
         border.color: strip.theme.hairline
 
         Behavior on width {
-            NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: strip.theme.motionQuick; easing.type: Easing.OutCubic }
         }
     }
 

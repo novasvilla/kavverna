@@ -11,7 +11,7 @@ ColumnLayout {
     required property var shows
 
     Layout.fillWidth: true
-    spacing: 12
+    spacing: section.theme.pad
 
     SectionLabel {
         theme: section.theme
@@ -20,11 +20,11 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        spacing: 10
+        spacing: section.theme.gap
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 10
+            spacing: section.theme.gap
 
             Bolt {
                 color: section.hub.awake ? section.theme.accent : section.theme.secondaryText
@@ -52,14 +52,15 @@ ColumnLayout {
 
             Toggle {
                 theme: section.theme
-                checked: section.hub.awake
-                onToggled: section.hub.toggle_awake()
+                text: "Keep awake"
+                on: section.hub.awake
+                onSwitched: section.hub.toggle_awake()
             }
         }
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 4
+            spacing: section.theme.gapTight
 
             Repeater {
                 model: [
@@ -77,6 +78,7 @@ ColumnLayout {
                     theme: section.theme
                     Layout.fillWidth: true
                     text: modelData.label
+                    active: section.hub.awake && section.hub.hold_preset === modelData.minutes
                     onClicked: section.hub.keep_awake_minutes(modelData.minutes)
                 }
             }
@@ -85,7 +87,7 @@ ColumnLayout {
         RowLayout {
             Layout.fillWidth: true
             visible: section.hub.timed
-            spacing: 6
+            spacing: section.theme.gapSnug
 
             Label {
                 text: "Add more"
@@ -105,18 +107,21 @@ ColumnLayout {
 
                     theme: section.theme
                     Layout.fillWidth: true
-                    implicitHeight: 24
+                    compact: true
                     text: modelData.label
                     onClicked: section.hub.extend_minutes(modelData.minutes)
                 }
             }
         }
 
-        Tick {
+        // A switch, as in Settings: a setting that is on or off is a Toggle everywhere, and a
+        // Tick is for picking members of a set, such as which outputs the shortcut visits.
+        SettingRow {
             theme: section.theme
-            text: "Let displays sleep"
-            checked: section.hub.allow_display_sleep
-            onToggled: section.hub.choose_display_sleep(checked)
+            title: "Let displays sleep"
+            detail: "Screens still turn off while the system stays up."
+            on: section.hub.allow_display_sleep
+            onToggled: (value) => section.hub.choose_display_sleep(value)
         }
     }
 }

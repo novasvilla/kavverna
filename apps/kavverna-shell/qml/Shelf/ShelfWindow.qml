@@ -130,7 +130,7 @@ Window {
         id: shelfSkin
         anchors.fill: parent
         anchors.margins: 6
-        radius: 14
+        radius: shelfWindow.theme.radiusSurface
         color: shelfWindow.theme.surface
         border.width: 1
         border.color: shelfWindow.theme.hairline
@@ -191,13 +191,14 @@ Window {
                     color: shelfWindow.theme.mutedText
                 }
 
-                IconButton {
+                ConfirmButton {
                     theme: shelfWindow.theme
                     source: "edit-clear-all"
+                    size: shelfWindow.theme.iconMedium
                     visible: shelfWindow.shelf.item_count > 0
-                    ToolTip.visible: hovered
-                    ToolTip.text: "Clear everything"
-                    onClicked: {
+                    text: "Clear everything"
+                    confirmText: "Clear " + shelfWindow.shelf.item_count + "?"
+                    onConfirmed: {
                         shelfWindow.picked = []
                         shelfWindow.shelf.clear()
                     }
@@ -206,6 +207,7 @@ Window {
                 IconButton {
                     theme: shelfWindow.theme
                     source: "window-close"
+                    text: "Close the shelf"
                     onClicked: shelfWindow.shelf.set_open(false)
                 }
             }

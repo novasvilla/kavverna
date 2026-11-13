@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import org.kde.kirigami as Kirigami
 
 /// One group of settings, closed until it is asked for. The page is a short index of these,
 /// so reaching the last group is a tap rather than a page of scrolling, and only one is ever
@@ -21,21 +22,22 @@ ColumnLayout {
     Layout.fillWidth: true
     spacing: section.theme.gapSnug
 
-    Rectangle {
+    Pressable {
+        id: heading
         Layout.fillWidth: true
-        implicitHeight: heading.implicitHeight + 2 * section.theme.gapSnug
-        radius: section.theme.radiusSmall
-        color: section.open ? section.theme.selected
-             : hover.hovered ? section.theme.control : "transparent"
+        theme: section.theme
+        text: section.title
+        padding: section.theme.gapSnug
+        fill: section.open ? section.theme.selected
+            : heading.hovered ? section.theme.control : "transparent"
 
-        HoverHandler { id: hover }
-        TapHandler { onTapped: section.toggled() }
+        Accessible.description: section.detail
+        Accessible.expandable: true
+        Accessible.expanded: section.open
 
-        RowLayout {
-            id: heading
-            anchors.fill: parent
-            anchors.leftMargin: section.theme.gapSnug
-            anchors.rightMargin: section.theme.gapSnug
+        onClicked: section.toggled()
+
+        contentItem: RowLayout {
             spacing: section.theme.gapSnug
 
             ColumnLayout {
@@ -50,24 +52,26 @@ ColumnLayout {
                     color: section.open ? section.theme.accent : section.theme.secondaryText
                 }
 
-                Label {
+                LongLabel {
+                    theme: section.theme
                     Layout.fillWidth: true
                     visible: !section.open
                     text: section.detail
                     font.pixelSize: section.theme.textFine
                     color: section.theme.mutedText
-                    elide: Text.ElideRight
                 }
             }
 
-            Label {
-                text: "›"
-                font.pixelSize: section.theme.textStrong
+            Kirigami.Icon {
+                source: "go-next-symbolic"
+                implicitWidth: section.theme.iconSmall
+                implicitHeight: section.theme.iconSmall
+                isMask: true
                 color: section.open ? section.theme.accent : section.theme.secondaryText
                 rotation: section.open ? 90 : 0
 
                 Behavior on rotation {
-                    NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: section.theme.motionQuick; easing.type: Easing.OutCubic }
                 }
             }
         }
@@ -77,6 +81,19 @@ ColumnLayout {
         id: card
         theme: section.theme
         visible: section.open
-        spacing: 12
+        spacing: section.theme.pad
+        onVisibleChanged: if (visible) unfold.restart()
+    }
+
+    // A fade rather than a growing height: the panel's window is sized to its content, and a
+    // height animated frame by frame would resize the layer surface on every one of them.
+    NumberAnimation {
+        id: unfold
+        target: card
+        property: "opacity"
+        from: 0
+        to: 1
+        duration: section.theme.motionCalm
+        easing.type: Easing.OutCubic
     }
 }

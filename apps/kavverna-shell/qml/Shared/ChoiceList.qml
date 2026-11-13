@@ -22,32 +22,37 @@ ColumnLayout {
     Repeater {
         model: list.choices
 
-        delegate: RowLayout {
+        delegate: Pressable {
             id: row
             required property var modelData
             readonly property bool chosen: list.current === modelData.value
 
             Layout.fillWidth: true
-            spacing: list.theme.gapSnug
+            theme: list.theme
+            text: modelData.label
+            enabled: modelData.value !== -2
 
-            Label {
-                text: row.chosen ? "●" : "○"
-                font.pixelSize: list.theme.textSmall
-                color: row.chosen ? list.theme.accent : list.theme.secondaryText
-            }
+            Accessible.role: Accessible.RadioButton
+            Accessible.checkable: true
+            Accessible.checked: row.chosen
 
-            Label {
-                Layout.fillWidth: true
-                text: row.modelData.label
-                font.pixelSize: list.theme.textBody
-                font.bold: row.chosen
-                color: row.modelData.value === -2 ? list.theme.mutedText
-                                                  : list.theme.primaryText
-                elide: Text.ElideRight
+            onClicked: list.picked(row.modelData.value)
 
-                TapHandler {
-                    enabled: row.modelData.value !== -2
-                    onTapped: list.picked(row.modelData.value)
+            contentItem: RowLayout {
+                spacing: list.theme.gapSnug
+
+                RadioMark {
+                    theme: list.theme
+                    chosen: row.chosen
+                }
+
+                LongLabel {
+                    theme: list.theme
+                    Layout.fillWidth: true
+                    text: row.modelData.label
+                    font.pixelSize: list.theme.textBody
+                    font.bold: row.chosen
+                    color: row.enabled ? list.theme.primaryText : list.theme.mutedText
                 }
             }
         }
