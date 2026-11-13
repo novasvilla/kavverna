@@ -282,14 +282,14 @@ ColumnLayout {
                 }
             }
 
-            IconButton {
+            ConfirmButton {
                 theme: section.theme
                 source: "edit-delete"
-                size: section.theme.iconSmall
                 tall: true
                 enabled: section.clipboard.recent_count > 0
                 text: "Clear everything not pinned"
-                onClicked: section.clipboard.clear_unpinned()
+                confirmText: "Clear " + section.clipboard.recent_count + "?"
+                onConfirmed: section.clipboard.clear_unpinned()
             }
         }
     }

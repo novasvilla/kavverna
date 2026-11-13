@@ -191,12 +191,14 @@ Window {
                     color: shelfWindow.theme.mutedText
                 }
 
-                IconButton {
+                ConfirmButton {
                     theme: shelfWindow.theme
                     source: "edit-clear-all"
+                    size: shelfWindow.theme.iconMedium
                     visible: shelfWindow.shelf.item_count > 0
                     text: "Clear everything"
-                    onClicked: {
+                    confirmText: "Clear " + shelfWindow.shelf.item_count + "?"
+                    onConfirmed: {
                         shelfWindow.picked = []
                         shelfWindow.shelf.clear()
                     }

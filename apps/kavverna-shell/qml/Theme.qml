@@ -136,6 +136,8 @@ QtObject {
     readonly property color selected: Qt.alpha(accent, dark ? 0.26 : 0.22)
     /// The fainter wash behind something running, a step below a selection.
     readonly property color glow: Qt.alpha(accent, 0.18)
+    /// The same wash in ember, behind something that is one press away from losing data.
+    readonly property color emberGlow: Qt.alpha(ember, 0.18)
 
     readonly property color primaryText: shade.primaryText
     readonly property color secondaryText: shade.secondaryText
