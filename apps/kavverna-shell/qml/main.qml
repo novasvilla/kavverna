@@ -494,7 +494,11 @@ Window {
                     Layout.fillWidth: true
                     spacing: theme.gapTight
 
+                    // Filling, because a layout never grows past its widest child: without it
+                    // the column stays the title's width and the close button sits beside the
+                    // title instead of at the edge.
                     Label {
+                        Layout.fillWidth: true
                         text: hub.showing_settings ? "Settings" : "Kavverna"
                         font.pixelSize: theme.textTitle
                         font.bold: true
@@ -534,13 +538,32 @@ Window {
                 }
 
                 // The panel floats over everything by default and so never closes on lost
-                // focus; this is the way out that needs no keyboard and no tray.
-                IconButton {
-                    Layout.alignment: Qt.AlignTop
+                // focus; this is the way out that needs no keyboard and no tray. Dressed like
+                // the footer's links, at rest in their colour and lit only under the pointer,
+                // and pulled out by its own inset so the glyph, not the hover square, lines up
+                // with the content's right edge.
+                Pressable {
+                    id: closer
+                    Layout.alignment: Qt.AlignVCenter
+                    Layout.rightMargin: -closer.padding
+                    padding: (closer.theme.buttonHeight - closer.theme.iconMedium) / 2
                     theme: theme
-                    source: "window-close"
                     text: "Close"
+                    fill: closer.down ? closer.theme.controlDown
+                        : closer.hovered ? closer.theme.control : "transparent"
+
+                    ToolTip.visible: closer.hovered
+                    ToolTip.text: closer.text
+
                     onClicked: hub.dismiss()
+
+                    contentItem: Kirigami.Icon {
+                        source: "window-close-symbolic"
+                        implicitWidth: closer.theme.iconMedium
+                        implicitHeight: closer.theme.iconMedium
+                        isMask: true
+                        color: closer.hovered ? closer.theme.primaryText : closer.theme.secondaryText
+                    }
                 }
             }
 
