@@ -46,7 +46,7 @@ Pressable {
             color: toggle.on ? toggle.theme.surface : toggle.theme.secondaryText
 
             Behavior on x {
-                NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: toggle.theme.motionQuick; easing.type: Easing.OutCubic }
             }
         }
     }

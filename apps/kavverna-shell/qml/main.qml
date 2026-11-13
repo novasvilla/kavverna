@@ -633,12 +633,30 @@ Window {
                 // next page wherever the last one was left, its top hidden above the fold.
                 Connections {
                     target: root
-                    function onPageChanged() { scroller.contentItem.contentY = 0 }
+                    function onPageChanged() {
+                        scroller.contentItem.contentY = 0
+                        pageArrival.restart()
+                    }
                 }
 
                 Connections {
                     target: hub
-                    function onShowing_settingsChanged() { scroller.contentItem.contentY = 0 }
+                    function onShowing_settingsChanged() {
+                        scroller.contentItem.contentY = 0
+                        pageArrival.restart()
+                    }
+                }
+
+                // The new page fades in where the old one was; it does not slide, since the
+                // window resizes to each page's height and a moving page would fight that.
+                NumberAnimation {
+                    id: pageArrival
+                    target: pages
+                    property: "opacity"
+                    from: 0
+                    to: 1
+                    duration: theme.motionCalm
+                    easing.type: Easing.OutCubic
                 }
 
                 ColumnLayout {

@@ -1,4 +1,5 @@
 import QtQuick
+import org.kde.kirigami as Kirigami
 
 /// Three caverns, each in two lights. The torch is the one Kavverna has always lived in:
 /// charcoal and stone under a warm flame, parchment at the mouth. The tide is the same cave
@@ -171,6 +172,14 @@ QtObject {
     readonly property int iconSmall: 12
     readonly property int iconMedium: 16
     readonly property int iconLarge: 18
+
+    // Durations come from the desktop, which scales them by Plasma's animation speed and makes
+    // them zero when animations are switched off, so motion here obeys the same setting as
+    // everything else on the screen.
+    /// A control answering a press, an action appearing on hover.
+    readonly property int motionQuick: Kirigami.Units.shortDuration
+    /// A page or a group of settings arriving.
+    readonly property int motionCalm: Kirigami.Units.longDuration
 
     readonly property int textFine: 9
     readonly property int textSmall: 10

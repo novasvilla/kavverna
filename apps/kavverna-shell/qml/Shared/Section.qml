@@ -71,7 +71,7 @@ ColumnLayout {
                 rotation: section.open ? 90 : 0
 
                 Behavior on rotation {
-                    NumberAnimation { duration: 110; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: section.theme.motionQuick; easing.type: Easing.OutCubic }
                 }
             }
         }
@@ -82,5 +82,18 @@ ColumnLayout {
         theme: section.theme
         visible: section.open
         spacing: section.theme.pad
+        onVisibleChanged: if (visible) unfold.restart()
+    }
+
+    // A fade rather than a growing height: the panel's window is sized to its content, and a
+    // height animated frame by frame would resize the layer surface on every one of them.
+    NumberAnimation {
+        id: unfold
+        target: card
+        property: "opacity"
+        from: 0
+        to: 1
+        duration: section.theme.motionCalm
+        easing.type: Easing.OutCubic
     }
 }

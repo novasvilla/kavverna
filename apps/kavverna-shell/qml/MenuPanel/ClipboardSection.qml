@@ -402,6 +402,7 @@ ColumnLayout {
                                     anchors.fill: parent
                                     spacing: section.theme.gapTight
                                     opacity: hover.hovered ? 1 : 0
+                                    Behavior on opacity { NumberAnimation { duration: section.theme.motionQuick } }
                                     visible: opacity > 0
 
                                     IconButton {
@@ -459,6 +460,7 @@ ColumnLayout {
                                 RowLayout {
                                     anchors.fill: parent
                                     opacity: hover.hovered ? 0 : 1
+                                    Behavior on opacity { NumberAnimation { duration: section.theme.motionQuick } }
                                     visible: opacity > 0
                                     spacing: section.theme.gapSnug
 

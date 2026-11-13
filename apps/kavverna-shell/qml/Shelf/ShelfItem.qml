@@ -187,6 +187,7 @@ Rectangle {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         opacity: hover.hovered ? 0 : 1
+                        Behavior on opacity { NumberAnimation { duration: row.theme.motionQuick } }
                         visible: opacity > 0
                         text: row.alive ? row.shelf.row_details[row.at] : "gone from disk"
                         font.pixelSize: row.theme.textFine
@@ -197,6 +198,7 @@ Rectangle {
                     RowLayout {
                         anchors.fill: parent
                         opacity: hover.hovered ? 1 : 0
+                        Behavior on opacity { NumberAnimation { duration: row.theme.motionQuick } }
                         visible: opacity > 0
                         spacing: 2
 

@@ -39,6 +39,13 @@ ColumnLayout {
                 isMask: true
                 color: opener.open ? opener.theme.primaryText : opener.theme.secondaryText
                 rotation: opener.open ? 90 : 0
+
+                Behavior on rotation {
+                    NumberAnimation {
+                        duration: opener.theme.motionQuick
+                        easing.type: Easing.OutCubic
+                    }
+                }
             }
 
             LongLabel {
