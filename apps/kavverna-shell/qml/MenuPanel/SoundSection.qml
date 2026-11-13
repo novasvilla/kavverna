@@ -41,7 +41,8 @@ ColumnLayout {
                 rotation: opener.open ? 90 : 0
             }
 
-            Label {
+            LongLabel {
+                theme: opener.theme
                 Layout.fillWidth: true
                 text: opener.text
                 font.pixelSize: opener.theme.textSmall
@@ -103,7 +104,8 @@ ColumnLayout {
                                 chosen: outputRow.isDefault
                             }
 
-                            Label {
+                            LongLabel {
+                                theme: section.theme
                                 Layout.fillWidth: true
                                 text: outputChoice.text
                                 font.pixelSize: section.theme.textBody
@@ -211,7 +213,8 @@ ColumnLayout {
                         implicitHeight: section.theme.iconMedium
                     }
 
-                    Label {
+                    LongLabel {
+                        theme: section.theme
                         Layout.fillWidth: true
                         text: section.mixer.stream_names[streamRow.index]
                         font.pixelSize: section.theme.textBody
@@ -365,7 +368,8 @@ ColumnLayout {
                             chosen: inputRow.isDefault
                         }
 
-                        Label {
+                        LongLabel {
+                            theme: section.theme
                             Layout.fillWidth: true
                             text: inputChoice.text
                             font.pixelSize: section.theme.textBody
@@ -427,7 +431,8 @@ ColumnLayout {
                         implicitHeight: section.theme.iconMedium
                     }
 
-                    Label {
+                    LongLabel {
+                        theme: section.theme
                         Layout.fillWidth: true
                         text: section.mixer.recorder_names[recorderRow.index]
                         font.pixelSize: section.theme.textBody

@@ -46,13 +46,13 @@ ColumnLayout {
                     chosen: row.chosen
                 }
 
-                Label {
+                LongLabel {
+                    theme: list.theme
                     Layout.fillWidth: true
                     text: row.modelData.label
                     font.pixelSize: list.theme.textBody
                     font.bold: row.chosen
                     color: row.enabled ? list.theme.primaryText : list.theme.mutedText
-                    elide: Text.ElideRight
                 }
             }
         }

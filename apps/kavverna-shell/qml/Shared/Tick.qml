@@ -46,13 +46,13 @@ Pressable {
     // Elided rather than left to set its own width. A sound device names itself things like
     // "Ryzen HD Audio Controller Analogue Stereo", and one long label would otherwise widen the
     // column past the panel and cut off every wrapped paragraph beside it.
-    contentItem: Label {
+    contentItem: LongLabel {
+        theme: tick.theme
         text: tick.text
         font: tick.font
         color: tick.theme.primaryText
         opacity: tick.enabled ? 1 : 0.4
         verticalAlignment: Text.AlignVCenter
         leftPadding: tick.indicator.width + tick.spacing
-        elide: Text.ElideRight
     }
 }

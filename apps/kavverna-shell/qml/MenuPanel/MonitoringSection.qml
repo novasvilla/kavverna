@@ -31,8 +31,11 @@ ColumnLayout {
         RowLayout {
             Layout.fillWidth: true
 
-            Label {
+            // The label carries live readings beside its name, a temperature and a power draw
+            // for the GPU, and gives way to the value on its right rather than pushing it out.
+            LongLabel {
                 id: meterLabel
+                theme: meter.theme
                 Layout.fillWidth: true
                 font.pixelSize: section.theme.textBody
                 color: theme.secondaryText
@@ -86,7 +89,8 @@ ColumnLayout {
             visible: section.vitals.processor_name.length > 0
             spacing: 1
 
-            Label {
+            LongLabel {
+                theme: section.theme
                 Layout.fillWidth: true
                 text: section.vitals.processor_name
                 font.pixelSize: section.theme.textBody
@@ -95,7 +99,8 @@ ColumnLayout {
                 elide: Text.ElideRight
             }
 
-            Label {
+            LongLabel {
+                theme: section.theme
                 Layout.fillWidth: true
                 text: section.vitals.processor_detail
                 font.pixelSize: section.theme.textFine
@@ -273,28 +278,42 @@ ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 3
 
-                Label {
+                LongLabel {
+                    theme: section.theme
+                    Layout.fillWidth: true
                     text: section.vitals.network_names[interfaceRow.index]
                     font.pixelSize: section.theme.textStrong
                     font.bold: true
                     color: section.theme.primaryText
                 }
 
+                // Half the row each, so a fast link's longer figure cannot shove the other
+                // direction off the card.
                 RowLayout {
                     Layout.fillWidth: true
-                    Label {
+                    spacing: section.theme.gap
+
+                    LongLabel {
+                        theme: section.theme
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 1
                         text: section.vitals.network_received[interfaceRow.index]
                         font.pixelSize: section.theme.textBody
                         color: section.theme.secondaryText
                     }
-                    Label {
+                    LongLabel {
+                        theme: section.theme
+                        Layout.fillWidth: true
+                        Layout.preferredWidth: 1
                         text: section.vitals.network_sent[interfaceRow.index]
                         font.pixelSize: section.theme.textBody
                         color: section.theme.secondaryText
                     }
                 }
 
-                Label {
+                LongLabel {
+                    theme: section.theme
+                    Layout.fillWidth: true
                     text: section.vitals.network_totals[interfaceRow.index]
                     font.pixelSize: section.theme.textSmall
                     color: section.theme.mutedText
@@ -332,18 +351,24 @@ ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 3
 
-                Label {
+                LongLabel {
+                    theme: section.theme
+                    Layout.fillWidth: true
                     text: section.vitals.disk_names[diskRow.index]
                     font.pixelSize: section.theme.textStrong
                     font.bold: true
                     color: section.theme.primaryText
                 }
-                Label {
+                LongLabel {
+                    theme: section.theme
+                    Layout.fillWidth: true
                     text: section.vitals.disk_spaces[diskRow.index]
                     font.pixelSize: section.theme.textBody
                     color: section.theme.secondaryText
                 }
-                Label {
+                LongLabel {
+                    theme: section.theme
+                    Layout.fillWidth: true
                     text: section.vitals.disk_rates[diskRow.index]
                     font.pixelSize: section.theme.textSmall
                     color: section.theme.mutedText

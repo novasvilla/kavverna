@@ -59,22 +59,29 @@ Section {
                         Layout.fillWidth: true
                         spacing: card.theme.gapSnug
 
-                        Label {
+                        // Each may shrink to make room but never grows past its own text, so
+                        // the two stay together on the left and only elide when the row is
+                        // genuinely too narrow for both.
+                        LongLabel {
+                            theme: card.theme
+                            Layout.fillWidth: true
+                            Layout.maximumWidth: implicitWidth
                             text: card.features.titles[entry.index]
                             font.pixelSize: card.theme.textStrong
                             font.bold: true
                             color: entry.built ? card.theme.primaryText
                                                : card.theme.mutedText
-                            elide: Text.ElideRight
                         }
 
                         // What this utility keeps alive, so the choice to leave one on
                         // is made against what it costs rather than against a guess.
-                        Label {
+                        LongLabel {
+                            theme: card.theme
+                            Layout.fillWidth: true
+                            Layout.maximumWidth: implicitWidth
                             text: card.features.energies[entry.index]
                             font.pixelSize: card.theme.textBody
                             color: card.theme.mutedText
-                            elide: Text.ElideRight
                         }
 
                         Item { Layout.fillWidth: true }

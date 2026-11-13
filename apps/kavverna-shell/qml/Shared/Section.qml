@@ -52,13 +52,13 @@ ColumnLayout {
                     color: section.open ? section.theme.accent : section.theme.secondaryText
                 }
 
-                Label {
+                LongLabel {
+                    theme: section.theme
                     Layout.fillWidth: true
                     visible: !section.open
                     text: section.detail
                     font.pixelSize: section.theme.textFine
                     color: section.theme.mutedText
-                    elide: Text.ElideRight
                 }
             }
 
