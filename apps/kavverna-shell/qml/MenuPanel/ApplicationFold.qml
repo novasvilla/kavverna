@@ -131,6 +131,9 @@ ColumnLayout {
                 LongLabel {
                     theme: fold.theme
                     Layout.fillWidth: true
+                    Layout.maximumWidth: row.asking === "" && (row.feedback_kind === "refused"
+                                                               || row.feedback_kind === "failed")
+                                         ? row.width * 0.3 : Infinity
                     text: row.confirming ? (row.asking === "force" ? "Force end " : "End ")
                                            + row.name + "?"
                                          : row.name
@@ -162,9 +165,11 @@ ColumnLayout {
                     }
                 }
 
+                // A refusal is a sentence and the name is already known, so the name gives way
+                // to it; it still keeps enough of itself to say which row was refused.
                 ActionFeedback {
                     theme: fold.theme
-                    Layout.maximumWidth: row.width / 2
+                    Layout.maximumWidth: row.width * 0.7
                     visible: row.asking === "" && row.feedback_kind.length > 0
                     kind: row.feedback_kind
                     text: row.feedback

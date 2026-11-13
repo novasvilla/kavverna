@@ -23,9 +23,11 @@ ColumnLayout {
         ports.view.refresh()
         unfold.restart()
     }
-    // Left open, it is read again each time the page comes back rather than showing a list
-    // from whenever it was last looked at.
-    onVisibleChanged: if (visible && open) ports.view.refresh()
+    // Left open, it is read again each time the panel or the page comes back rather than
+    // showing a list from whenever it was last looked at. An item's own visibility does not
+    // follow its window's, so the window is asked as well.
+    readonly property bool shown: ports.visible && (ports.Window.window?.visible ?? false)
+    onShownChanged: if (shown && open) ports.view.refresh()
 
     function copy(text) {
         copier.text = text
