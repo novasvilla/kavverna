@@ -216,7 +216,7 @@ impl qobject::AgentUsageView {
 
     fn apply(mut self: Pin<&mut Self>, snapshot: Option<Snapshot>, now: SystemTime) {
         self.as_mut().set_empty_text(QString::from(EMPTY_TEXT));
-        self.as_mut().set_has_reading(snapshot.is_some());
+        let has_reading = snapshot.is_some();
         let agents = snapshot.map(|s| s.agents).unwrap_or_default();
 
         let (mut ids, mut titles, mut kinds, mut notes, mut ages, mut totals, mut costs) =
@@ -285,8 +285,10 @@ impl qobject::AgentUsageView {
         self.as_mut().set_window_reset_texts(strings(resets));
         self.as_mut().set_window_age_texts(strings(window_ages));
         self.as_mut().set_window_states(strings(states));
-        // Last, so a binding on the count sees every list already filled in.
+        // Last, so a binding on either sees every list already filled in, and the empty state
+        // cannot flash up between the first reading arriving and its agents being counted.
         self.as_mut().set_agent_count(agents.len() as i32);
+        self.as_mut().set_has_reading(has_reading);
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::{agent_usage_view, panel};
 use agent_usage::{Freshness, Snapshot, Usage, UsageMeter, Window, WindowKind};
 use serde_json::{Value, json};
-use std::io::{Read, Write};
+use std::io::{IsTerminal, Read, Write};
 use std::sync::mpsc::{RecvTimeoutError, Sender};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, SystemTime};
@@ -196,7 +196,10 @@ fn window_json(window: &Window, now: SystemTime) -> Value {
 /// of every session, which is worse than a missed reading.
 pub fn pass_status_line() {
     let mut document = Vec::new();
-    let _ = std::io::stdin().take(LONGEST_DOCUMENT).read_to_end(&mut document);
+    // Run by hand from a terminal there is no document coming, and waiting for one would hang.
+    if !std::io::stdin().is_terminal() {
+        let _ = std::io::stdin().take(LONGEST_DOCUMENT).read_to_end(&mut document);
+    }
     if let Some(cache) = agent_usage::cache_dir() {
         let _ = agent_usage::record_status_line(&document, &cache, SystemTime::now());
     }

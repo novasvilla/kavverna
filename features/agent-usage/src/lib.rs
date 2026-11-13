@@ -169,8 +169,8 @@ pub struct Snapshot {
     pub agents: Vec<AgentUsage>,
 }
 
-/// Keeps what it learned from files that have not changed since, so reading every half minute
-/// does not decompress the same closed Codex sessions each time.
+/// Keeps what it learned from files that have not changed since, so reading every minute does
+/// not decompress the same closed Codex sessions each time.
 #[derive(Default)]
 pub struct UsageMeter {
     codex: codex::Rollouts,
