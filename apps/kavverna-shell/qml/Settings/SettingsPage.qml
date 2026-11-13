@@ -348,8 +348,8 @@ ColumnLayout {
         ChoiceRow {
             theme: page.theme
             visible: page.shows("clipboard-history")
-            title: "Keep"
-            detail: "Pinned entries do not count toward this."
+            title: "Keep at most"
+            detail: "Entries, newest first. Pinned entries do not count toward this."
             current: page.clipboard.limit
             choices: [
                 { label: "20", value: 20 },
@@ -359,6 +359,21 @@ ColumnLayout {
                 { label: "\u221e", value: 0 }
             ]
             onPicked: (value) => page.clipboard.choose_limit(value)
+        }
+
+        // The ages come from the view, which refuses any other: a stray number here would
+        // delete history.
+        ChoiceRow {
+            theme: page.theme
+            visible: page.shows("clipboard-history")
+            title: "Keep entries for"
+            detail: "Older entries are deleted. Pinned entries are kept however old they are."
+            current: page.clipboard.keep_days
+            choices: page.clipboard.keep_days_choices.map((days) => ({
+                label: days === 0 ? "Forever" : days === 1 ? "1 day" : days + " days",
+                value: days
+            }))
+            onPicked: (value) => page.clipboard.choose_keep_days(value)
         }
 
         SettingRow {
