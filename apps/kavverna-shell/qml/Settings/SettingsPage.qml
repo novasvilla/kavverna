@@ -21,7 +21,7 @@ ColumnLayout {
     property bool cleanRulesOpen: false
 
     Layout.fillWidth: true
-    spacing: 12
+    spacing: page.theme.pad
 
     Label {
         Layout.fillWidth: true
@@ -36,7 +36,7 @@ ColumnLayout {
         theme: page.theme
         title: "PANEL"
         detail: "Where it opens, whether it floats over everything"
-        spacing: 12
+        spacing: page.theme.pad
         open: page.openSection === "PANEL"
         onToggled: page.openSection = open ? "" : "PANEL"
 
@@ -75,7 +75,7 @@ ColumnLayout {
         theme: page.theme
         title: "APPEARANCE"
         detail: "Theme and light or dark"
-        spacing: 12
+        spacing: page.theme.pad
         open: page.openSection === "APPEARANCE"
         onToggled: page.openSection = open ? "" : "APPEARANCE"
 
@@ -148,7 +148,7 @@ ColumnLayout {
                         }
 
                         Row {
-                            spacing: 4
+                            spacing: page.theme.gapTight
 
                             Repeater {
                                 model: [themeRow.shade.accent, themeRow.shade.surface,
@@ -220,7 +220,7 @@ ColumnLayout {
         theme: page.theme
         title: "SOUND"
         detail: "Preferred microphone, the outputs the shortcut steps through"
-        spacing: 14
+        spacing: page.theme.pad
         open: page.openSection === "SOUND"
         onToggled: page.openSection = open ? "" : "SOUND"
         visible: page.shows("microphone-tools") || page.shows("output-switcher")
@@ -312,7 +312,7 @@ ColumnLayout {
         theme: page.theme
         title: "CLIPBOARD"
         detail: "History, what is skipped, emptying, URL rules"
-        spacing: 14
+        spacing: page.theme.pad
         open: page.openSection === "CLIPBOARD"
         onToggled: page.openSection = open ? "" : "CLIPBOARD"
         visible: page.shows("clipboard-history") || page.shows("clipboard-auto-clear")
@@ -459,7 +459,7 @@ ColumnLayout {
                     IconButton {
                         theme: page.theme
                         source: "edit-delete"
-                        size: 12
+                        size: page.theme.iconSmall
                         visible: ruleRow.yours
                         text: "Remove this rule"
                         onClicked: page.clipboard.remove_clean_rule(ruleRow.modelData)
@@ -588,7 +588,7 @@ ColumnLayout {
 
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: 6
+            spacing: page.theme.gapSnug
             visible: page.clipboard.klipper_waiting > 0 && page.clipboard.available
 
             Label {
@@ -622,7 +622,7 @@ ColumnLayout {
         theme: page.theme
         title: "SHELF"
         detail: "Edge strip, where it hangs, what survives a restart"
-        spacing: 12
+        spacing: page.theme.pad
         open: page.openSection === "SHELF"
         onToggled: page.openSection = open ? "" : "SHELF"
         visible: page.shows("shelf")
@@ -668,7 +668,7 @@ ColumnLayout {
         theme: page.theme
         title: "ENERGY"
         detail: "How long a hold lasts, what it holds"
-        spacing: 14
+        spacing: page.theme.pad
         open: page.openSection === "ENERGY"
         onToggled: page.openSection = open ? "" : "ENERGY"
         visible: page.shows("keep-awake")
@@ -710,7 +710,7 @@ ColumnLayout {
         theme: page.theme
         title: "TOOLS"
         detail: "When the mouse is nudged and with what"
-        spacing: 12
+        spacing: page.theme.pad
         open: page.openSection === "TOOLS"
         onToggled: page.openSection = open ? "" : "TOOLS"
         visible: page.shows("mouse-jiggle")
@@ -774,7 +774,7 @@ ColumnLayout {
         theme: page.theme
         title: "STARTUP"
         detail: "Starting with the session, restoring a hold"
-        spacing: 12
+        spacing: page.theme.pad
         open: page.openSection === "STARTUP"
         onToggled: page.openSection = open ? "" : "STARTUP"
 
@@ -799,17 +799,17 @@ ColumnLayout {
         theme: page.theme
         title: "ABOUT"
         detail: "Version, where the settings live, what this machine offers"
-        spacing: 8
+        spacing: page.theme.gap
         open: page.openSection === "ABOUT"
         onToggled: page.openSection = open ? "" : "ABOUT"
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 8
+            spacing: page.theme.gap
 
             Label {
                 text: "Kavverna"
-                font.pixelSize: 14
+                font.pixelSize: page.theme.textStrong
                 font.bold: true
                 color: page.theme.primaryText
             }
@@ -843,7 +843,7 @@ ColumnLayout {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 6
+            spacing: page.theme.gapSnug
 
             Repeater {
                 model: [

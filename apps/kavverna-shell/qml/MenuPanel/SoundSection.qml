@@ -14,7 +14,7 @@ ColumnLayout {
     required property var shows
 
     Layout.fillWidth: true
-    spacing: 12
+    spacing: section.theme.pad
 
     /// Where a stream or a recording is going, and the way to change it: a press opens the list
     /// of devices beneath it.
@@ -59,7 +59,7 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        spacing: 8
+        spacing: section.theme.gap
         visible: section.shows("output-switcher")
 
         Repeater {
@@ -79,7 +79,7 @@ ColumnLayout {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: section.theme.gapSnug
 
                     Pressable {
                         id: outputChoice
@@ -156,7 +156,7 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        spacing: 8
+        spacing: section.theme.gap
         visible: section.shows("volume-mixer")
 
         Label {
@@ -203,12 +203,12 @@ ColumnLayout {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: section.theme.gapSnug
 
                     Kirigami.Icon {
                         source: section.mixer.stream_icons[streamRow.index]
-                        implicitWidth: 16
-                        implicitHeight: 16
+                        implicitWidth: section.theme.iconMedium
+                        implicitHeight: section.theme.iconMedium
                     }
 
                     Label {
@@ -232,7 +232,7 @@ ColumnLayout {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: section.theme.gapSnug
 
                     Level {
                         theme: section.theme
@@ -419,12 +419,12 @@ ColumnLayout {
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: section.theme.gapSnug
 
                     Kirigami.Icon {
                         source: section.mixer.recorder_icons[recorderRow.index]
-                        implicitWidth: 16
-                        implicitHeight: 16
+                        implicitWidth: section.theme.iconMedium
+                        implicitHeight: section.theme.iconMedium
                     }
 
                     Label {

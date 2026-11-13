@@ -12,7 +12,7 @@ RowLayout {
     signal toggled(bool value)
 
     Layout.fillWidth: true
-    spacing: 10
+    spacing: row.theme.gap
 
     ColumnLayout {
         Layout.fillWidth: true

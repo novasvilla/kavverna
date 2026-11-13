@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import org.kde.kirigami as Kirigami
 
 /// A check box in the panel's own colours, for the same reason Toggle exists: the stock one
 /// takes the desktop's accent and would be the only blue thing on the page. Like Toggle it
@@ -31,12 +32,13 @@ Pressable {
         border.color: tick.on ? tick.theme.accent : tick.theme.hairline
         opacity: tick.enabled ? 1 : 0.4
 
-        Label {
+        Kirigami.Icon {
             anchors.centerIn: parent
             visible: tick.on
-            text: "✓"
-            font.pixelSize: tick.theme.textStrong
-            font.bold: true
+            source: "checkmark"
+            implicitWidth: tick.theme.iconSmall
+            implicitHeight: tick.theme.iconSmall
+            isMask: true
             color: tick.theme.surface
         }
     }

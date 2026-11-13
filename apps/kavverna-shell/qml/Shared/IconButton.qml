@@ -12,10 +12,12 @@ Pressable {
     id: button
 
     required property string source
-    property int size: 16
+    property int size: theme.iconMedium
+    /// As tall as a PillButton, for one that sits in the same row as a text field or a pill.
+    property bool tall: false
 
-    implicitWidth: size + theme.gapSnug
-    implicitHeight: size + theme.gapSnug
+    implicitWidth: tall ? theme.buttonHeight : theme.buttonHeightCompact
+    implicitHeight: implicitWidth
     fill: button.down ? button.theme.controlDown : "transparent"
 
     ToolTip.visible: button.hovered && button.text.length > 0

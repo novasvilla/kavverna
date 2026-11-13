@@ -130,7 +130,7 @@ Window {
         id: shelfSkin
         anchors.fill: parent
         anchors.margins: 6
-        radius: 14
+        radius: shelfWindow.theme.radiusSurface
         color: shelfWindow.theme.surface
         border.width: 1
         border.color: shelfWindow.theme.hairline

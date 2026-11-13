@@ -12,7 +12,7 @@ ColumnLayout {
     required property var shows
 
     Layout.fillWidth: true
-    spacing: 12
+    spacing: section.theme.pad
 
     SectionLabel {
         theme: section.theme
@@ -21,16 +21,16 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        spacing: 10
+        spacing: section.theme.gap
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 10
+            spacing: section.theme.gap
 
             Kirigami.Icon {
                 source: "input-mouse"
-                implicitWidth: 18
-                implicitHeight: 18
+                implicitWidth: section.theme.iconLarge
+                implicitHeight: section.theme.iconLarge
                 isMask: true
                 color: section.hub.mouse_jiggle ? section.theme.accent
                                                 : section.theme.secondaryText
@@ -133,7 +133,6 @@ ColumnLayout {
         PillButton {
             theme: section.theme
             Layout.fillWidth: true
-            implicitHeight: 28
             enabled: section.hub.jiggle_available
             text: "Nudge now"
             onClicked: section.hub.nudge_now()

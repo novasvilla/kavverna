@@ -35,15 +35,15 @@ Window {
 
             Kirigami.Icon {
                 source: footerLink.source
-                implicitWidth: 16
-                implicitHeight: 16
+                implicitWidth: footerLink.theme.iconMedium
+                implicitHeight: footerLink.theme.iconMedium
                 isMask: true
                 color: footerLink.theme.secondaryText
             }
 
             Label {
                 text: footerLink.text
-                font.pixelSize: 12
+                font.pixelSize: footerLink.theme.textBody
                 color: footerLink.theme.secondaryText
             }
         }
@@ -342,7 +342,7 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
-                radius: 14
+                radius: theme.radiusSurface
                 color: shelfWindow.shelfShot ? "transparent" : theme.glow
                 border.width: 2
                 border.color: theme.accent
@@ -393,7 +393,7 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
-                radius: 14
+                radius: theme.radiusSurface
                 color: root.ghostShot ? "transparent" : theme.glow
                 border.width: 2
                 border.color: theme.accent
@@ -409,7 +409,7 @@ Window {
         id: skin
         anchors.fill: parent
         anchors.margins: 6
-        radius: 14
+        radius: theme.radiusSurface
         color: theme.surface
         border.width: 1
         border.color: theme.hairline
@@ -451,22 +451,22 @@ Window {
             id: body
             anchors.fill: parent
             anchors.margins: theme.pad
-            spacing: 12
+            spacing: theme.pad
 
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 10
+                spacing: theme.gap
 
                 Rectangle {
                     implicitWidth: 38
                     implicitHeight: 38
-                    radius: 9
+                    radius: theme.radiusRow
                     color: theme.raised
 
                     Label {
                         anchors.centerIn: parent
                         text: "K"
-                        font.pixelSize: 20
+                        font.pixelSize: theme.textBrand
                         font.bold: true
                         color: hub.awake ? theme.accent : theme.secondaryText
                     }
@@ -474,7 +474,7 @@ Window {
 
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: 4
+                    spacing: theme.gapTight
 
                     Label {
                         text: hub.showing_settings ? "Settings" : "Kavverna"
@@ -493,7 +493,7 @@ Window {
                         RowLayout {
                             id: pill
                             anchors.centerIn: parent
-                            spacing: 6
+                            spacing: theme.gapSnug
 
                             Rectangle {
                                 implicitWidth: 7
@@ -557,7 +557,7 @@ Window {
                             Layout.fillWidth: visible
                             Layout.fillHeight: true
                             theme: theme
-                            corner: 8
+                            corner: theme.radiusRow
                             fill: current ? theme.selected : "transparent"
                             text: modelData.name
 
@@ -579,8 +579,8 @@ Window {
                                     anchors.centerIn: parent
                                     visible: tab.modelData.icon !== ""
                                     source: tab.modelData.icon
-                                    implicitWidth: 18
-                                    implicitHeight: 18
+                                    implicitWidth: theme.iconLarge
+                                    implicitHeight: theme.iconLarge
                                     isMask: true
                                     color: tab.mark
                                 }
@@ -626,7 +626,7 @@ Window {
                     // the flickable's own width instead leaves the content wider than what is
                     // visible, and the right hand side of every row goes off the edge.
                     width: scroller.availableWidth
-                    spacing: 12
+                    spacing: theme.pad
 
                 EnergySection {
                     theme: theme

@@ -81,6 +81,6 @@ ColumnLayout {
         id: card
         theme: section.theme
         visible: section.open
-        spacing: 12
+        spacing: section.theme.pad
     }
 }

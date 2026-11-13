@@ -155,7 +155,16 @@ QtObject {
     readonly property int pad: 12
 
     readonly property int radiusSmall: 6
+    /// A row in a list and a tab in the strip: rounder than a button, tighter than a card.
+    readonly property int radiusRow: 8
     readonly property int radius: 10
+    /// The outer skin of a window, the panel's and the shelf's, and the ghosts that stand in
+    /// for them during a drag.
+    readonly property int radiusSurface: 14
+
+    readonly property int buttonHeight: 26
+    /// For buttons that sit inside a row of a list, or a row of several presets.
+    readonly property int buttonHeightCompact: 22
 
     readonly property int iconSmall: 12
     readonly property int iconMedium: 16
@@ -166,4 +175,6 @@ QtObject {
     readonly property int textBody: 11
     readonly property int textStrong: 13
     readonly property int textTitle: 16
+    /// The letter on the badge in the header, which is a mark rather than text.
+    readonly property int textBrand: 20
 }

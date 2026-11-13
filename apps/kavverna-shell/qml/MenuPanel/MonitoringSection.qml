@@ -11,7 +11,7 @@ ColumnLayout {
     required property var shows
 
     Layout.fillWidth: true
-    spacing: 12
+    spacing: section.theme.pad
 
     component Meter: ColumnLayout {
         id: meter
@@ -78,7 +78,7 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        spacing: 10
+        spacing: section.theme.gap
         visible: section.shows("system-monitor")
 
         ColumnLayout {
@@ -201,12 +201,12 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        spacing: 10
+        spacing: section.theme.gap
         visible: section.shows("system-monitor")
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 4
+            spacing: section.theme.gapTight
             visible: section.vitals.card_names.length > 1
 
             Repeater {
@@ -219,7 +219,7 @@ ColumnLayout {
                     theme: section.theme
                     active: section.vitals.chosen_card === index
                     Layout.fillWidth: true
-                    implicitHeight: 24
+                    compact: true
                     text: modelData
                     onClicked: section.vitals.choose_card(index)
                 }
@@ -252,7 +252,7 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        spacing: 10
+        spacing: section.theme.gap
         visible: section.shows("network-monitor")
 
         Label {
@@ -311,7 +311,7 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        spacing: 10
+        spacing: section.theme.gap
         visible: section.shows("system-monitor")
 
         Label {

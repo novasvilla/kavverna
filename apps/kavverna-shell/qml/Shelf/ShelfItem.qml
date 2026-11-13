@@ -30,7 +30,7 @@ Rectangle {
     readonly property bool glancing: hover.hovered && row.glance.length > 0
 
     implicitHeight: line.implicitHeight + 12
-    radius: 8
+    radius: row.theme.radiusRow
     color: row.onIt ? row.theme.selected : hover.hovered ? row.theme.selected : row.theme.sunken
     border.width: row.onIt ? 1 : 0
     border.color: row.theme.accent
@@ -110,7 +110,7 @@ Rectangle {
         id: line
         anchors.fill: parent
         anchors.margins: 6
-        spacing: 4
+        spacing: row.theme.gapTight
 
         Label {
             visible: row.opensPile
@@ -141,7 +141,7 @@ Rectangle {
             Rectangle {
                 implicitWidth: 36
                 implicitHeight: 36
-                radius: 6
+                radius: row.theme.radiusSmall
                 color: row.theme.sunken
                 clip: true
 
@@ -192,9 +192,7 @@ Rectangle {
                     IconButton {
                         theme: row.theme
                         source: "document-open"
-                        size: 11
-                        implicitWidth: 22
-                        implicitHeight: 22
+                        size: row.theme.iconSmall
                         enabled: row.alive
                         text: "Open"
                         onClicked: Qt.openUrlExternally(row.shelf.open_target(row.entryId))
@@ -203,9 +201,7 @@ Rectangle {
                     IconButton {
                         theme: row.theme
                         source: "system-file-manager"
-                        size: 11
-                        implicitWidth: 22
-                        implicitHeight: 22
+                        size: row.theme.iconSmall
                         visible: row.shelf.row_kinds[row.at] !== "link"
                         enabled: row.alive
                         text: "Reveal in the file manager"
@@ -215,9 +211,7 @@ Rectangle {
                     IconButton {
                         theme: row.theme
                         source: "edit-copy"
-                        size: 11
-                        implicitWidth: 22
-                        implicitHeight: 22
+                        size: row.theme.iconSmall
                         text: row.shelf.row_kinds[row.at] === "link"
                                       ? "Copy the address" : "Copy the path"
                         onClicked: row.home.copyText(row.shelf.path_of(row.entryId))
@@ -228,9 +222,7 @@ Rectangle {
                     IconButton {
                         theme: row.theme
                         source: "edit-delete"
-                        size: 11
-                        implicitWidth: 22
-                        implicitHeight: 22
+                        size: row.theme.iconSmall
                         text: "Take it off the shelf"
                         onClicked: {
                             row.home.picked = []

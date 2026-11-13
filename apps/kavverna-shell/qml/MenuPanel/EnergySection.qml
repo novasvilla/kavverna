@@ -11,7 +11,7 @@ ColumnLayout {
     required property var shows
 
     Layout.fillWidth: true
-    spacing: 12
+    spacing: section.theme.pad
 
     SectionLabel {
         theme: section.theme
@@ -20,11 +20,11 @@ ColumnLayout {
 
     Card {
         theme: section.theme
-        spacing: 10
+        spacing: section.theme.gap
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 10
+            spacing: section.theme.gap
 
             Bolt {
                 color: section.hub.awake ? section.theme.accent : section.theme.secondaryText
@@ -60,7 +60,7 @@ ColumnLayout {
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 4
+            spacing: section.theme.gapTight
 
             Repeater {
                 model: [
@@ -86,7 +86,7 @@ ColumnLayout {
         RowLayout {
             Layout.fillWidth: true
             visible: section.hub.timed
-            spacing: 6
+            spacing: section.theme.gapSnug
 
             Label {
                 text: "Add more"
@@ -106,7 +106,7 @@ ColumnLayout {
 
                     theme: section.theme
                     Layout.fillWidth: true
-                    implicitHeight: 24
+                    compact: true
                     text: modelData.label
                     onClicked: section.hub.extend_minutes(modelData.minutes)
                 }

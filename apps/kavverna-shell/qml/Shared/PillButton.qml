@@ -8,11 +8,12 @@ Pressable {
     id: pill
 
     property bool active: false
+    property bool compact: false
 
     // Room to breathe when the button sizes itself; a row of them squeezed by a layout still
     // keeps only the thin padding below, so short labels fit before any of them elide.
     implicitWidth: contentItem.implicitWidth + 2 * theme.gap
-    implicitHeight: 26
+    implicitHeight: compact ? theme.buttonHeightCompact : theme.buttonHeight
     font.pixelSize: theme.textBody
     leftPadding: pill.theme.gapTight / 2
     rightPadding: pill.theme.gapTight / 2
