@@ -12,8 +12,8 @@ mod opencode;
 mod private_file;
 
 pub use claude::{
-    CACHE_FILE as CLAUDE_CACHE_FILE, StatusLineLimits, StatusLineWindow, parse_status_line,
-    record_status_line,
+    CACHE_FILE as CLAUDE_CACHE_FILE, STATUSBAR_FILE as CLAUDE_STATUSBAR_FILE, StatusLineLimits,
+    StatusLineWindow, parse_status_line, record_status_line,
 };
 pub use opencode::TOTALS_SPAN;
 
@@ -151,15 +151,37 @@ pub struct TokenTotals {
 pub enum Usage {
     Allowance(Vec<Window>),
     Totals(TokenTotals),
-    /// The agent is installed but has left nothing readable yet. For Claude Code that means the
-    /// status line passthrough has not run.
+    /// The agent is installed but has left nothing readable yet. For Claude Code that means
+    /// neither Kavverna's passthrough nor `claude-statusbar` has seen an allowance.
     NoReading,
+}
+
+/// Where a reading came from, for an agent that can be read through more than one file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Source {
+    /// Kavverna's own status line passthrough.
+    Kavverna,
+    /// The copy the `claude-statusbar` tool keeps of the last status line document.
+    ClaudeStatusbar,
+}
+
+impl Source {
+    /// Stable across releases, like [`Agent::id`].
+    pub fn id(self) -> &'static str {
+        match self {
+            Source::Kavverna => "kavverna",
+            Source::ClaudeStatusbar => "claude-statusbar",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentUsage {
     pub agent: Agent,
     pub usage: Usage,
+    /// `None` for an agent read from its own files, which have only one place to be, and for
+    /// [`Usage::NoReading`].
+    pub source: Option<Source>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -181,23 +203,31 @@ impl UsageMeter {
         Self::default()
     }
 
-    /// `data_dir` is the user's data home, where OpenCode keeps its database, and `cache_dir` is
-    /// Kavverna's own cache directory, where the Claude Code passthrough writes.
+    /// `data_dir` is the user's data home, where OpenCode keeps its database, `cache_home` is the
+    /// user's cache home, where `claude-statusbar` keeps its copy, and `cache_dir` is Kavverna's
+    /// own cache directory, where the Claude Code passthrough writes.
     pub fn read_in(
         &mut self,
         home: &Path,
         data_dir: &Path,
+        cache_home: &Path,
         cache_dir: &Path,
         now: SystemTime,
     ) -> Snapshot {
         let mut agents = Vec::new();
 
         if home.join(".claude").is_dir() {
-            let usage = match claude::read_cache(cache_dir, now) {
-                Some(windows) => Usage::Allowance(windows),
-                None => Usage::NoReading,
+            let found = match claude::latest(cache_dir, cache_home) {
+                Some(reading) => AgentUsage {
+                    agent: Agent::ClaudeCode,
+                    usage: Usage::Allowance(reading.windows(now)),
+                    source: Some(reading.source),
+                },
+                None => {
+                    AgentUsage { agent: Agent::ClaudeCode, usage: Usage::NoReading, source: None }
+                }
             };
-            agents.push(AgentUsage { agent: Agent::ClaudeCode, usage });
+            agents.push(found);
         }
 
         let codex_home = home.join(".codex");
@@ -206,7 +236,7 @@ impl UsageMeter {
                 Some(windows) => Usage::Allowance(windows),
                 None => Usage::NoReading,
             };
-            agents.push(AgentUsage { agent: Agent::Codex, usage });
+            agents.push(AgentUsage { agent: Agent::Codex, usage, source: None });
         }
 
         let opencode_db = opencode::database(data_dir);
@@ -215,7 +245,7 @@ impl UsageMeter {
                 Some(totals) => Usage::Totals(totals),
                 None => Usage::NoReading,
             };
-            agents.push(AgentUsage { agent: Agent::OpenCode, usage });
+            agents.push(AgentUsage { agent: Agent::OpenCode, usage, source: None });
         }
 
         Snapshot { taken_at: now, agents }
@@ -224,15 +254,21 @@ impl UsageMeter {
     pub fn read(&mut self, now: SystemTime) -> Snapshot {
         match (directories::BaseDirs::new(), cache_dir()) {
             (Some(base), Some(cache)) => {
-                self.read_in(base.home_dir(), base.data_dir(), &cache, now)
+                self.read_in(base.home_dir(), base.data_dir(), base.cache_dir(), &cache, now)
             }
             _ => Snapshot { taken_at: now, agents: Vec::new() },
         }
     }
 }
 
-pub fn discover_in(home: &Path, data_dir: &Path, cache_dir: &Path, now: SystemTime) -> Snapshot {
-    UsageMeter::new().read_in(home, data_dir, cache_dir, now)
+pub fn discover_in(
+    home: &Path,
+    data_dir: &Path,
+    cache_home: &Path,
+    cache_dir: &Path,
+    now: SystemTime,
+) -> Snapshot {
+    UsageMeter::new().read_in(home, data_dir, cache_home, cache_dir, now)
 }
 
 pub fn discover(now: SystemTime) -> Snapshot {
@@ -299,11 +335,15 @@ mod tests {
     fn only_agents_present_in_home_are_listed() {
         let home = tempfile::tempdir().unwrap();
         let cache = tempfile::tempdir().unwrap();
-        assert!(discover_in(home.path(), home.path(), cache.path(), at(1)).agents.is_empty());
+        assert!(
+            discover_in(home.path(), home.path(), home.path(), cache.path(), at(1))
+                .agents
+                .is_empty()
+        );
 
         std::fs::create_dir(home.path().join(".codex")).unwrap();
         std::fs::create_dir(home.path().join(".claude")).unwrap();
-        let snapshot = discover_in(home.path(), home.path(), cache.path(), at(1));
+        let snapshot = discover_in(home.path(), home.path(), home.path(), cache.path(), at(1));
         let listed: Vec<_> = snapshot.agents.iter().map(|a| (a.agent, a.usage.clone())).collect();
         assert_eq!(
             listed,
@@ -322,13 +362,79 @@ mod tests {
         std::fs::create_dir_all(&default).unwrap();
         std::fs::write(default.join("opencode.db"), b"").unwrap();
 
-        let snapshot = discover_in(home.path(), data.path(), cache.path(), at(1));
+        let snapshot = discover_in(home.path(), data.path(), home.path(), cache.path(), at(1));
         assert!(snapshot.agents.is_empty(), "found a database outside the data home");
 
         std::fs::create_dir_all(data.path().join("opencode")).unwrap();
         std::fs::write(data.path().join("opencode/opencode.db"), b"").unwrap();
-        let snapshot = discover_in(home.path(), data.path(), cache.path(), at(1));
+        let snapshot = discover_in(home.path(), data.path(), home.path(), cache.path(), at(1));
         let listed: Vec<_> = snapshot.agents.iter().map(|a| a.agent).collect();
         assert_eq!(listed, vec![Agent::OpenCode]);
+    }
+
+    /// A statusbar copy carrying everything a real status line document does, with made-up
+    /// values that must not survive into the reading.
+    const STATUSBAR_DOCUMENT: &str = r#"{
+        "session_id": "11111111-2222-3333-4444-555555555555",
+        "cwd": "/tmp/private-folder",
+        "transcript_path": "/tmp/private-folder/private-transcript.jsonl",
+        "model": {"id": "private-model-id", "display_name": "Private Model Name"},
+        "workspace": {"current_dir": "/tmp/private-workspace"},
+        "rate_limits": {"seven_day": {"used_percentage": 12.5, "resets_at": 1800300000}}
+    }"#;
+
+    #[test]
+    fn claude_code_is_read_through_the_statusbar_copy_and_keeps_only_the_limits() {
+        let home = tempfile::tempdir().unwrap();
+        let cache_home = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        std::fs::create_dir(home.path().join(".claude")).unwrap();
+        let copy = cache_home.path().join(CLAUDE_STATUSBAR_FILE);
+        std::fs::create_dir_all(copy.parent().unwrap()).unwrap();
+        std::fs::write(&copy, STATUSBAR_DOCUMENT).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&copy)
+            .unwrap()
+            .set_modified(at(1_799_990_000))
+            .unwrap();
+
+        let snapshot = discover_in(
+            home.path(),
+            home.path(),
+            cache_home.path(),
+            cache.path(),
+            at(1_799_990_060),
+        );
+        let found = &snapshot.agents[0];
+        assert_eq!(found.agent, Agent::ClaudeCode);
+        assert_eq!(found.source, Some(Source::ClaudeStatusbar));
+        let Usage::Allowance(windows) = &found.usage else { panic!("no allowance read") };
+        assert_eq!(windows.len(), 1);
+        assert_eq!(windows[0].kind, WindowKind::Weekly);
+        assert_eq!(windows[0].used_percent, 12.5);
+        assert_eq!(windows[0].observed_at, at(1_799_990_000));
+
+        let kept = format!("{snapshot:?}");
+        for private in [
+            "11111111",
+            "private-folder",
+            "private-transcript",
+            "private-model",
+            "Private Model",
+            "private-workspace",
+        ] {
+            assert!(!kept.contains(private), "{private} survived into the reading");
+        }
+        assert!(cache.path().read_dir().unwrap().next().is_none(), "the copy was recorded");
+    }
+
+    #[test]
+    fn a_missing_reading_names_no_source() {
+        let home = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        std::fs::create_dir(home.path().join(".claude")).unwrap();
+        let snapshot = discover_in(home.path(), home.path(), home.path(), cache.path(), at(1));
+        assert_eq!(snapshot.agents[0].source, None);
     }
 }

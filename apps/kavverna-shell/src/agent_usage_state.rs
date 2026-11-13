@@ -282,6 +282,7 @@ mod tests {
                     window(300, 1_000, 2_000),
                     window(10_080, 1_000, 9_000),
                 ]),
+                source: None,
             }],
         };
 
@@ -302,7 +303,7 @@ mod tests {
         let snapshot = Snapshot {
             taken_at: at(1_000),
             agents: vec![
-                AgentUsage { agent: Agent::Codex, usage: Usage::NoReading },
+                AgentUsage { agent: Agent::Codex, usage: Usage::NoReading, source: None },
                 AgentUsage {
                     agent: Agent::OpenCode,
                     usage: Usage::Totals(TokenTotals {
@@ -310,6 +311,7 @@ mod tests {
                         cost: 0.5,
                         ..Default::default()
                     }),
+                    source: None,
                 },
             ],
         };
