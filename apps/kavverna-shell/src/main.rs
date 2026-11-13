@@ -57,7 +57,16 @@ fn main() {
 
     tracing::info!(version = env!("CARGO_PKG_VERSION"), "kavverna starting");
 
-    let bus = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
+    // Two workers, not one per core. All that runs here is the remote interface, the global
+    // shortcuts and the suspend and lock watch, plus the reader task zbus starts for each of
+    // their connections: a handful of futures parked on the bus. One worker would do; the
+    // second keeps a slow handler from holding up the rest.
+    let bus = match tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .thread_name("kavverna-bus")
+        .enable_all()
+        .build()
+    {
         Ok(runtime) => runtime,
         Err(err) => {
             tracing::error!(%err, "no runtime for the session bus");
