@@ -10,7 +10,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "agent-usage"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "directories",
  "rusqlite",
@@ -71,7 +71,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "app-identity"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "tempfile",
 ]
@@ -490,7 +490,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "clipboard-history"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "blake3",
  "htmd",
@@ -999,7 +999,7 @@ dependencies = [
 
 [[package]]
 name = "feature-catalog"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "strum",
  "strum_macros",
@@ -1452,7 +1452,7 @@ dependencies = [
 
 [[package]]
 name = "kavverna-shell"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "agent-usage",
  "clipboard-history",
@@ -1483,7 +1483,7 @@ dependencies = [
 
 [[package]]
 name = "kde-bridge"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "futures-util",
  "thiserror 2.0.20",
@@ -1494,7 +1494,7 @@ dependencies = [
 
 [[package]]
 name = "keep-awake"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "fastrand",
  "thiserror 2.0.20",
@@ -1617,7 +1617,7 @@ dependencies = [
 
 [[package]]
 name = "link-cleaner"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "url",
 ]
@@ -2222,7 +2222,7 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "preferences"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "directories",
  "serde_json",
@@ -2675,7 +2675,7 @@ dependencies = [
 
 [[package]]
 name = "shelf"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "blake3",
  "directories",
@@ -2753,7 +2753,7 @@ dependencies = [
 
 [[package]]
 name = "sound-mixer"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "app-identity",
  "libspa",
@@ -2884,7 +2884,7 @@ dependencies = [
 
 [[package]]
 name = "system-monitor"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "app-identity",
  "libc",

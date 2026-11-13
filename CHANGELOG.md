@@ -3,6 +3,61 @@
 Versions are `major.minor.fix.build`. The first three are the release; the fourth is the
 build that produced the binary, stamped by CI and zero for anything built by hand.
 
+## 0.6.0
+
+### Added
+
+- **The applications behind every reading.** Clicking CPU, Memory, a graphics card or Disk
+  activity on the Monitoring page opens the applications spending it, one row per application
+  with its name and icon. Helpers fold into the application that started them through its
+  systemd unit, so a browser is one row, not forty. The two graphics cards are listed apart and
+  never added together. The order holds still while the pointer is over the list, and a row
+  only overtakes another when it leads clearly for two readings in a row.
+- **Ending an application, and knowing it ended.** A row can end its application or force it
+  to stop, after asking in the row itself. Kavverna reads the process table again afterwards
+  and says whether it really went, and refuses in plain words for anything that belongs to the
+  desktop session, another user or Kavverna itself.
+- **Listening ports.** A card at the end of the Monitoring page lists what your programs listen
+  on, whether each port is open to the network or only to this computer, and ends the program
+  behind one with a confirmation that names the port it closes.
+- **AI agents.** A card shows how much of each installed coding agent's allowance is used.
+  Claude Code is asked for its own usage, the same as typing `/usage`, so weekly and per-model
+  limits appear with their reset times. Codex is read from its session files and OpenCode from
+  its database, all on this computer. Every reading says how old it is, and a window that has
+  reset since is never shown as current.
+- **A Monitoring page arranged your way.** Cards move by dragging their heading, fold with a
+  click and show a one-line summary when folded. The order and the folds are kept, and Settings
+  lists the cards with buttons to move them and to restore the original order.
+- **Clipboard history that can expire.** Entries older than one, seven, thirty or ninety days
+  can be dropped, pinned ones always kept. Entries can be edited in place, several can be picked
+  and pasted together, pictures show as thumbnails, and the list loads more as it scrolls.
+- **Scripts and agents can read what the panel shows.** The session bus answers with the top
+  applications for a resource, the listening ports, the AI agents reading and the clipboard
+  history, each as JSON. Nothing there can end or change anything.
+- **A new logo,** drawn by Ian Ponce Vargas, as the app icon, the tray mark and the panel's
+  header.
+
+### Changed
+
+- **Less work while the panel is closed.** Readings stop reaching the interface, the graphics
+  cards are no longer asked, the tray redraws only when what it shows changes, and the bus runs
+  on two threads instead of one per core.
+- **Controls that always tell the truth.** A switch or a check box shows the value Kavverna
+  holds, so a refused change or one made from the tray no longer leaves it showing the wrong
+  state.
+- **Keyboard and screen readers.** Every tab, heading and control is reached with Tab, shows a
+  focus ring and carries a name.
+- **Clearing a whole history or shelf asks twice.**
+- **The panel has a close button,** and Escape closes it as soon as it opens.
+- **Rust 1.89 or newer** is needed to build, which is what the dependencies already required.
+
+### Fixed
+
+- **Clean URL no longer keeps the history recording.** With Clipboard History removed and Clean
+  URL installed, an old history switch kept saving what was copied.
+- **Transforming the clipboard works on its own.** With only that utility installed, its
+  buttons did nothing because nothing was reading the clipboard.
+
 ## 0.5.0
 
 ### Added

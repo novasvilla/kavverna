@@ -6,7 +6,7 @@ Linux. Fresh implementation, not a port. See CREDITS.md.
 
 ## Target
 
-CachyOS (Arch), KDE Plasma 6.7, KWin on Wayland, Qt 6, Kirigami, PipeWire, Rust 1.85+ on edition
+CachyOS (Arch), KDE Plasma 6.7, KWin on Wayland, Qt 6, Kirigami, PipeWire, Rust 1.89+ on edition
 2024. Desktop machine with no battery, so battery features are out of scope. Two GPUs: an
 NVIDIA discrete card read through NVML and an AMD integrated one read through sysfs. They
 are never summed into one figure.
