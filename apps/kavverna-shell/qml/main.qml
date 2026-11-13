@@ -679,6 +679,11 @@ Window {
                 Layout.fillHeight: true
                 implicitHeight: pages.implicitHeight
                 contentWidth: availableWidth
+                // The bar is laid over the content's right edge, where every card keeps its fold
+                // chevron and drag handle, so a bar that appeared covered them. Reserving its
+                // width always, not only while it shows, keeps the cards from shifting when a
+                // page grows tall enough to scroll.
+                rightPadding: ScrollBar.vertical.width + theme.gapTight
                 clip: true
                 // Nothing here is ever meant to be wider than the panel, so a horizontal bar
                 // would only ever mean a page had overflowed.
