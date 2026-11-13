@@ -51,12 +51,11 @@ impl DiskSampler {
                 })
             });
             let mut rates = (None, None);
-            if let Some(device) = device {
-                if let Some(&(read, written)) = counters.get(&device) {
-                    rates =
-                        rates_since(self.previous.get(&device).copied(), (read, written), elapsed);
-                    current.insert(device, (read, written));
-                }
+            if let Some(device) = device
+                && let Some(&(read, written)) = counters.get(&device)
+            {
+                rates = rates_since(self.previous.get(&device).copied(), (read, written), elapsed);
+                current.insert(device, (read, written));
             }
             readings.push(DiskReading {
                 name: volume.name,

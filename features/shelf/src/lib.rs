@@ -213,10 +213,10 @@ impl Shelf {
                     .any(|remaining| remaining.owned_blob() == Some(*blob))
             })
             .map(std::path::Path::to_path_buf);
-        if self.save_change(piles) {
-            if let Some(blob) = orphan {
-                let _ = std::fs::remove_file(blob);
-            }
+        if self.save_change(piles)
+            && let Some(blob) = orphan
+        {
+            let _ = std::fs::remove_file(blob);
         }
     }
 

@@ -192,17 +192,16 @@ impl Tracked {
 
         // Every Electron application calls itself Chromium, so without this the mixer shows
         // several identical rows and no way to tell which is which.
-        if is_generic(&name) || is_generic(key.as_str()) {
-            if let Some(real) = process_id(&props, client.as_ref())
+        if (is_generic(&name) || is_generic(key.as_str()))
+            && let Some(real) = process_id(&props, client.as_ref())
                 .map(cmdline_of_process)
                 .and_then(|args| refine_from_cmdline(&args))
-            {
-                if is_generic(&name) {
-                    name = presentable(&real);
-                }
-                if is_generic(key.as_str()) {
-                    key = crate::AppKey::from_refined(&real);
-                }
+        {
+            if is_generic(&name) {
+                name = presentable(&real);
+            }
+            if is_generic(key.as_str()) {
+                key = crate::AppKey::from_refined(&real);
             }
         }
 
@@ -674,10 +673,10 @@ fn adopt_node(
                     if let Some(place) = place {
                         state.route_of_node.insert(id, place);
                     }
-                    if let Some(serial) = full.get("object.serial").and_then(|v| v.parse().ok()) {
-                        if let Some(device) = state.devices.get_mut(&id) {
-                            device.serial = serial;
-                        }
+                    if let Some(serial) = full.get("object.serial").and_then(|v| v.parse().ok())
+                        && let Some(device) = state.devices.get_mut(&id)
+                    {
+                        device.serial = serial;
                     }
                 }
                 drop(state);

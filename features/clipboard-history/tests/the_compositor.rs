@@ -157,11 +157,11 @@ fn what_we_put_back_is_readable_and_is_not_a_new_copy() {
     let mut seen = None;
     for _ in 0..20 {
         std::thread::sleep(Duration::from_millis(100));
-        if let Some(text) = paste() {
-            if text == "put back by kavverna" {
-                seen = Some(text);
-                break;
-            }
+        if let Some(text) = paste()
+            && text == "put back by kavverna"
+        {
+            seen = Some(text);
+            break;
         }
     }
     assert_eq!(seen.as_deref(), Some("put back by kavverna"), "the paste target read our offer");
