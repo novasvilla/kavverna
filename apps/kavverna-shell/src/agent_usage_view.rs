@@ -32,6 +32,7 @@ pub mod qobject {
         #[qproperty(QStringList, agent_costs)]
         #[qproperty(QList_i32, window_agents)]
         #[qproperty(QStringList, window_labels)]
+        #[qproperty(QStringList, window_notes)]
         #[qproperty(QList_f64, window_used)]
         #[qproperty(QStringList, window_used_texts)]
         #[qproperty(QStringList, window_reset_texts)]
@@ -72,6 +73,7 @@ pub struct AgentUsageViewRust {
     agent_costs: QStringList,
     window_agents: QList<i32>,
     window_labels: QStringList,
+    window_notes: QStringList,
     window_used: QList<f64>,
     window_used_texts: QStringList,
     window_reset_texts: QStringList,
@@ -87,6 +89,14 @@ pub fn window_label(kind: WindowKind, minutes: Option<u32>) -> String {
         (_, Some(m)) if m > 0 && m % 60 == 0 => format!("{}-hour", m / 60),
         (_, Some(m)) if m > 0 => format!("{m}-minute"),
         _ => "Allowance".into(),
+    }
+}
+
+/// A cap that counts one model's use is known by that model's name.
+pub fn shown_label(window: &Window) -> String {
+    match &window.scope {
+        Some(model) => model.clone(),
+        None => window_label(window.kind, window.minutes),
     }
 }
 
@@ -185,8 +195,9 @@ pub fn cost_text(cost: f64) -> String {
 pub fn waiting_note(agent: Agent) -> &'static str {
     match agent {
         Agent::ClaudeCode => {
-            "Set Claude Code's status line command to kavverna-shell --claude-statusline and \
-             the allowance appears after its next reply on a subscription plan."
+            "Kavverna asks Claude Code for its usage while this panel is open. A status line \
+             command of kavverna-shell --claude-statusline also records it after each reply on \
+             a subscription plan."
         }
         Agent::Codex => "Codex writes its allowance down after its next reply.",
         Agent::OpenCode => "OpenCode's database could not be read.",
@@ -225,14 +236,16 @@ impl qobject::AgentUsageView {
         let mut window_used = QList::<f64>::default();
         let (mut labels, mut used, mut resets, mut window_ages, mut states) =
             (vec![], vec![], vec![], vec![], vec![]);
+        let mut window_notes = vec![];
 
         for (index, found) in agents.iter().enumerate() {
             ids.push(found.agent.id().to_owned());
             titles.push(found.agent.title().to_owned());
+            let problem = found.problem.map(|problem| problem.message().to_owned());
             let (kind, note, age, total, cost) = match &found.usage {
                 Usage::NoReading => (
                     "no-reading",
-                    waiting_note(found.agent).to_owned(),
+                    problem.unwrap_or_else(|| waiting_note(found.agent).to_owned()),
                     String::new(),
                     "".into(),
                     "".into(),
@@ -241,7 +254,8 @@ impl qobject::AgentUsageView {
                     for window in windows {
                         window_agents.append(index as i32);
                         window_used.append(window.used_percent);
-                        labels.push(window_label(window.kind, window.minutes));
+                        labels.push(shown_label(window));
+                        window_notes.push(window.note.clone().unwrap_or_default());
                         used.push(format!("{:.0}%", window.used_percent));
                         resets.push(reset_text(window.resets_at, now, local_clock));
                         window_ages.push(age_text(window.observed_at, now));
@@ -254,7 +268,7 @@ impl qobject::AgentUsageView {
                     }
                     let newest = windows.iter().map(|w: &Window| w.observed_at).max();
                     let age = newest.map(|at| age_text(at, now)).unwrap_or_default();
-                    ("allowance", String::new(), age, String::new(), String::new())
+                    ("allowance", problem.unwrap_or_default(), age, String::new(), String::new())
                 }
                 Usage::Totals(spent) => (
                     "totals",
@@ -280,6 +294,7 @@ impl qobject::AgentUsageView {
         self.as_mut().set_agent_costs(strings(costs));
         self.as_mut().set_window_agents(window_agents);
         self.as_mut().set_window_labels(strings(labels));
+        self.as_mut().set_window_notes(strings(window_notes));
         self.as_mut().set_window_used(window_used);
         self.as_mut().set_window_used_texts(strings(used));
         self.as_mut().set_window_reset_texts(strings(resets));
@@ -385,7 +400,26 @@ mod tests {
     }
 
     #[test]
-    fn claude_code_waiting_says_how_to_start_the_reading() {
-        assert!(waiting_note(Agent::ClaudeCode).contains("--claude-statusline"));
+    fn claude_code_waiting_says_how_the_reading_starts() {
+        let note = waiting_note(Agent::ClaudeCode);
+        assert!(note.contains("asks Claude Code"));
+        assert!(note.contains("--claude-statusline"));
+    }
+
+    #[test]
+    fn a_scoped_cap_is_named_by_its_model() {
+        let now = at(1_000);
+        let window = Window {
+            kind: WindowKind::Weekly,
+            minutes: Some(10_080),
+            used_percent: 95.0,
+            resets_at: None,
+            observed_at: now,
+            state: agent_usage::Freshness::Fresh,
+            scope: Some("Example Model".into()),
+            note: Some("Up to 50% of your weekly limit".into()),
+        };
+        assert_eq!(shown_label(&window), "Example Model");
+        assert_eq!(shown_label(&Window { scope: None, ..window }), "Weekly");
     }
 }

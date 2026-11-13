@@ -129,6 +129,11 @@ not. See [CREDITS.md](CREDITS.md).
   started. Container bridge links are left out of the panel.
 - **Local storage**, with free capacity and read/write rates for the system volume and distinct
   home or removable volumes. Missing kernel counters are shown as unavailable.
+- **AI agents**: how much of Claude Code's and Codex's allowance is used, including Claude's
+  weekly caps for a single model, and OpenCode's token totals. While the panel is open the AI
+  agents utility asks your installed Claude Code for its usage, at most once a minute. Claude
+  Code then contacts Anthropic with its own sign-in, the same as typing `/usage`. Codex and
+  OpenCode are read from the files they keep.
 
 ### Clipboard
 
@@ -302,8 +307,11 @@ matter of adding backends rather than rewriting.
 
 ## Private by default
 
-Nothing leaves the machine. There is no account, no telemetry, no update check and no network
-code of any kind. What you copy is stored under `$XDG_DATA_HOME/kavverna` in a database only
+Kavverna itself sends nothing off the machine. There is no account, no telemetry, no update
+check and no network code of any kind. The one exception is made by another program: the AI
+agents utility can ask your installed Claude Code for its usage, and Claude Code contacts
+Anthropic with its own sign-in to answer, the same as when you type `/usage`. Kavverna makes no
+network request and reads no credential for it. What you copy is stored under `$XDG_DATA_HOME/kavverna` in a database only
 your user can read, and the settings live beside it with the same permissions. All of it can be
 deleted at any time from the panel or by removing the directory.
 See [docs/PRIVACY.md](docs/PRIVACY.md).

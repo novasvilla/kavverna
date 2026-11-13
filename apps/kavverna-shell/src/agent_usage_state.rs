@@ -1,10 +1,10 @@
 use crate::{agent_usage_view, panel};
-use agent_usage::{Freshness, Snapshot, Usage, UsageMeter, Window, WindowKind};
+use agent_usage::{Agent, AskError, Freshness, Snapshot, Usage, UsageMeter, Window, WindowKind};
 use serde_json::{Value, json};
 use std::io::{IsTerminal, Read, Write};
 use std::sync::mpsc::{RecvTimeoutError, Sender};
 use std::sync::{Mutex, MutexGuard};
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
 /// The agents write their figures down at most once a reply, so reading more often finds the
 /// same files. Nothing is read at all while the panel is hidden.
@@ -57,11 +57,22 @@ pub fn run(on_change: impl Fn()) {
     tracing::info!("agent usage reader started");
 
     let mut meter = UsageMeter::new();
+    let mut asking = Asking::default();
     let mut due = panel::is_open();
     loop {
         if due {
-            take(&mut meter);
+            let snapshot = take(&mut meter);
             on_change();
+            // Asked after the files are shown, since an answer can take many seconds and the
+            // panel should not sit empty meanwhile.
+            let claude_listed = snapshot.agents.iter().any(|a| a.agent == Agent::ClaudeCode);
+            if claude_listed && panel::is_open() && asking.is_due() {
+                let outcome = agent_usage::ask_claude_code();
+                asking.after(outcome.as_ref().err().copied());
+                meter.keep_claude_answer(outcome);
+                take(&mut meter);
+                on_change();
+            }
         }
         let next = if panel::is_open() {
             requests.recv_timeout(EVERY)
@@ -79,6 +90,26 @@ pub fn run(on_change: impl Fn()) {
             }
             Err(RecvTimeoutError::Disconnected) => return,
         };
+    }
+}
+
+/// When Claude Code may next be started. Kept for the life of the reader, so closing and opening
+/// the panel, or asking for a reading over the bus, never starts it sooner than the backoff says.
+#[derive(Default)]
+struct Asking {
+    next: Option<Instant>,
+    failures_in_a_row: u32,
+}
+
+impl Asking {
+    fn is_due(&self) -> bool {
+        self.next.is_none_or(|next| Instant::now() >= next)
+    }
+
+    fn after(&mut self, failure: Option<AskError>) {
+        self.failures_in_a_row = if failure.is_some() { self.failures_in_a_row + 1 } else { 0 };
+        let wait = agent_usage::ask_again_after(failure, self.failures_in_a_row);
+        self.next = Some(Instant::now() + wait);
     }
 }
 
@@ -132,6 +163,9 @@ fn as_json(installed: bool, snapshot: Option<&Snapshot>, now: SystemTime) -> Val
             let mut agent = json!({
                 "id": found.agent.id(),
                 "title": found.agent.title(),
+                "source": found.source.map(|source| source.id()),
+                "problem": found.problem.map(|problem| problem.id()),
+                "problem_text": found.problem.map(|problem| problem.message()),
             });
             match &found.usage {
                 Usage::NoReading => agent["usage"] = json!("no-reading"),
@@ -172,7 +206,9 @@ fn as_json(installed: bool, snapshot: Option<&Snapshot>, now: SystemTime) -> Val
 
 fn window_json(window: &Window, now: SystemTime) -> Value {
     json!({
-        "label": agent_usage_view::window_label(window.kind, window.minutes),
+        "label": agent_usage_view::shown_label(window),
+        "scope": window.scope,
+        "note": window.note,
         "kind": match window.kind {
             WindowKind::Session => "session",
             WindowKind::Weekly => "weekly",
@@ -269,6 +305,8 @@ mod tests {
             resets_at: Some(at(resets)),
             observed_at: at(observed),
             state: Freshness::Fresh,
+            scope: None,
+            note: None,
         }
     }
 
@@ -282,6 +320,8 @@ mod tests {
                     window(300, 1_000, 2_000),
                     window(10_080, 1_000, 9_000),
                 ]),
+                source: None,
+                problem: None,
             }],
         };
 
@@ -302,7 +342,12 @@ mod tests {
         let snapshot = Snapshot {
             taken_at: at(1_000),
             agents: vec![
-                AgentUsage { agent: Agent::Codex, usage: Usage::NoReading },
+                AgentUsage {
+                    agent: Agent::Codex,
+                    usage: Usage::NoReading,
+                    source: None,
+                    problem: None,
+                },
                 AgentUsage {
                     agent: Agent::OpenCode,
                     usage: Usage::Totals(TokenTotals {
@@ -310,6 +355,8 @@ mod tests {
                         cost: 0.5,
                         ..Default::default()
                     }),
+                    source: None,
+                    problem: None,
                 },
             ],
         };
