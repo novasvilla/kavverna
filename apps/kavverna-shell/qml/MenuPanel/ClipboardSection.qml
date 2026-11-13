@@ -39,7 +39,7 @@ ColumnLayout {
     function closeOpen() {
         page.openId = -1
         page.openForEdit = false
-        if (page.visible && search.visible && search.enabled) {
+        if (page.shown && search.visible && search.enabled) {
             search.forceActiveFocus()
         }
     }
@@ -92,16 +92,20 @@ ColumnLayout {
         }
     }
 
+    /// On screen, which `visible` alone does not say: the panel closes by hiding its window,
+    /// and an item keeps its own visibility through that.
+    readonly property bool shown: page.visible && page.Window.visibility !== Window.Hidden
+
     Layout.fillWidth: true
     spacing: page.theme.pad
 
     // Every opening starts from the top: a list left scrolled from last time would hide the
     // newest entry, which is nearly always the one wanted. A close still pending from a pick
     // must not reach a panel that has since been opened again.
-    onVisibleChanged: {
+    onShownChanged: {
         linger.stop()
         page.closeOpen()
-        if (visible) {
+        if (shown) {
             list.currentIndex = 0
             list.positionViewAtBeginning()
         }
@@ -382,6 +386,64 @@ ColumnLayout {
         }
     }
 
+    // The counts and the selection share one slot of fixed height above the list. A bar that
+    // arrived there only on the first pick would push every row down, and the next click meant
+    // for one row would land on the row after it.
+    Item {
+        Layout.fillWidth: true
+        visible: page.listShown
+        implicitHeight: page.theme.buttonHeight
+
+        RowLayout {
+            anchors.fill: parent
+            visible: page.clipboard.selected_count === 0
+            spacing: page.theme.gapSnug
+
+            Label {
+                text: page.clipboard.pinned_count + " pinned  ·  "
+                      + page.clipboard.recent_count + " recent"
+                font.pixelSize: page.theme.textSmall
+                color: page.theme.mutedText
+            }
+
+            Item { Layout.fillWidth: true }
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            visible: page.clipboard.selected_count > 0
+            spacing: page.theme.gapSnug
+
+            Label {
+                Layout.fillWidth: true
+                text: page.clipboard.selected_count + " selected"
+                font.pixelSize: page.theme.textSmall
+                color: page.theme.primaryText
+                elide: Text.ElideRight
+            }
+
+            PillButton {
+                id: pasteTogether
+                theme: page.theme
+                text: "Paste together"
+                onClicked: {
+                    page.clipboard.paste_selection()
+                    // The selection is let go only once the joined text is on its way, so one
+                    // still standing means nothing reached the clipboard.
+                    if (page.clipboard.selected_count === 0) {
+                        page.finish(pasteTogether.visualFocus)
+                    }
+                }
+            }
+
+            PillButton {
+                theme: page.theme
+                text: "Clear"
+                onClicked: page.clipboard.clear_selection()
+            }
+        }
+    }
+
     Card {
         theme: page.theme
         visible: page.listShown
@@ -489,64 +551,6 @@ ColumnLayout {
                     color: page.theme.primaryText
                     elide: Text.ElideRight
                 }
-            }
-        }
-    }
-
-    // The selection is told here, under the list in the line the counts use, rather than in a
-    // bar above it: a bar arriving there on the first pick would push every row down, and the
-    // next click meant for one row would land on the row after it.
-    Item {
-        Layout.fillWidth: true
-        visible: page.listShown
-        implicitHeight: page.theme.buttonHeight
-
-        RowLayout {
-            anchors.fill: parent
-            visible: page.clipboard.selected_count === 0
-            spacing: page.theme.gapSnug
-
-            Label {
-                text: page.clipboard.pinned_count + " pinned  ·  "
-                      + page.clipboard.recent_count + " recent"
-                font.pixelSize: page.theme.textSmall
-                color: page.theme.mutedText
-            }
-
-            Item { Layout.fillWidth: true }
-        }
-
-        RowLayout {
-            anchors.fill: parent
-            visible: page.clipboard.selected_count > 0
-            spacing: page.theme.gapSnug
-
-            Label {
-                Layout.fillWidth: true
-                text: page.clipboard.selected_count + " selected"
-                font.pixelSize: page.theme.textSmall
-                color: page.theme.primaryText
-                elide: Text.ElideRight
-            }
-
-            PillButton {
-                id: pasteTogether
-                theme: page.theme
-                text: "Paste together"
-                onClicked: {
-                    page.clipboard.paste_selection()
-                    // The selection is let go only once the joined text is on its way, so one
-                    // still standing means nothing reached the clipboard.
-                    if (page.clipboard.selected_count === 0) {
-                        page.finish(pasteTogether.visualFocus)
-                    }
-                }
-            }
-
-            PillButton {
-                theme: page.theme
-                text: "Clear"
-                onClicked: page.clipboard.clear_selection()
             }
         }
     }

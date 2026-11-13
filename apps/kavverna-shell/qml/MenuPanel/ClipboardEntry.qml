@@ -30,6 +30,7 @@ Pressable {
     readonly property var clipboard: clipboardSection.clipboard
     readonly property bool onIt: ListView.isCurrentItem
     readonly property bool isOpen: clipboardSection.openId === row.entry_id
+    readonly property bool isEditing: row.isOpen && clipboardSection.openForEdit
     readonly property bool editable: row.kind === "text" || row.kind === "link"
     readonly property bool hasThumbnail: row.kind === "image" && row.thumbnail_width > 0
                                          && row.thumbnail_height > 0
@@ -37,6 +38,12 @@ Pressable {
     // for one the keyboard has walked into, as well as under the pointer.
     readonly property bool showsActions: hover.hovered || row.onIt || row.activeFocus
                                          || row.focusInside(actions)
+
+    function reveal() {
+        if (row.isOpen && row.ListView.view) {
+            row.ListView.view.positionViewAtIndex(row.index, ListView.Contain)
+        }
+    }
 
     function focusInside(item) {
         for (let at = row.Window.activeFocusItem; at; at = at.parent) {
@@ -57,8 +64,9 @@ Pressable {
                        : theme.sunken
 
     // A row that holds the keyboard was reached with Tab, and somebody pasting by keyboard is
-    // about to press Ctrl+V: the panel gets out of the way at once.
-    onClicked: clipboardSection.pick(row.entry_id, row.visualFocus)
+    // about to press Ctrl+V: the panel gets out of the way at once. A row being edited does not
+    // pick: a click that missed the text area would close the panel and lose the typing.
+    onClicked: if (!row.isEditing) clipboardSection.pick(row.entry_id, row.visualFocus)
 
     // Scrolled out of the list, the delegate goes back to the pool and may come back as another
     // entry. An edit in it would be left open with nothing on screen to close it.
@@ -124,7 +132,7 @@ Pressable {
                 id: previewArea
                 Layout.fillWidth: true
                 theme: row.theme
-                enabled: row.kind !== "image"
+                enabled: !row.isEditing && row.kind !== "image"
                          && (row.isOpen || words.truncated || row.preview.endsWith("…"))
                 text: row.isOpen ? "Show less" : "Show all of it"
                 onClicked: row.isOpen ? row.clipboardSection.closeOpen()
@@ -167,11 +175,15 @@ Pressable {
 
         // Made only while open, so a reused delegate never brings an editor or a reading
         // along from the entry it showed before.
+        // Opening grows the row, and near the bottom of the list the growth would land below
+        // the card's edge; the list scrolls to keep it in sight as it opens and as the text
+        // arrives.
         Loader {
             Layout.fillWidth: true
             active: row.isOpen
             visible: active
             sourceComponent: row.clipboardSection.openForEdit ? editor : wholeText
+            onImplicitHeightChanged: if (active) Qt.callLater(row.reveal)
         }
 
         // The actions and the shortcut line share one slot as tall as the actions, so the row
@@ -247,7 +259,12 @@ Pressable {
                     source: "edit-delete"
                     size: row.theme.iconSmall
                     text: "Delete"
-                    onClicked: row.clipboard.forget(row.entry_id)
+                    onClicked: {
+                        if (row.isOpen) {
+                            row.clipboardSection.closeOpen()
+                        }
+                        row.clipboard.forget(row.entry_id)
+                    }
                 }
             }
 
