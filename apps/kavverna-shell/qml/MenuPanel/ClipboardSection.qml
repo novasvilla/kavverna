@@ -218,8 +218,8 @@ ColumnLayout {
         Tick {
             theme: section.theme
             text: "Save clipboard history"
-            checked: section.clipboard.enabled
-            onToggled: section.clipboard.enable(checked)
+            on: section.clipboard.enabled
+            onSwitched: (wanted) => section.clipboard.enable(wanted)
         }
 
         Label {

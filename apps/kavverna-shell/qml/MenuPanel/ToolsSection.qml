@@ -61,9 +61,10 @@ ColumnLayout {
 
             Toggle {
                 theme: section.theme
+                text: "Nudge the pointer"
                 enabled: section.hub.jiggle_available
-                checked: section.hub.mouse_jiggle
-                onToggled: section.hub.choose_mouse_jiggle(checked)
+                on: section.hub.mouse_jiggle
+                onSwitched: (wanted) => section.hub.choose_mouse_jiggle(wanted)
             }
         }
 

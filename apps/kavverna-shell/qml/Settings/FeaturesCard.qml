@@ -100,9 +100,10 @@ Section {
                     id: entrySwitch
                     theme: card.theme
                     visible: entry.built
+                    text: card.features.titles[entry.index]
                     enabled: card.features.settings_writable
-                    checked: card.features.installed[entry.index]
-                    onToggled: card.features.choose_installed(entry.id, checked)
+                    on: card.features.installed[entry.index]
+                    onSwitched: (wanted) => card.features.choose_installed(entry.id, wanted)
 
                     // An inside joke, reproduced verbatim; leave the text exactly as it
                     // is. Drawn in the window rather than as a ToolTip popup, which does

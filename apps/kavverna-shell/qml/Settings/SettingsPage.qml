@@ -251,10 +251,10 @@ ColumnLayout {
                     Layout.fillWidth: true
                     theme: page.theme
                     text: page.mixer.input_names[index]
-                    checked: index < page.mixer.input_preferred.length
-                             && page.mixer.input_preferred[index]
-                    onToggled: page.mixer.choose_preferred_input(
-                        page.mixer.input_ids[index], checked)
+                    on: index < page.mixer.input_preferred.length
+                        && page.mixer.input_preferred[index]
+                    onSwitched: (wanted) => page.mixer.choose_preferred_input(
+                        page.mixer.input_ids[index], wanted)
                 }
             }
 
@@ -296,10 +296,10 @@ ColumnLayout {
                     Layout.fillWidth: true
                     theme: page.theme
                     text: page.mixer.output_names[index]
-                    checked: index < page.mixer.output_in_cycle.length
-                             && page.mixer.output_in_cycle[index]
-                    onToggled: page.mixer.choose_output_in_cycle(
-                        page.mixer.output_ids[index], checked)
+                    on: index < page.mixer.output_in_cycle.length
+                        && page.mixer.output_in_cycle[index]
+                    onSwitched: (wanted) => page.mixer.choose_output_in_cycle(
+                        page.mixer.output_ids[index], wanted)
                 }
             }
         }
@@ -447,14 +447,10 @@ ColumnLayout {
                         theme: page.theme
                         text: page.clipboard.clean_rule_scopes[ruleRow.modelData] + " · "
                               + page.clipboard.clean_rule_parameters[ruleRow.modelData]
-                        // A click writes the box itself and would drop a plain binding; the
-                        // rows move as rules are added and searched, and the box would then
-                        // sit beside a different rule.
-                        Binding on checked {
-                            value: ruleRow.modelData < page.clipboard.clean_rule_enabled.length
-                                   && page.clipboard.clean_rule_enabled[ruleRow.modelData]
-                        }
-                        onToggled: page.clipboard.toggle_clean_rule(ruleRow.modelData, checked)
+                        on: ruleRow.modelData < page.clipboard.clean_rule_enabled.length
+                            && page.clipboard.clean_rule_enabled[ruleRow.modelData]
+                        onSwitched: (wanted) => page.clipboard.toggle_clean_rule(
+                            ruleRow.modelData, wanted)
                     }
 
                     IconButton {

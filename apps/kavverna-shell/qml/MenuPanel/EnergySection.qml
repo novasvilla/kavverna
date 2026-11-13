@@ -52,8 +52,9 @@ ColumnLayout {
 
             Toggle {
                 theme: section.theme
-                checked: section.hub.awake
-                onToggled: section.hub.toggle_awake()
+                text: "Keep awake"
+                on: section.hub.awake
+                onSwitched: section.hub.toggle_awake()
             }
         }
 
@@ -115,8 +116,8 @@ ColumnLayout {
         Tick {
             theme: section.theme
             text: "Let displays sleep"
-            checked: section.hub.allow_display_sleep
-            onToggled: section.hub.choose_display_sleep(checked)
+            on: section.hub.allow_display_sleep
+            onSwitched: (wanted) => section.hub.choose_display_sleep(wanted)
         }
     }
 }
