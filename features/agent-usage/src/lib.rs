@@ -1,12 +1,16 @@
-//! How much of each installed coding agent's allowance is used, read only from files the agents
-//! leave on this machine.
+//! How much of each installed coding agent's allowance is used, from files the agents leave on
+//! this machine and, for Claude Code, from the agent itself.
 //!
-//! Nothing here opens a network connection, reads a credential or asks a provider anything. The
-//! price of that is freshness: a reading is only as recent as the last time an agent wrote it
-//! down, so every window carries the moment it was observed, and a window whose reset time has
-//! passed is reported as expired instead of being guessed forward.
+//! Nothing here opens a network connection or reads a credential. Codex and OpenCode are read
+//! only from their files. Claude Code can also be asked for its `/usage` figures, which makes
+//! Claude Code, not Kavverna, contact its account with its own sign-in; see `claude_ask`.
+//!
+//! A file reading is only as recent as the last time an agent wrote it down, so every window
+//! carries the moment it was observed, and a window whose reset time has passed is reported as
+//! expired instead of being guessed forward.
 
 mod claude;
+mod claude_ask;
 mod codex;
 mod opencode;
 mod private_file;
@@ -14,6 +18,10 @@ mod private_file;
 pub use claude::{
     CACHE_FILE as CLAUDE_CACHE_FILE, STATUSBAR_FILE as CLAUDE_STATUSBAR_FILE, StatusLineLimits,
     StatusLineWindow, parse_status_line, record_status_line,
+};
+pub use claude_ask::{
+    ASK_EVERY, ASK_TIMEOUT, AskError, ClaudeAnswer, ask_again_after, ask_claude_code, ask_with,
+    claude_code_environment, find_claude_code_in, usage_command,
 };
 pub use opencode::TOTALS_SPAN;
 
@@ -23,6 +31,9 @@ use std::time::{Duration, SystemTime};
 /// A reading older than this is still the latest truth on disk, but the agent has not been used
 /// since, so the meter says so rather than presenting it as current.
 pub const STALE_AFTER: Duration = Duration::from_secs(10 * 60);
+
+const FIVE_HOUR_MINUTES: u32 = 5 * 60;
+const SEVEN_DAY_MINUTES: u32 = 7 * 24 * 60;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Agent {
@@ -104,6 +115,12 @@ pub struct Window {
     pub resets_at: Option<SystemTime>,
     pub observed_at: SystemTime,
     pub state: Freshness,
+    /// The model a cap applies to, as the provider names it, for a window that counts only that
+    /// model's use. `None` for a window over everything.
+    pub scope: Option<String>,
+    /// What the provider says about the window beyond its figure, such as how much of the
+    /// weekly limit a scoped cap may take.
+    pub note: Option<String>,
 }
 
 impl Window {
@@ -121,6 +138,8 @@ impl Window {
             resets_at,
             observed_at,
             state: Freshness::judge(observed_at, resets_at, now),
+            scope: None,
+            note: None,
         }
     }
 
@@ -151,14 +170,17 @@ pub struct TokenTotals {
 pub enum Usage {
     Allowance(Vec<Window>),
     Totals(TokenTotals),
-    /// The agent is installed but has left nothing readable yet. For Claude Code that means
-    /// neither Kavverna's passthrough nor `claude-statusbar` has seen an allowance.
+    /// The agent is installed but has left nothing readable yet. For Claude Code that means it
+    /// has not answered, and neither Kavverna's passthrough nor `claude-statusbar` has seen an
+    /// allowance.
     NoReading,
 }
 
-/// Where a reading came from, for an agent that can be read through more than one file.
+/// Where a reading came from, for an agent that can be read in more than one way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Source {
+    /// The installed Claude Code, asked for its `/usage` figures.
+    ClaudeCode,
     /// Kavverna's own status line passthrough.
     Kavverna,
     /// The copy the `claude-statusbar` tool keeps of the last status line document.
@@ -169,6 +191,7 @@ impl Source {
     /// Stable across releases, like [`Agent::id`].
     pub fn id(self) -> &'static str {
         match self {
+            Source::ClaudeCode => "claude-code-usage",
             Source::Kavverna => "kavverna",
             Source::ClaudeStatusbar => "claude-statusbar",
         }
@@ -182,6 +205,9 @@ pub struct AgentUsage {
     /// `None` for an agent read from its own files, which have only one place to be, and for
     /// [`Usage::NoReading`].
     pub source: Option<Source>,
+    /// Why asking the agent itself last failed, while it keeps failing. A reading from a file
+    /// can still stand beside it.
+    pub problem: Option<AskError>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -192,15 +218,54 @@ pub struct Snapshot {
 }
 
 /// Keeps what it learned from files that have not changed since, so reading every minute does
-/// not decompress the same closed Codex sessions each time.
+/// not decompress the same closed Codex sessions each time, and keeps Claude Code's last answer
+/// between the times it is asked.
 #[derive(Default)]
 pub struct UsageMeter {
     codex: codex::Rollouts,
+    claude_answer: Option<ClaudeAnswer>,
+    claude_problem: Option<AskError>,
 }
 
 impl UsageMeter {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Takes the outcome of [`ask_claude_code`] into the readings that follow. A failure leaves
+    /// the previous answer in place, to age like any other reading.
+    pub fn keep_claude_answer(&mut self, outcome: Result<ClaudeAnswer, AskError>) {
+        match outcome {
+            Ok(answer) => {
+                self.claude_answer = Some(answer);
+                self.claude_problem = None;
+            }
+            Err(problem) => self.claude_problem = Some(problem),
+        }
+    }
+
+    /// The answer is the fuller reading, with the caps scoped to one model, so it is preferred
+    /// while it is current, even over a status line file rewritten seconds later. Once it has
+    /// aged, whichever reading is newest wins.
+    fn claude_usage(&self, cache_dir: &Path, cache_home: &Path, now: SystemTime) -> AgentUsage {
+        let answer = self.claude_answer.as_ref();
+        let current =
+            answer.filter(|a| Freshness::judge(a.observed_at, None, now) == Freshness::Fresh);
+        let file = claude::latest(cache_dir, cache_home);
+        let (usage, source) = match (current, answer, file) {
+            (Some(answer), _, _) => {
+                (Usage::Allowance(answer.windows(now)), Some(Source::ClaudeCode))
+            }
+            (None, Some(answer), Some(file)) if answer.observed_at >= file.observed_at => {
+                (Usage::Allowance(answer.windows(now)), Some(Source::ClaudeCode))
+            }
+            (None, _, Some(file)) => (Usage::Allowance(file.windows(now)), Some(file.source)),
+            (None, Some(answer), None) => {
+                (Usage::Allowance(answer.windows(now)), Some(Source::ClaudeCode))
+            }
+            (None, None, None) => (Usage::NoReading, None),
+        };
+        AgentUsage { agent: Agent::ClaudeCode, usage, source, problem: self.claude_problem }
     }
 
     /// `data_dir` is the user's data home, where OpenCode keeps its database, `cache_home` is the
@@ -217,17 +282,7 @@ impl UsageMeter {
         let mut agents = Vec::new();
 
         if home.join(".claude").is_dir() {
-            let found = match claude::latest(cache_dir, cache_home) {
-                Some(reading) => AgentUsage {
-                    agent: Agent::ClaudeCode,
-                    usage: Usage::Allowance(reading.windows(now)),
-                    source: Some(reading.source),
-                },
-                None => {
-                    AgentUsage { agent: Agent::ClaudeCode, usage: Usage::NoReading, source: None }
-                }
-            };
-            agents.push(found);
+            agents.push(self.claude_usage(cache_dir, cache_home, now));
         }
 
         let codex_home = home.join(".codex");
@@ -236,7 +291,7 @@ impl UsageMeter {
                 Some(windows) => Usage::Allowance(windows),
                 None => Usage::NoReading,
             };
-            agents.push(AgentUsage { agent: Agent::Codex, usage, source: None });
+            agents.push(AgentUsage { agent: Agent::Codex, usage, source: None, problem: None });
         }
 
         let opencode_db = opencode::database(data_dir);
@@ -245,7 +300,7 @@ impl UsageMeter {
                 Some(totals) => Usage::Totals(totals),
                 None => Usage::NoReading,
             };
-            agents.push(AgentUsage { agent: Agent::OpenCode, usage, source: None });
+            agents.push(AgentUsage { agent: Agent::OpenCode, usage, source: None, problem: None });
         }
 
         Snapshot { taken_at: now, agents }
@@ -436,5 +491,85 @@ mod tests {
         std::fs::create_dir(home.path().join(".claude")).unwrap();
         let snapshot = discover_in(home.path(), home.path(), home.path(), cache.path(), at(1));
         assert_eq!(snapshot.agents[0].source, None);
+    }
+
+    fn answer_at(observed: u64) -> ClaudeAnswer {
+        let body = serde_json::json!({"rate_limits": {"limits": [
+            {"kind": "weekly_all", "group": "weekly", "percent": 70},
+            {"kind": "weekly_scoped", "group": "weekly", "percent": 95,
+             "scope": {"model": {"display_name": "Example Model"}}}
+        ]}});
+        claude_ask::parse_answer(&body, at(observed)).unwrap()
+    }
+
+    /// Home with Claude Code present and a statusbar copy stamped at `statusbar_at`.
+    fn claude_home(statusbar_at: u64) -> (tempfile::TempDir, tempfile::TempDir) {
+        let home = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        std::fs::create_dir(home.path().join(".claude")).unwrap();
+        let copy = home.path().join(CLAUDE_STATUSBAR_FILE);
+        std::fs::create_dir_all(copy.parent().unwrap()).unwrap();
+        std::fs::write(&copy, STATUSBAR_DOCUMENT).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&copy)
+            .unwrap()
+            .set_modified(at(statusbar_at))
+            .unwrap();
+        (home, cache)
+    }
+
+    fn claude_reading(meter: &mut UsageMeter, home: &Path, cache: &Path, now: u64) -> AgentUsage {
+        meter.read_in(home, home, home, cache, at(now)).agents.remove(0)
+    }
+
+    #[test]
+    fn a_current_answer_wins_over_a_newer_status_line_file() {
+        let (home, cache) = claude_home(1_799_990_029);
+        let mut meter = UsageMeter::new();
+        meter.keep_claude_answer(Ok(answer_at(1_799_990_000)));
+
+        let found = claude_reading(&mut meter, home.path(), cache.path(), 1_799_990_030);
+        assert_eq!(found.source, Some(Source::ClaudeCode));
+        let Usage::Allowance(windows) = found.usage else { panic!("no allowance") };
+        assert_eq!(windows[1].scope.as_deref(), Some("Example Model"));
+    }
+
+    #[test]
+    fn an_aged_answer_gives_way_to_a_newer_file() {
+        let (home, cache) = claude_home(1_799_990_900);
+        let mut meter = UsageMeter::new();
+        meter.keep_claude_answer(Ok(answer_at(1_799_990_000)));
+        let now = 1_799_990_000 + STALE_AFTER.as_secs() + 60;
+
+        let found = claude_reading(&mut meter, home.path(), cache.path(), now);
+        assert_eq!(found.source, Some(Source::ClaudeStatusbar));
+
+        // A file older than the aged answer does not replace it.
+        let (home, cache) = claude_home(1_799_989_000);
+        let found = claude_reading(&mut meter, home.path(), cache.path(), now);
+        assert_eq!(found.source, Some(Source::ClaudeCode));
+    }
+
+    #[test]
+    fn a_failure_is_reported_beside_the_last_answer() {
+        let home = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        std::fs::create_dir(home.path().join(".claude")).unwrap();
+        let mut meter = UsageMeter::new();
+
+        meter.keep_claude_answer(Err(AskError::NeedsSignIn));
+        let found = claude_reading(&mut meter, home.path(), cache.path(), 1_799_990_000);
+        assert_eq!((found.usage, found.problem), (Usage::NoReading, Some(AskError::NeedsSignIn)));
+
+        meter.keep_claude_answer(Ok(answer_at(1_799_990_000)));
+        meter.keep_claude_answer(Err(AskError::Unreachable));
+        let found = claude_reading(&mut meter, home.path(), cache.path(), 1_799_990_010);
+        assert_eq!(found.source, Some(Source::ClaudeCode));
+        assert_eq!(found.problem, Some(AskError::Unreachable));
+
+        meter.keep_claude_answer(Ok(answer_at(1_799_990_020)));
+        let found = claude_reading(&mut meter, home.path(), cache.path(), 1_799_990_030);
+        assert_eq!(found.problem, None);
     }
 }

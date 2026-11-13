@@ -4,7 +4,7 @@
 //! its own cache; a person who keeps another status line tool can still be read through the copy
 //! that tool leaves behind, and the meter takes whichever of the two saw the allowance last.
 
-use crate::{Source, Window, epoch_seconds, private_file};
+use crate::{FIVE_HOUR_MINUTES, SEVEN_DAY_MINUTES, Source, Window, epoch_seconds, private_file};
 use serde_json::{Value, json};
 use std::fs::File;
 use std::io::{self, Read};
@@ -12,9 +12,6 @@ use std::path::Path;
 use std::time::SystemTime;
 
 pub const CACHE_FILE: &str = "claude-rate-limits.json";
-
-const FIVE_HOUR_MINUTES: u32 = 5 * 60;
-const SEVEN_DAY_MINUTES: u32 = 7 * 24 * 60;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StatusLineWindow {

@@ -4,6 +4,27 @@ Kavverna has no network code. Not a disabled telemetry switch, not an update che
 turned off: no HTTP client is linked into the binary at all. You can check with
 `cargo tree | grep -iE 'reqwest|hyper|curl'` and get nothing back.
 
+## The AI agents utility and Claude Code
+
+While the panel is open, the AI agents utility can ask the Claude Code installed for your user
+how much of its allowance is used, at most once a minute and less often after a failure. It
+starts `claude` with no tools, no MCP servers, no hooks and no saved session, sends it the same
+request `/usage` makes, and stops it as soon as it answers. Claude Code then contacts Anthropic
+with its own sign-in, exactly as when you type `/usage`. No prompt is sent, so no model runs.
+
+Kavverna makes no network request for this and reads no credential. It removes Claude session
+markers and `ANTHROPIC_` variables from the environment it passes, so the sign-in used is the
+one Claude Code keeps, and carries over the telemetry opt-outs and proxy settings you keep in
+Claude Code's `settings.json`. From the answer it keeps only the percentages, reset times, the
+model a cap applies to and that cap's share of the weekly limit, in memory. Account, plan and
+spending details in the same answer are discarded and never logged.
+
+When the AI agents utility is not installed, Kavverna never starts Claude Code. When Claude Code
+cannot be asked, its allowance is read from files on this machine only: Kavverna's own status
+line record, or the copy the `claude-statusbar` tool leaves in
+`$XDG_CACHE_HOME/claude-statusbar/last_stdin.json`, of which only the rate limit windows are
+read.
+
 ## What is stored, and where
 
 | What | Where | Who can read it |
