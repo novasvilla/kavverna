@@ -164,7 +164,9 @@ impl Feature {
                 summary: "Make what was copied plain, laid out JSON or Markdown before pasting.",
                 group: Group::Clipboard,
                 icon: "edit-paste-style",
-                energy: EnergyProfile::Idle,
+                // It holds the clipboard connection open so a transform can read and replace
+                // what was copied, even with the history switched off.
+                energy: EnergyProfile::WatchesClipboard,
                 readiness: Readiness::Built,
                 enable_keys: &["clipboard-transform.enabled"],
             },
