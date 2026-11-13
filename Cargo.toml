@@ -6,6 +6,7 @@ members = [
     "desktop/kde-bridge",
     "domain/feature-catalog",
     "domain/preferences",
+    "features/agent-usage",
     "features/clipboard-history",
     "features/keep-awake",
     "features/link-cleaner",
@@ -56,6 +57,9 @@ image = "0.25.10"
 url = "2.5.8"
 directories = "6.0.0"
 tempfile = "3.27.0"
+# Codex keeps most of its session rollouts zstd-compressed. A pure Rust decoder keeps a C library
+# out of the build for the one thing it is used for.
+ruzstd = "0.9.1"
 
 # Tray. `blocking` layers a sync API over the default tokio backend, backed by ksni's own
 # private current-thread runtime. The tray therefore shares neither Qt's event loop nor our
@@ -75,6 +79,7 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 # Feature catalogue
 strum = "0.28.0"
 strum_macros = "0.28.0"
+agent-usage = { path = "features/agent-usage" }
 clipboard-history = { path = "features/clipboard-history" }
 app-identity = { path = "desktop/app-identity" }
 feature-catalog = { path = "domain/feature-catalog" }
