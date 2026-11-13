@@ -115,6 +115,13 @@ impl CpuTicks {
         Self { busy, idle }
     }
 
+    /// Every tick that passed across all cores, busy or not, since the earlier reading.
+    pub(crate) fn elapsed_since(self, earlier: Self) -> Option<u64> {
+        let busy = self.busy.checked_sub(earlier.busy)?;
+        let idle = self.idle.checked_sub(earlier.idle)?;
+        Some(busy + idle)
+    }
+
     /// `None` until a second reading exists, or when the counters have not moved.
     pub fn load_since(self, earlier: Self) -> Option<f32> {
         let busy = self.busy.checked_sub(earlier.busy)?;

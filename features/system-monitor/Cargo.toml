@@ -7,10 +7,13 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-nix = { workspace = true, features = ["fs"] }
+app-identity.workspace = true
+libc.workspace = true
+nix = { workspace = true, features = ["fs", "user", "feature"] }
 nvml-wrapper.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+zbus.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

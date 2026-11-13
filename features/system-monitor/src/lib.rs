@@ -1,22 +1,33 @@
 //! Reading what the machine is and what it is doing: the processor it names itself after, its
-//! load and speed, memory, graphics and temperatures.
+//! load and speed, memory, graphics and temperatures, and which applications are spending it.
 
 mod disk;
 mod graphics;
+mod listening;
 mod memory;
 mod network;
 mod nvidia;
+mod processes;
 mod processor;
 mod thermal;
 
 pub use disk::{DiskReading, DiskSampler, Volume};
 pub use graphics::{Gpu, GpuReading, GpuRole, GraphicsReading, SysfsCard, discover_sysfs_cards};
+pub use listening::{
+    Exposure, ListeningSocket, SocketHolder, Transport, listening_sockets, listening_sockets_in,
+};
 pub use memory::{
     CompressedSwap, MemoryPressure, MemoryReading, PressureLevel, discover_compressed_swap,
     parse_meminfo, parse_mm_stat, parse_pressure,
 };
 pub use network::{NetworkReading, NetworkSampler};
 pub use nvidia::NvidiaCards;
+pub use processes::{
+    Action, ActionReport, ApplicationKey, ApplicationUse, BASELINE_LIMIT, CardUse, CpuFold,
+    CpuShare, CpuWeight, DiskFold, DiskRate, GraphicsFold, Member, MemoryBasis, MemoryFold,
+    MemoryUse, Outcome, PriorityError, ProcessCard, ProcessControl, ProcessKey, ProcessSampler,
+    Reading, Refusal,
+};
 pub use processor::{CpuTicks, Processor, ProcessorTicks, parse_stat};
 pub use thermal::{Sensor, Thermometer, parse_label};
 
