@@ -39,4 +39,7 @@ that inspired it.
 
 ## People
 
+Ian designed the Kavverna logo and the app icon drawn from it, and the tray mark is its
+silhouette.
+
 Thanks to Ian Ponce for his early feedback on this software.
